@@ -82,13 +82,18 @@ To learn more about React Native, take a look at the following resources:
 
 •	buildToolsVersion = "34.0.0"
 → Android Build Tools 34.0.0 사용
+
 •	minSdkVersion = 23
 → Android 6.0 (API 23) 이상 기기에서 앱 실행 가능
+
 •	compileSdkVersion = 34
 → 앱을 Android 14 (API 34) 기준으로 컴파일
+
 •	targetSdkVersion = 34
 → 앱이 Android 14 (API 34) 버전에 맞춰 최적화됨
+
 •	ndkVersion = "26.1.10909125"
 → NDK 26.1.10909125 버전 사용 (C/C++ 네이티브 빌드)
+
 •	kotlinVersion = "1.9.24"
 → Kotlin 1.9.24 버전 사용 (Kotlin 코드가 있을 경우)
