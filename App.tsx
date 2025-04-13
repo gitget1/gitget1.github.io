@@ -1,24 +1,22 @@
 import React from 'react';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import AppNavigator from './src/navigations/AppNavigator';
 import { NavigationContainer } from '@react-navigation/native';
-import RootNavigator from './src/navigations/root/RootNavigator';
-import { QueryClientProvider } from '@tanstack/react-query';
-import queryClient from './src/api/queryClient';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
+const queryClient = new QueryClient();
 
-
-function App() {
- 
-
-
+export default function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <NavigationContainer>
-        <RootNavigator/>
-      </NavigationContainer>
-    </QueryClientProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <SafeAreaProvider>
+        <QueryClientProvider client={queryClient}>
+          <NavigationContainer>
+            <AppNavigator />
+          </NavigationContainer>
+        </QueryClientProvider>
+      </SafeAreaProvider>
+    </GestureHandlerRootView>
   );
 }
-
-
-
-export default App;
