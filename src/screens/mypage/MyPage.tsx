@@ -1,4 +1,4 @@
-import React, {useState} from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -11,15 +11,16 @@ import {
   TextInput,
   Alert,
 } from 'react-native';
-import {launchCamera, launchImageLibrary} from 'react-native-image-picker';
-import {useNavigation} from '@react-navigation/native';
-import type {StackNavigationProp} from '@react-navigation/stack';
+import { launchCamera, launchImageLibrary } from 'react-native-image-picker';
+import { useNavigation } from '@react-navigation/native';
+import type { StackNavigationProp } from '@react-navigation/stack';
 
 // RootStackParamList 정의
 type RootStackParamList = {
   MyPage: undefined;
-  Question: undefined;
+  QuestionScreen: undefined;
   Result: undefined;
+  MakeProgram: undefined;
 };
 
 const MainScreen = () => {
@@ -37,7 +38,7 @@ const MainScreen = () => {
   const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
 
   const pickImage = () => {
-    launchImageLibrary({mediaType: 'photo'}, response => {
+    launchImageLibrary({ mediaType: 'photo' }, response => {
       if (response.assets && response.assets.length > 0) {
         setProfileImage(response.assets[0].uri || null);
         setShowModal(false);
@@ -46,7 +47,7 @@ const MainScreen = () => {
   };
 
   const takePhoto = () => {
-    launchCamera({mediaType: 'photo'}, response => {
+    launchCamera({ mediaType: 'photo' }, response => {
       if (response.assets && response.assets.length > 0) {
         setProfileImage(response.assets[0].uri || null);
         setShowModal(false);
@@ -189,7 +190,11 @@ const MainScreen = () => {
   };
 
   const goToTest = () => {
-    navigation.navigate('Question');
+    navigation.navigate('QuestionScreen');
+  };
+
+  const goToMakeProgram = () => {
+    navigation.navigate('MakeProgram');
   };
 
   return (
@@ -199,7 +204,7 @@ const MainScreen = () => {
           <Image
             source={
               profileImage
-                ? {uri: profileImage}
+                ? { uri: profileImage }
                 : require('../../assets/default.png')
             }
             style={styles.profileCircle}
@@ -212,7 +217,7 @@ const MainScreen = () => {
         <TouchableOpacity style={styles.tabButton} onPress={goToTest}>
           <Text>성향테스트 하러 가기</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.tabButton}>
+        <TouchableOpacity style={styles.tabButton} onPress={goToMakeProgram}>
           <Text>프로그램 작성하러 가기</Text>
         </TouchableOpacity>
       </View>

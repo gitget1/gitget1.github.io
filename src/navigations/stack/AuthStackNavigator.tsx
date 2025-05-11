@@ -81,11 +81,7 @@ function AuthStackNavigator({ navigationOverride }: AuthStackNavigatorProps) {
         name={authNavigations.HOME}
         component={MainHomeScreen}
         options={{
-          headerTitle: 'TravelLocal',
-          headerTitleStyle: {
-            fontSize: 24,
-          },
-          headerTitleAlign: 'center',
+          headerShown: false,
         }}
       />
     </Stack.Navigator>

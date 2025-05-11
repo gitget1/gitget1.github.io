@@ -5,7 +5,7 @@ const authNavigations = {
   KAKAO: 'kakao',
   NAVER: 'naver',
   GOOGLE: 'goolge',
-  HOME: 'home',
+  HOME: 'MainHome',
 } as const;
 
 

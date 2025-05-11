@@ -1,5 +1,5 @@
 import React from 'react';
-import {Dimensions, Pressable, StyleSheet, Text, View} from 'react-native';
+import { Dimensions, Pressable, StyleSheet, Text, View } from 'react-native';
 import { colors } from '../../constants';
 
 interface DateBoxProps {
@@ -36,7 +36,7 @@ function DateBox({ date, selectedDate, hasSchedule, onPressDate, isToday }: Date
               {date}
             </Text>
           </View>
-          {hasSchedule && <View style={styles.scheduleIndicator}/>}
+          {/* {hasSchedule && <View style={styles.scheduleIndicator}/>} */}
         </>
       )}
     </Pressable>
@@ -57,15 +57,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     width: 28,
     height: 28,
-    borderRadius: 28,
+    borderRadius: 14,
   },
   selectedContainer: {
     backgroundColor: colors.BLACK,
-    
   },
   dateText: {
     fontSize: 17,
     color: colors.BLACK,
+    textAlign: 'center',
+    lineHeight: 28,
   },
   selectedDateText: {
     color: colors.WHITE,

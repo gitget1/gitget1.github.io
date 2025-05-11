@@ -4,9 +4,9 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 
 // 화면 컴포넌트들 import
-import MainHomeScreen from './MainHomeScreen';
-import CalendarScreen from '../calendar/CalendarScreen';
-import Mypage from '../mypage/MyPage';
+import MainHomeScreen from '../screens/auth/MainHomeScreen';
+import CalendarScreen from '../screens/calendar/CalendarScreen';
+import Mypage from '../screens/mypage/MyPage';
 
 const Tab = createBottomTabNavigator();
 
@@ -27,9 +27,9 @@ const BottomTabNavigator = () => {
       })}
     >
       <Tab.Screen
-        name="홈"
+        name="TravelLocal"
         component={MainHomeScreen}
-        options={{ tabBarLabel: () => <Text>홈</Text> }} // ✅ 수정
+        options={{ tabBarLabel: () => <Text>홈</Text>, headerShown: false }} // ✅ 헤더 숨김
       />
       <Tab.Screen
         name="캘린더"
