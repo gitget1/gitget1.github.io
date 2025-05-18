@@ -184,6 +184,8 @@ const MainScreen = () => {
         return <Text>여기에 예약 요청 리스트 표시</Text>;
       case '1:1 문의':
         return <Text>여기에 1:1 문의 내용 표시</Text>;
+      case '마이리뷰':
+        return <Text>여기에 내 리뷰 내역 표시</Text>;
       default:
         return <Text>선택된 항목이 없습니다.</Text>;
     }
@@ -215,10 +217,10 @@ const MainScreen = () => {
 
       <View style={styles.tabContainer}>
         <TouchableOpacity style={styles.tabButton} onPress={goToTest}>
-          <Text>성향테스트 하러 가기</Text>
+          <Text style={styles.tabButtonText}>성향테스트 하러 가기</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.tabButton} onPress={goToMakeProgram}>
-          <Text>프로그램 작성하러 가기</Text>
+          <Text style={styles.tabButtonText}>프로그램 작성하러 가기</Text>
         </TouchableOpacity>
       </View>
 
@@ -233,6 +235,7 @@ const MainScreen = () => {
             '관광 프로그램 Helper',
             '예약 요청 목록 리스트',
             '1:1 문의',
+            '마이 리뷰',
           ].map(item => (
             <TouchableOpacity
               key={item}
@@ -294,13 +297,25 @@ const styles = StyleSheet.create({
   tabContainer: {
     flexDirection: 'row',
     marginHorizontal: 10,
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 10,
   },
   tabButton: {
     flex: 1,
-    padding: 10,
+    minWidth: '30%',
+    padding: 12,
     borderWidth: 1,
-    borderColor: '#aaa',
+    borderColor: '#0288d1',
+    borderRadius: 8,
     alignItems: 'center',
+    backgroundColor: '#fff',
+    marginBottom: 8,
+  },
+  tabButtonText: {
+    color: '#0288d1',
+    fontSize: 14,
+    fontWeight: '500',
   },
   body: {
     flex: 1,

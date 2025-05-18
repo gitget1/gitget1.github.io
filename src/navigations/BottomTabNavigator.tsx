@@ -7,6 +7,8 @@ import Ionicons from 'react-native-vector-icons/Ionicons';
 import MainHomeScreen from '../screens/auth/MainHomeScreen';
 import CalendarScreen from '../screens/calendar/CalendarScreen';
 import Mypage from '../screens/mypage/MyPage';
+import ChatStackNavigator from './stack/ChatStackNavigator';
+import WishlistScreen from '../screens/wishlist/WishlistScreen';
 
 const Tab = createBottomTabNavigator();
 
@@ -18,6 +20,8 @@ const BottomTabNavigator = () => {
           let iconName = 'home';
           if (route.name === '홈') iconName = 'home';
           else if (route.name === '캘린더') iconName = 'calendar';
+          else if (route.name === '채팅') iconName = 'chatbubbles';
+          else if (route.name === '위시리스트') iconName = 'heart';
           else if (route.name === '마이페이지') iconName = 'person';
 
           return <Ionicons name={iconName} size={size} color={color} />;
@@ -27,19 +31,29 @@ const BottomTabNavigator = () => {
       })}
     >
       <Tab.Screen
-        name="TravelLocal"
+        name="홈"
         component={MainHomeScreen}
-        options={{ tabBarLabel: () => <Text>홈</Text>, headerShown: false }} // ✅ 헤더 숨김
+        options={{ tabBarLabel: () => <Text>홈</Text>, headerShown: false }}
       />
       <Tab.Screen
         name="캘린더"
         component={CalendarScreen}
-        options={{ tabBarLabel: () => <Text>캘린더</Text> }} // ✅ 수정
+        options={{ tabBarLabel: () => <Text>캘린더</Text> }}
+      />
+      <Tab.Screen
+        name="채팅"
+        component={ChatStackNavigator}
+        options={{ tabBarLabel: () => <Text>채팅</Text>, headerShown: false }}
+      />
+      <Tab.Screen
+        name="위시리스트"
+        component={WishlistScreen}
+        options={{ tabBarLabel: () => <Text>위시리스트</Text> }}
       />
       <Tab.Screen
         name="마이페이지"
         component={Mypage}
-        options={{ tabBarLabel: () => <Text>마이페이지</Text> }} // ✅ 수정
+        options={{ tabBarLabel: () => <Text>마이페이지</Text> }}
       />
     </Tab.Navigator>
   );

@@ -11,15 +11,9 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { AppStackParamList } from '../../navigations/AppNavigator';
 
-type RootStackParamList = {
-  FunctionStack: {
-    screen: 'Test' | 'TourByPreference' | 'TourByRegion' | 'TodayRecommend';
-  };
-  QuestionScreen: undefined;
-};
-
-type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
+type NavigationProp = NativeStackNavigationProp<AppStackParamList>;
 
 const { width } = Dimensions.get('window');
 
@@ -35,10 +29,13 @@ const MainHomeScreen = () => {
   // 이미지 슬라이드 관련 상태 및 애니메이션
   const [currentIndex, setCurrentIndex] = useState(0);
   const translateX = useRef(new Animated.Value(width)).current;
+  const dotPosition = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     const animate = () => {
       translateX.setValue(width);
+      
+      // 이미지 슬라이드 애니메이션
       Animated.timing(translateX, {
         toValue: 0,
         duration: 700,
@@ -52,32 +49,73 @@ const MainHomeScreen = () => {
           }).start(() => {
             setCurrentIndex((prev) => (prev + 1) % images.length);
           });
-        }, 5000); // 3초간 이미지 고정
+        }, 5000);
       });
+
+      // 점 애니메이션
+      Animated.spring(dotPosition, {
+        toValue: currentIndex,
+        tension: 50,
+        friction: 8,
+        useNativeDriver: true,
+      }).start();
     };
     animate();
-  }, [currentIndex, translateX]);
+  }, [currentIndex, translateX, dotPosition]);
 
   const handleTest = () => {
     navigation.navigate('QuestionScreen');
   };
 
-  const handleTourByPreference = () => {
-    navigation.navigate('FunctionStack', { screen: 'TourByPreference' });
+  const handleTraitSelection = () => {
+    navigation.navigate('TraitSelection');
   };
 
   const handleTourByRegion = () => {
-    navigation.navigate('FunctionStack', { screen: 'TourByRegion' });
+    navigation.navigate('Practice');
   };
 
   const handleTodayRecommend = () => {
     navigation.navigate('FunctionStack', { screen: 'TodayRecommend' });
   };
 
+  const renderDots = () => {
+    return (
+      <View style={styles.dotsContainer}>
+        {images.map((_, index) => (
+          <View
+            key={index}
+            style={[
+              styles.dot,
+              {
+                backgroundColor: index === currentIndex ? '#0288d1' : '#D9D9D9',
+              },
+            ]}
+          />
+        ))}
+        <Animated.View
+          style={[
+            styles.activeDot,
+            {
+              transform: [
+                {
+                  translateX: dotPosition.interpolate({
+                    inputRange: [0, 1, 2],
+                    outputRange: [0, 24, 48], // 점 사이의 간격에 따라 조정
+                  }),
+                },
+              ],
+            },
+          ]}
+        />
+      </View>
+    );
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       {/* 이미지 슬라이드 */}
-      <View style={{ alignItems: 'center', marginTop: 90, marginBottom: 30 }}>
+      <View style={{ alignItems: 'center', marginTop: 90, marginBottom: 10 }}>
         <Animated.View style={{ transform: [{ translateX }], width: 320, height: 180, borderRadius: 16, overflow: 'hidden' }}>
           <Image
             source={images[currentIndex]}
@@ -85,7 +123,9 @@ const MainHomeScreen = () => {
             resizeMode="cover"
           />
         </Animated.View>
+        {renderDots()}
       </View>
+
       {/* 기존 버튼 UI */}
       <View style={styles.buttonContainer}>
         <View style={styles.buttonRow}>
@@ -98,7 +138,7 @@ const MainHomeScreen = () => {
 
           <TouchableOpacity
             style={[styles.customButton, { backgroundColor: '#27ae60' }]}
-            onPress={handleTourByPreference}
+            onPress={handleTraitSelection}
           >
             <Text style={styles.buttonText}>나의 성향으로 관광 정하기</Text>
           </TouchableOpacity>
@@ -152,6 +192,27 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     fontSize: 14,
     textAlign: 'center',
+  },
+  dotsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 16,
+    height: 8,
+  },
+  dot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginHorizontal: 8,
+  },
+  activeDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#0288d1',
+    position: 'absolute',
+    left: 8, // 첫 번째 점의 위치
   },
 });
 

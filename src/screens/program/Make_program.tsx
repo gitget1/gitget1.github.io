@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { StyleSheet, View, Text, TextInput, TouchableOpacity, Button, Image, ScrollView } from 'react-native';
+import { StyleSheet, View, Text, TextInput, TouchableOpacity, Button, Image, ScrollView, Alert } from 'react-native';
+import { launchImageLibrary } from 'react-native-image-picker';
 // import MapView, { Marker } from 'react-native-maps';
 
 interface DayPlan {
@@ -18,16 +19,22 @@ function Make_program() {
   const [days, setDays] = useState<DaySchedule[]>([{ plans: [] }]);
   const [selectedDay, setSelectedDay] = useState(0);
   const [plan, setPlan] = useState<DayPlan>({ place: '', memo: '' });
-  const [region, setRegion] = useState({
-    latitude: 37.5665,
-    longitude: 126.9780,
-    latitudeDelta: 0.01,
-    longitudeDelta: 0.01,
-  });
 
-  // 썸네일(사진) 추가 (기본 구조, 실제 구현은 추후)
-  const handlePickThumbnail = () => {
-    // TODO: 이미지 선택 구현
+  // 썸네일(사진) 추가
+  const handlePickThumbnail = async () => {
+    try {
+      const result = await launchImageLibrary({
+        mediaType: 'photo',
+        quality: 1,
+        selectionLimit: 1,
+      });
+
+      if (result.assets && result.assets[0]?.uri) {
+        setThumbnail(result.assets[0].uri);
+      }
+    } catch (error) {
+      Alert.alert('오류', '이미지를 선택하는 중 오류가 발생했습니다.');
+    }
   };
 
   // Day 추가
@@ -62,9 +69,12 @@ function Make_program() {
       <View style={styles.topRow}>
         <TouchableOpacity style={styles.thumbnailBox} onPress={handlePickThumbnail}>
           {thumbnail ? (
-            <Image source={{ uri: thumbnail }} style={styles.thumbnailImg} />
+            <Image source={{ uri: thumbnail }} style={styles.thumbnailImg} resizeMode="cover" />
           ) : (
-            <Text style={{ color: '#888' }}>사진추가</Text>
+            <View style={styles.thumbnailPlaceholder}>
+              <Text style={styles.thumbnailText}>사진추가</Text>
+              <Text style={styles.thumbnailSubText}>클릭하여 선택</Text>
+            </View>
           )}
         </TouchableOpacity>
         <View style={styles.titleBox}>
@@ -151,18 +161,34 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   thumbnailBox: {
-    width: 80,
-    height: 80,
-    backgroundColor: '#eee',
+    width: 100,
+    height: 100,
+    backgroundColor: '#f0f0f0',
     borderRadius: 8,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 15,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#ddd',
   },
   thumbnailImg: {
-    width: 80,
-    height: 80,
+    width: '100%',
+    height: '100%',
     borderRadius: 8,
+  },
+  thumbnailPlaceholder: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  thumbnailText: {
+    color: '#666',
+    fontSize: 16,
+    marginBottom: 4,
+  },
+  thumbnailSubText: {
+    color: '#999',
+    fontSize: 12,
   },
   titleBox: {
     flex: 1,

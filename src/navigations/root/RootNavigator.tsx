@@ -19,6 +19,7 @@ import MainScreen from '../../screens/mypage/MyPage';
 import QuestionScreen from '../../screens/mbti/QuestionScreen';
 import ResultScreen from '../../screens/mbti/ResultScreen';
 import Make_program from '../../screens/program/Make_program';
+import Practice from '../../screens/auth/Practice';
 
 // 스택 네비게이터 타입 정의
 export type RootStackParamList = {
@@ -28,9 +29,10 @@ export type RootStackParamList = {
   TourByRegion: undefined;
   TodayRecommendation: undefined;
   MyPage: undefined;
-  Question: undefined;
+  QuestionScreen: undefined;
   Result: { result: any };
   MakeProgram: undefined;
+  Practice: undefined;
 };
 
 const Stack = createStackNavigator<RootStackParamList>();
@@ -45,7 +47,7 @@ const AppNavigator = () => {
           options={{ title: '마이페이지' }}
         />
         <Stack.Screen
-          name="Question"
+          name="QuestionScreen"
           component={QuestionScreen}
           options={{ title: '성향 테스트' }}
         />
@@ -58,6 +60,11 @@ const AppNavigator = () => {
           name="MakeProgram"
           component={Make_program}
           options={{ title: '프로그램 작성하기' }}
+        />
+        <Stack.Screen
+          name="Practice"
+          component={Practice}
+          options={{ title: '지역 설정' }}
         />
       </Stack.Navigator>
     </NavigationContainer>
