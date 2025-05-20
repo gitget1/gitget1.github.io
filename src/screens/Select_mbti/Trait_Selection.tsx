@@ -25,7 +25,7 @@ const TraitDropdown = () => {
 
   useEffect(() => {
     axios
-      .get('http://10.0.2.2:8000/get_mbti_by_token')
+      .get('http://10.0.2.2:8003/get_mbti_by_token')
       .then(res => setMbtiList(res.data))
       .catch(err => console.error('MBTI 불러오기 오류:', err));
   }, []);

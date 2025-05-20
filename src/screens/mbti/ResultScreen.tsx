@@ -9,15 +9,50 @@ import {
   Alert,
 } from 'react-native';
 import axios from 'axios';
-import { AppStackScreenProps } from '../../navigations/AppNavigator';
+import {AppStackScreenProps} from '../../navigations/AppNavigator';
 
-export default function ResultScreen({route, navigation}: AppStackScreenProps<'Result'>) {
+export default function ResultScreen({
+  route,
+  navigation,
+}: AppStackScreenProps<'Result'>) {
   const {result} = route.params;
-  const userName = '여행자(name)';
+  const userName = '홍길동'; // Replace with actual user name
   const [selectedFeedback, setSelectedFeedback] = useState<string | null>(null);
 
-  const handleSave = () => {
-    Alert.alert('저장', 'MBTI 분석 결과가 Save_MBTI API로 전송될 예정입니다.');
+  const handleSave = async () => {
+    try {
+      // 예시 데이터: 실제로는 result에서 꺼내서 전달해야 함
+      const payload = {
+        mbti: result.mbti,
+        tags: result.tags,
+        recommended_regions: result.recommended_regions,
+      };
+
+      const response = await axios.post(
+        'http://10.0.2.2:8003/save_mbti',
+        payload,
+        {
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        },
+      );
+
+      if (response.status === 200) {
+        Alert.alert(
+          '✅ 저장 성공',
+          'MBTI 분석 결과가 성공적으로 저장되었습니다.',
+        );
+      } else {
+        Alert.alert('⚠️ 저장 실패', '서버 응답이 올바르지 않습니다.');
+      }
+    } catch (error: any) {
+      console.error('MBTI 저장 실패:', error);
+      Alert.alert(
+        '❌ 저장 실패',
+        error?.response?.data?.detail || '서버 오류가 발생했습니다.',
+      );
+    }
   };
 
   const handleSubmitFeedback = async () => {
@@ -61,7 +96,7 @@ export default function ResultScreen({route, navigation}: AppStackScreenProps<'R
   return (
     <ScrollView contentContainerStyle={styles.container}>
       <View style={styles.headerWrapper}>
-        <Text style={styles.headerEmoji}>🌈 {userName}님의</Text>
+        <Text style={styles.headerEmoji}>{userName}님의</Text>
         <Text style={styles.title}>여행 성향 분석 결과</Text>
       </View>
 
@@ -151,7 +186,7 @@ const styles = StyleSheet.create({
   container: {
     flexGrow: 1,
     padding: 20,
-    backgroundColor: '#e0f7fa',
+    backgroundColor: '#f0f9ff',
     alignItems: 'center',
   },
   headerWrapper: {

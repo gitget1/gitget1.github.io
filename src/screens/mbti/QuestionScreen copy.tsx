@@ -136,7 +136,6 @@ export default function QuestionScreen({navigation}: Props) {
     </ScrollView>
   );
 }
-// 생략된 import, 타입 등은 그대로 사용
 
 const styles = StyleSheet.create({
   container: {
@@ -144,69 +143,66 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: 24,
-    backgroundColor: '#f0f9ff', // 🔵 메인화면 톤에 맞춘 하늘색
+    backgroundColor: '#e0f7fa',
   },
   pageTitle: {
-    fontSize: 24,
+    fontSize: 26,
     fontWeight: 'bold',
-    color: '#2196F3', // 🔵 포인트 컬러
-    marginBottom: 20,
+    color: '#0288d1',
+    marginBottom: 12,
     textAlign: 'center',
   },
   card: {
-    backgroundColor: '#ffffff',
-    borderRadius: 20,
+    backgroundColor: '#fff',
+    borderRadius: 16,
     padding: 24,
     width: '100%',
     shadowColor: '#000',
-    shadowOffset: {width: 0, height: 3},
+    shadowOffset: {width: 0, height: 2},
     shadowOpacity: 0.1,
-    shadowRadius: 5,
-    elevation: 4,
+    shadowRadius: 4,
+    elevation: 3,
   },
   subtitle: {
     fontSize: 14,
-    color: '#888',
+    color: '#666',
     marginBottom: 10,
     textAlign: 'center',
   },
   question: {
     fontSize: 18,
-    marginBottom: 24,
+    marginBottom: 30,
     textAlign: 'center',
-    color: '#333',
     lineHeight: 26,
+    color: '#333',
   },
   loadingText: {
     marginTop: 10,
     fontSize: 16,
-    color: '#555',
     textAlign: 'center',
   },
   buttonGroup: {
     width: '100%',
+    alignItems: 'center',
     marginBottom: 20,
   },
   optionButton: {
-    backgroundColor: '#BBDEFB',
+    backgroundColor: '#4fc3f7',
     paddingVertical: 14,
     paddingHorizontal: 20,
     borderRadius: 12,
     marginBottom: 12,
     width: '100%',
-    borderWidth: 1,
-    borderColor: '#2196F3',
-  },
-  optionSelected: {
-    backgroundColor: '#2196F3',
   },
   optionText: {
+    color: '#fff',
     fontSize: 16,
-    color: '#0d47a1',
     textAlign: 'center',
   },
+  optionSelected: {
+    backgroundColor: '#0288d1',
+  },
   optionTextSelected: {
-    color: '#fff',
     fontWeight: 'bold',
   },
   prevButton: {
@@ -214,7 +210,7 @@ const styles = StyleSheet.create({
     marginTop: 12,
   },
   prevButtonText: {
-    color: '#1976D2',
+    color: '#0288d1',
     fontSize: 14,
   },
 });

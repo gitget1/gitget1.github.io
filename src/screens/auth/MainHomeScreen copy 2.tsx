@@ -96,7 +96,7 @@ const MainHomeScreen = () => {
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        {/* 🔍 검색창 */}
+        {/* 🔍 검색 영역 */}
         <View style={styles.searchContainer}>
           <Text style={styles.searchEmoji}>🔍</Text>
           <Text style={styles.searchText}>검색을 시작해 보세요</Text>
@@ -135,19 +135,19 @@ const MainHomeScreen = () => {
               icon: '📍',
               label: '나의 성향 관광',
               action: handleTraitSelection,
-              bg: '#C8E6C9',
+              bg: '#E8F5E9',
             },
             {
               icon: '🗺️',
               label: '지역 설정 관광',
               action: handleTourByRegion,
-              bg: '#FFE0B2',
+              bg: '#FFF3E0',
             },
             {
               icon: '🌟',
               label: '오늘의 추천',
               action: handleTodayRecommend,
-              bg: '#FFCDD2',
+              bg: '#FFEBEE',
             },
           ].map((item, index) => (
             <TouchableOpacity
@@ -159,18 +159,16 @@ const MainHomeScreen = () => {
             </TouchableOpacity>
           ))}
         </View>
-
-        {/* 📍 위치 기반 추천 박스 */}
+        {/* ✅ 위치 기반 추천 박스 */}
         <View style={styles.tipBox}>
           <Text style={styles.tipTitle}>📍 현재 위치: 서울</Text>
           <Text style={styles.tipSub}>☀️ 맑음, 22℃ | 한강 산책 어때요?</Text>
         </View>
 
-        {/* 📢 이벤트 정보 박스 */}
-        <View style={styles.eventBox}>
-          <Text style={styles.eventTitle}>📢 이벤트</Text>
-          <Text style={styles.eventDescription}>
-            🎉 5월 한정! 성향 분석하면 굿즈 추첨 이벤트에 참여해보세요.
+        {/* ✅ 이벤트 배너 박스 */}
+        <View style={styles.bannerBox}>
+          <Text style={styles.bannerText}>
+            🎉 5월 한정! 성향 분석하면 굿즈 추첨!
           </Text>
         </View>
       </ScrollView>
@@ -185,6 +183,42 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingBottom: 60,
+  },
+  tipBox: {
+    marginTop: 10,
+    marginHorizontal: 20,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    backgroundColor: '#E3F2FD',
+    borderRadius: 12,
+  },
+  tipTitle: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#0277bd',
+    marginBottom: 4,
+  },
+  tipSub: {
+    fontSize: 13,
+    color: '#333',
+  },
+  bannerBox: {
+    marginTop: 14,
+    marginHorizontal: 20,
+    backgroundColor: '#FFF9C4',
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 1},
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  bannerText: {
+    fontSize: 14,
+    color: '#795548',
+    fontWeight: '600',
   },
   searchContainer: {
     marginTop: 20,
@@ -260,48 +294,6 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
     color: '#333',
-  },
-  tipBox: {
-    marginTop: 24,
-    marginHorizontal: 20,
-    backgroundColor: '#e1f5fe',
-    borderRadius: 12,
-    padding: 16,
-    flexDirection: 'column',
-    gap: 4,
-  },
-  tipTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#0277bd',
-  },
-  tipSub: {
-    fontSize: 15,
-    color: '#37474f',
-  },
-  eventBox: {
-    marginTop: 24,
-    marginHorizontal: 20,
-    backgroundColor: '#FFF8E1',
-    borderRadius: 12,
-    paddingVertical: 16,
-    paddingHorizontal: 20,
-    shadowColor: '#000',
-    shadowOffset: {width: 0, height: 2},
-    shadowOpacity: 0.05,
-    shadowRadius: 3,
-    elevation: 2,
-  },
-  eventTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#F57C00',
-    marginBottom: 6,
-  },
-  eventDescription: {
-    fontSize: 14,
-    color: '#4E342E',
-    lineHeight: 20,
   },
 });
 
