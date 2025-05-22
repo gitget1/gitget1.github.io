@@ -8,7 +8,7 @@ import QuestionScreen from '../screens/mbti/QuestionScreen';
 import Make_program from '../screens/program/Make_program';
 import TraitSelection from '../screens/Select_mbti/Trait_Selection';
 import ResultScreen from '../screens/mbti/ResultScreen';
-import Practice from '../screens/practice/Practice.tsx';
+import Practice from '../screens/practice/Practice';
 import {NativeStackScreenProps} from '@react-navigation/native-stack';
 
 export type AppStackParamList = {

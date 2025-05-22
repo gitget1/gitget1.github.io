@@ -26,6 +26,58 @@ const mockReviews = [
     tags: ['한옥마을', '전통여행', '맛집투어'],
     images: [],
   },
+  {
+    name: '하늘이',
+    count: 12,
+    avg: 4.9,
+    avatar: 'https://via.placeholder.com/36x36.png?text=😀',
+    date: '2024-06-20',
+    text: '바다 전망이 정말 환상적이었어요! 사진으로는 담기지 않는 감동🥺🌊',
+    tags: ['제주도', '오션뷰숙소', '힐링여행'],
+    images: [
+      'https://via.placeholder.com/120x120.png?text=🌊1',
+      'https://via.placeholder.com/120x120.png?text=🌊2',
+    ],
+  },
+  {
+    name: '하늘이',
+    count: 12,
+    avg: 4.9,
+    avatar: 'https://via.placeholder.com/36x36.png?text=😀',
+    date: '2024-06-20',
+    text: '바다 전망이 정말 환상적이었어요! 사진으로는 담기지 않는 감동🥺🌊',
+    tags: ['제주도', '오션뷰숙소', '힐링여행'],
+    images: [
+      'https://via.placeholder.com/120x120.png?text=🌊1',
+      'https://via.placeholder.com/120x120.png?text=🌊2',
+    ],
+  },
+  {
+    name: '하늘이',
+    count: 12,
+    avg: 4.9,
+    avatar: 'https://via.placeholder.com/36x36.png?text=😀',
+    date: '2024-06-20',
+    text: '바다 전망이 정말 환상적이었어요! 사진으로는 담기지 않는 감동🥺🌊',
+    tags: ['제주도', '오션뷰숙소', '힐링여행'],
+    images: [
+      'https://via.placeholder.com/120x120.png?text=🌊1',
+      'https://via.placeholder.com/120x120.png?text=🌊2',
+    ],
+  },
+  {
+    name: '하늘이',
+    count: 12,
+    avg: 4.9,
+    avatar: 'https://via.placeholder.com/36x36.png?text=😀',
+    date: '2024-06-20',
+    text: '바다 전망이 정말 환상적이었어요! 사진으로는 담기지 않는 감동🥺🌊',
+    tags: ['제주도', '오션뷰숙소', '힐링여행'],
+    images: [
+      'https://via.placeholder.com/120x120.png?text=🌊1',
+      'https://via.placeholder.com/120x120.png?text=🌊2',
+    ],
+  },
 ];
 
 const ratingData = [
@@ -107,10 +159,12 @@ export default function ReviewScreen() {
             <Image source={{uri: review.avatar}} style={styles.avatar} />
             <View>
               <Text style={styles.nickname}>{review.name}</Text>
-              <Text style={styles.smallText}>{renderStars(review.avg)}</Text>
+              <View style={styles.metaRow}>
+                <Text style={styles.smallText}>{renderStars(review.avg)}</Text>
+                <Text style={styles.date}>{review.date}</Text>
+              </View>
             </View>
           </View>
-          <Text style={styles.date}>{review.date}</Text>
           <Text style={styles.content}>{review.text}</Text>
           <View style={styles.tagBox}>
             {review.tags.map((tag, j) => (
@@ -210,7 +264,8 @@ const styles = StyleSheet.create({
   },
   reviewCard: {
     padding: 16,
-    borderBottomWidth: 1,
+    // borderBottomWidth: 1,
+    marginTop: 12,
     borderColor: '#eee',
   },
   profileRow: {
@@ -234,7 +289,8 @@ const styles = StyleSheet.create({
   date: {
     fontSize: 12,
     color: '#aaa',
-    marginBottom: 4,
+    textAlign: 'right',
+    minWidth: 240, // ← 필요시 고정 너비로 위치 안정
   },
   content: {
     fontSize: 14,
@@ -252,5 +308,11 @@ const styles = StyleSheet.create({
     marginRight: 6,
     marginTop: 4,
     fontSize: 12,
+  },
+  metaRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
   },
 });
