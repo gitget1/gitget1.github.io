@@ -1,6 +1,6 @@
 // ✅ AppNavigator.tsx
 import React from 'react';
-import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import {createNativeStackNavigator} from '@react-navigation/native-stack';
 import BottomTabNavigator from './BottomTabNavigator';
 import AuthStackNavigator from './stack/AuthStackNavigator';
 import FunctionStackNavigator from './stack/FunctionStackNavigator';
@@ -8,8 +8,8 @@ import QuestionScreen from '../screens/mbti/QuestionScreen';
 import Make_program from '../screens/program/Make_program';
 import TraitSelection from '../screens/Select_mbti/Trait_Selection';
 import ResultScreen from '../screens/mbti/ResultScreen';
-import Practice from '../screens/practice/Practice';
-import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import Practice from '../screens/practice/Practice.tsx';
+import {NativeStackScreenProps} from '@react-navigation/native-stack';
 
 export type AppStackParamList = {
   AuthStack: undefined;
@@ -26,24 +26,24 @@ export type AppStackParamList = {
   Practice: undefined;
 };
 
-export type AppStackScreenProps<T extends keyof AppStackParamList> = NativeStackScreenProps<
-  AppStackParamList,
-  T
->;
+export type AppStackScreenProps<T extends keyof AppStackParamList> =
+  NativeStackScreenProps<AppStackParamList, T>;
 
 const Stack = createNativeStackNavigator<AppStackParamList>();
 
 const AppNavigator = () => {
   return (
-    <Stack.Navigator initialRouteName="AuthStack" screenOptions={{ headerShown: false }}>
+    <Stack.Navigator
+      initialRouteName="AuthStack"
+      screenOptions={{headerShown: false}}>
       <Stack.Screen
         name="AuthStack"
-        children={({ navigation }) => (
+        children={({navigation}) => (
           <AuthStackNavigator
             navigationOverride={() =>
               navigation.reset({
                 index: 0,
-                routes: [{ name: 'Main' }],
+                routes: [{name: 'Main'}],
               })
             }
           />
