@@ -10,30 +10,51 @@ import {
   Modal,
   TextInput,
 } from 'react-native';
-//import axios from 'axios';
+import axios from 'axios';
 
-// 가상 리뷰 데이터 (초기값)
-const defaultReviews = [
-  {
-    id: 'temp-1',
-    title: '테스트 리뷰입니다',
-    content: '이건 가상 리뷰이며 삭제 또는 수정이 가능합니다.',
-    date: '2025-05-28',
-  },
-];
+type Review = {
+  tourProgramId: number;
+  title: string;
+  content: string;
+  createdAt: string;
+};
 
 const MyReviewList = () => {
-  const [reviews, setReviews] = useState(defaultReviews);
-  const [editingReview, setEditingReview] = useState<any | null>(null);
+  const [reviews, setReviews] = useState<Review[]>([]);
+  const [editingReview, setEditingReview] = useState<Review | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
   const [editedContent, setEditedContent] = useState('');
 
   useEffect(() => {
-    // TODO: 여기에 실제 리뷰 API 연동 가능
-    // axios.get('/api/my-reviews').then(res => setReviews(res.data));
+    fetchReviews();
   }, []);
 
-  const handleDelete = (id: string) => {
+  const fetchReviews = async () => {
+    try {
+      const res = await axios.get('http://localhost:8080/api/review', {
+        params: {
+          page: 0,
+          size: 10,
+          sortOption: 'ratingDesc',
+        },
+        headers: {
+          Authorization: `Bearer ${process.env.API_TOKEN}`,
+        },
+      });
+
+      const mapped = res.data.data.map((r: any) => ({
+        tourProgramId: r.tourProgramId,
+        title: r.title,
+        content: r.content,
+        createdAt: r.createdAt.slice(0, 10),
+      }));
+      setReviews(mapped);
+    } catch (error) {
+      console.error('리뷰 불러오기 실패:', error);
+    }
+  };
+
+  const handleDelete = (id: number) => {
     Alert.alert('리뷰 삭제', '정말 삭제하시겠습니까?', [
       {
         text: '취소',
@@ -41,15 +62,24 @@ const MyReviewList = () => {
       },
       {
         text: '삭제',
-        onPress: () => {
-          setReviews(prev => prev.filter(r => r.id !== id));
+        onPress: async () => {
+          try {
+            await axios.delete(`http://localhost:8080/api/review/${id}`, {
+              headers: {
+                Authorization: `Bearer ${process.env.API_TOKEN}`,
+              },
+            });
+            setReviews(prev => prev.filter(r => r.tourProgramId !== id));
+          } catch (error) {
+            Alert.alert('오류', '리뷰 삭제 중 오류 발생');
+          }
         },
         style: 'destructive',
       },
     ]);
   };
 
-  const handleEdit = (review: any) => {
+  const handleEdit = (review: Review) => {
     setEditingReview(review);
     setEditedContent(review.content);
     setModalVisible(true);
@@ -58,7 +88,9 @@ const MyReviewList = () => {
   const saveEdited = () => {
     setReviews(prev =>
       prev.map(r =>
-        r.id === editingReview.id ? {...r, content: editedContent} : r,
+        r.tourProgramId === editingReview?.tourProgramId
+          ? {...r, content: editedContent}
+          : r,
       ),
     );
     setModalVisible(false);
@@ -71,7 +103,7 @@ const MyReviewList = () => {
 
       <FlatList
         data={reviews}
-        keyExtractor={item => item.id}
+        keyExtractor={item => item.tourProgramId.toString()}
         renderItem={({item}) => (
           <View style={styles.reviewCard}>
             <View style={styles.cardTop}>
@@ -80,13 +112,14 @@ const MyReviewList = () => {
                 <TouchableOpacity onPress={() => handleEdit(item)}>
                   <Text style={styles.actionText}>수정</Text>
                 </TouchableOpacity>
-                <TouchableOpacity onPress={() => handleDelete(item.id)}>
+                <TouchableOpacity
+                  onPress={() => handleDelete(item.tourProgramId)}>
                   <Text style={[styles.actionText, {color: 'red'}]}>삭제</Text>
                 </TouchableOpacity>
               </View>
             </View>
             <Text style={styles.content}>{item.content}</Text>
-            <Text style={styles.date}>{item.date}</Text>
+            <Text style={styles.date}>{item.createdAt}</Text>
           </View>
         )}
         ListEmptyComponent={
@@ -97,8 +130,7 @@ const MyReviewList = () => {
         }
       />
 
-      {/* 수정 모달 */}
-      <Modal visible={modalVisible} animationType="slide" transparent={true}>
+      <Modal visible={modalVisible} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
           <View style={styles.modalBox}>
             <Text style={styles.modalTitle}>리뷰 수정</Text>
