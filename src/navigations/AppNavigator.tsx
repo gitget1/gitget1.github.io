@@ -9,6 +9,8 @@ import Make_program from '../screens/program/Make_program';
 import TraitSelection from '../screens/Select_mbti/Trait_Selection';
 import ResultScreen from '../screens/mbti/ResultScreen';
 import Practice from '../screens/practice/Practice';
+import Practice1 from '../screens/practice/Practice_detail page';
+import MyReviewList from '../screens/mypage/MyReviewList';
 import {NativeStackScreenProps} from '@react-navigation/native-stack';
 
 export type AppStackParamList = {
@@ -24,6 +26,7 @@ export type AppStackParamList = {
     result: any;
   };
   Practice: undefined;
+  MyReviewList: undefined;
 };
 
 export type AppStackScreenProps<T extends keyof AppStackParamList> =
@@ -63,6 +66,15 @@ const AppNavigator = () => {
         }}
       />
       <Stack.Screen
+        name="PracticeDetail"
+        component={Practice1}
+        options={{
+          headerShown: true,
+          title: '투어 상세',
+          headerTitleStyle: {fontSize: 20},
+        }}
+      />
+      <Stack.Screen
         name="TraitSelection"
         component={TraitSelection}
         options={{
@@ -89,7 +101,7 @@ const AppNavigator = () => {
         component={Practice}
         options={{
           headerShown: true,
-          title: '지역 설정',
+          title: '리뷰',
           headerTitleStyle: {
             fontSize: 20,
           },
@@ -104,6 +116,15 @@ const AppNavigator = () => {
           headerTitleStyle: {
             fontSize: 20,
           },
+        }}
+      />
+      <Stack.Screen
+        name="MyReviewList"
+        component={MyReviewList}
+        options={{
+          headerShown: true,
+          title: '내가 쓴 리뷰',
+          headerTitleStyle: {fontSize: 20},
         }}
       />
     </Stack.Navigator>

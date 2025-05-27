@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, {useState} from 'react';
 import {
   View,
   Text,
@@ -11,9 +11,9 @@ import {
   TextInput,
   Alert,
 } from 'react-native';
-import { launchCamera, launchImageLibrary } from 'react-native-image-picker';
-import { useNavigation } from '@react-navigation/native';
-import type { StackNavigationProp } from '@react-navigation/stack';
+import {launchCamera, launchImageLibrary} from 'react-native-image-picker';
+import {useNavigation} from '@react-navigation/native';
+import type {StackNavigationProp} from '@react-navigation/stack';
 
 // RootStackParamList 정의
 type RootStackParamList = {
@@ -21,6 +21,7 @@ type RootStackParamList = {
   QuestionScreen: undefined;
   Result: undefined;
   MakeProgram: undefined;
+  MyReviewList: undefined;
 };
 
 const MainScreen = () => {
@@ -38,7 +39,7 @@ const MainScreen = () => {
   const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
 
   const pickImage = () => {
-    launchImageLibrary({ mediaType: 'photo' }, response => {
+    launchImageLibrary({mediaType: 'photo'}, response => {
       if (response.assets && response.assets.length > 0) {
         setProfileImage(response.assets[0].uri || null);
         setShowModal(false);
@@ -47,7 +48,7 @@ const MainScreen = () => {
   };
 
   const takePhoto = () => {
-    launchCamera({ mediaType: 'photo' }, response => {
+    launchCamera({mediaType: 'photo'}, response => {
       if (response.assets && response.assets.length > 0) {
         setProfileImage(response.assets[0].uri || null);
         setShowModal(false);
@@ -206,7 +207,7 @@ const MainScreen = () => {
           <Image
             source={
               profileImage
-                ? { uri: profileImage }
+                ? {uri: profileImage}
                 : require('../../assets/default.png')
             }
             style={styles.profileCircle}
@@ -235,11 +236,17 @@ const MainScreen = () => {
             '관광 프로그램 Helper',
             '예약 요청 목록 리스트',
             '1:1 문의',
-            '마이 리뷰',
+            '마이리뷰',
           ].map(item => (
             <TouchableOpacity
               key={item}
-              onPress={() => setSelectedMenu(item)}
+              onPress={() => {
+                if (item === '마이리뷰') {
+                  navigation.navigate('MyReviewList');
+                } else {
+                  setSelectedMenu(item);
+                }
+              }}
               style={styles.sidebarItem}>
               <Text style={styles.sidebarText}>{item}</Text>
             </TouchableOpacity>

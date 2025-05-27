@@ -8,6 +8,9 @@ import {
   TouchableOpacity,
   Image,
 } from 'react-native';
+import {useNavigation} from '@react-navigation/native';
+import type {StackNavigationProp} from '@react-navigation/stack';
+import type {AppStackParamList} from '../../navigations/AppNavigator';
 
 // Removed unused 'width' variable
 
@@ -37,6 +40,7 @@ type TourData = {
 const Practice = () => {
   const [data, setData] = useState<TourData | null>(null);
   const [isLiked, setIsLiked] = useState(false);
+  const navigation = useNavigation<StackNavigationProp<AppStackParamList>>();
 
   useEffect(() => {
     const mockResponse = {
@@ -108,7 +112,12 @@ const Practice = () => {
             <Text style={styles.region}>📍 {data.region}</Text>
 
             <View style={styles.rowRight}>
-              <Text style={styles.review}>💬 리뷰 {data.reviewCount}</Text>
+              <TouchableOpacity
+                onPress={() =>
+                  navigation.navigate('FunctionStack', {screen: 'Practice'})
+                }>
+                <Text style={styles.review}>💬 리뷰 {data.reviewCount}</Text>
+              </TouchableOpacity>
               <TouchableOpacity onPress={toggleLike}>
                 <Text style={styles.like}>
                   {isLiked ? '💖 찜함' : '🤍 찜'} {data.wishlistCount}
