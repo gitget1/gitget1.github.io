@@ -11,25 +11,47 @@ import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import WebView from 'react-native-webview';
 
+// 버튼 컴포넌트의 props 타입 정의
 interface ButtonProps {
   backendUrl: string;
 }
 
+// URL 파라미터 파싱 함수
+function getQueryParams(url: string) {
+  const params: Record<string, string> = {};
+  const queryString = url.split('?')[1];
+  if (!queryString) return params;
+
+  queryString.split('&').forEach(pair => {
+    const [key, value] = pair.split('=');
+    if (key && value) {
+      params[key] = decodeURIComponent(value);
+    }
+  });
+  return params;
+}
+
 const App: React.FC = () => {
-  const backendUrl: string = 'http://114.71.220.195:8080';
+  // 백엔드 서버 URL 설정
+  const backendUrl: string = 'http://124.60.137.10:8080';
+  // WebView 모달 표시 여부를 관리하는 상태
   const [isWebViewVisible, setIsWebViewVisible] = useState(false);
 
+  // 컴포넌트 마운트 시 토큰 체크 및 갱신
   useEffect(() => {
     console.log('useEffect 실행1');
     checkAndRefreshToken();
   }, []);
 
+  // 토큰 체크 및 갱신 함수
   const checkAndRefreshToken = async () => {
     try {
+      // AsyncStorage에서 토큰 확인
       const accessToken = await AsyncStorage.getItem('accessToken');
 
       if (!accessToken) {
         console.log('useEffect 실행2');
+        // 토큰이 없으면 갱신 요청
         const response = await axios.post(
           `${backendUrl}/reissue`,
           {},
@@ -47,6 +69,7 @@ const App: React.FC = () => {
         console.log('Access Token 확인:', newAccessToken);
 
         if (newAccessToken) {
+          // 새 토큰 저장
           await AsyncStorage.setItem('accessToken', newAccessToken);
           console.log('Access Token 갱신 완료:', newAccessToken);
         } else {
@@ -54,6 +77,7 @@ const App: React.FC = () => {
         }
       }
     } catch (error) {
+      // 에러 처리
       if (axios.isAxiosError(error)) {
         if (error.code === 'ECONNABORTED') {
           Alert.alert(
@@ -81,17 +105,19 @@ const App: React.FC = () => {
     }
   };
 
+  // 네이버 로그인 버튼 클릭 시 WebView 모달 표시
   const onNaverLogin = (): void => {
     setIsWebViewVisible(true);
   };
 
+  // WebView 네비게이션 상태 변경 처리
   const handleWebViewNavigationStateChange = (navState: any) => {
     console.log('Navigation State:', navState);
     // 네이버 로그인 콜백 URL 처리
     if (navState.url.includes('login/oauth2/code/naver')) {
-      const url = new URL(navState.url);
-      const code = url.searchParams.get('code');
-      const state = url.searchParams.get('state');
+      const params = getQueryParams(navState.url);
+      const code = params.code;
+      const state = params.state;
       if (code && state) {
         // 토큰 교환 요청
         axios
@@ -120,12 +146,14 @@ const App: React.FC = () => {
     }
   };
 
+  // WebView 에러 처리
   const handleWebViewError = (syntheticEvent: any) => {
     const {nativeEvent} = syntheticEvent;
     console.error('WebView Error:', nativeEvent);
     Alert.alert('알림', '페이지 로딩 중 오류가 발생했습니다.');
   };
 
+  // 로그아웃 처리
   const handleLogout = async (): Promise<void> => {
     try {
       const accessToken = await AsyncStorage.getItem('accessToken');
@@ -138,12 +166,14 @@ const App: React.FC = () => {
         return;
       }
 
+      // 로그아웃 요청
       const response = await axios.get(`${backendUrl}/logout`, {
         withCredentials: true,
       });
 
       if (response.status === 200) {
         console.log('로그아웃 성공');
+        // 토큰 제거
         await AsyncStorage.removeItem('accessToken');
         Alert.alert('알림', '로그아웃되었습니다.');
       } else {
@@ -159,15 +189,20 @@ const App: React.FC = () => {
   return (
     <View style={styles.container}>
       <Text style={styles.title}>OAuth2 네이버 로그인 및 데이터 요청</Text>
+      {/* 네이버 로그인 버튼 */}
       <TouchableOpacity style={styles.button} onPress={onNaverLogin}>
         <Text style={styles.buttonText}>NAVER LOGIN</Text>
       </TouchableOpacity>
+      {/* 테스트 버튼 */}
       <TestButton backendUrl={backendUrl} />
+      {/* 메인 버튼 */}
       <MainButton backendUrl={backendUrl} />
+      {/* 로그아웃 버튼 */}
       <TouchableOpacity style={styles.button} onPress={handleLogout}>
         <Text style={styles.buttonText}>LOGOUT</Text>
       </TouchableOpacity>
 
+      {/* WebView 모달 */}
       <Modal
         visible={isWebViewVisible}
         onRequestClose={() => setIsWebViewVisible(false)}
@@ -175,11 +210,13 @@ const App: React.FC = () => {
         transparent={true}>
         <View style={styles.modalContainer}>
           <View style={styles.webViewContainer}>
+            {/* 닫기 버튼 */}
             <TouchableOpacity
               style={styles.closeButton}
               onPress={() => setIsWebViewVisible(false)}>
               <Text style={styles.closeButtonText}>닫기</Text>
             </TouchableOpacity>
+            {/* 네이버 로그인 WebView */}
             <WebView
               source={{uri: `${backendUrl}/oauth2/authorization/naver`}}
               onNavigationStateChange={handleWebViewNavigationStateChange}
@@ -193,6 +230,7 @@ const App: React.FC = () => {
   );
 };
 
+// 테스트 API 호출 버튼 컴포넌트
 const TestButton: React.FC<ButtonProps> = ({backendUrl}) => {
   const TestData = async (): Promise<void> => {
     try {
@@ -202,6 +240,7 @@ const TestButton: React.FC<ButtonProps> = ({backendUrl}) => {
         return;
       }
 
+      // 테스트 API 호출
       const response = await axios.get(`${backendUrl}/test`, {
         headers: {
           Authorization: `${accessToken}`,
@@ -224,6 +263,7 @@ const TestButton: React.FC<ButtonProps> = ({backendUrl}) => {
   );
 };
 
+// 메인 API 호출 버튼 컴포넌트
 const MainButton: React.FC<ButtonProps> = ({backendUrl}) => {
   const MainData = async (): Promise<void> => {
     try {
@@ -233,6 +273,7 @@ const MainButton: React.FC<ButtonProps> = ({backendUrl}) => {
         return;
       }
 
+      // 메인 API 호출
       const response = await axios.get(`${backendUrl}/`, {
         headers: {
           Authorization: `${accessToken}`,
@@ -258,6 +299,7 @@ const MainButton: React.FC<ButtonProps> = ({backendUrl}) => {
   );
 };
 
+// 스타일 정의
 const styles = StyleSheet.create({
   container: {
     flex: 1,

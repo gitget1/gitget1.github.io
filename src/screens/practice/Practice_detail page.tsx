@@ -9,8 +9,9 @@ import {
   Image,
 } from 'react-native';
 import {useNavigation} from '@react-navigation/native';
-import type {StackNavigationProp} from '@react-navigation/stack';
+import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import type {AppStackParamList} from '../../navigations/AppNavigator';
+import axios from 'axios';
 
 // Removed unused 'width' variable
 
@@ -25,6 +26,7 @@ type Schedule = {
 };
 
 type TourData = {
+  id: number;
   title: string;
   description: string;
   region: string;
@@ -40,10 +42,12 @@ type TourData = {
 const Practice = () => {
   const [data, setData] = useState<TourData | null>(null);
   const [isLiked, setIsLiked] = useState(false);
-  const navigation = useNavigation<StackNavigationProp<AppStackParamList>>();
+  const navigation =
+    useNavigation<NativeStackNavigationProp<AppStackParamList>>();
 
   useEffect(() => {
     const mockResponse = {
+      id: 1,
       title: '전주 한옥마을 투어',
       description: '전주의 멋과 맛을 함께 즐길 수 있는 투어입니다.',
       region: '전주',
@@ -87,7 +91,29 @@ const Practice = () => {
     setData(mockResponse);
   }, []);
 
-  const toggleLike = () => setIsLiked(prev => !prev);
+  const toggleLike = async () => {
+    try {
+      const response = await axios.post('/api/wishlist/toggle', {
+        tourId: data?.id, // 투어 ID가 필요합니다. TourData 타입에 id 필드를 추가해야 합니다.
+      });
+
+      if (response.data.status === '100 CONTINUE') {
+        setIsLiked(prev => !prev);
+        // 위시리스트 카운트 업데이트
+        if (data) {
+          setData({
+            ...data,
+            wishlistCount: isLiked
+              ? data.wishlistCount - 1
+              : data.wishlistCount + 1,
+          });
+        }
+      }
+    } catch (error) {
+      console.error('위시리스트 토글 에러:', error);
+      // 에러 발생 시 UI는 변경하지 않음
+    }
+  };
 
   if (!data)
     return <Text style={{marginTop: 40, textAlign: 'center'}}>로딩 중...</Text>;
@@ -112,10 +138,7 @@ const Practice = () => {
             <Text style={styles.region}>📍 {data.region}</Text>
 
             <View style={styles.rowRight}>
-              <TouchableOpacity
-                onPress={() =>
-                  navigation.navigate('FunctionStack', {screen: 'Practice'})
-                }>
+              <TouchableOpacity onPress={() => navigation.navigate('Practice')}>
                 <Text style={styles.review}>💬 리뷰 {data.reviewCount}</Text>
               </TouchableOpacity>
               <TouchableOpacity onPress={toggleLike}>
@@ -162,15 +185,22 @@ const Practice = () => {
 
       {/* 하단 예약 바 */}
       <View style={styles.bottomBar}>
-        <Text style={styles.price}>
-          ₩{data.guidePrice.toLocaleString()} /인
-        </Text>
+        <View style={styles.priceContainer}>
+          <TouchableOpacity onPress={toggleLike} style={styles.heartButton}>
+            <Text style={styles.heartIcon}>{isLiked ? '❤️' : '🤍'}</Text>
+          </TouchableOpacity>
+          <Text style={styles.price}>
+            ₩{data.guidePrice.toLocaleString()} /인
+          </Text>
+        </View>
 
         <View style={styles.buttonGroup}>
           <TouchableOpacity style={styles.chatBtn}>
             <Text style={styles.chatText}>상담하기</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.reserveBtn}>
+          <TouchableOpacity
+            style={styles.reserveBtn}
+            onPress={() => navigation.navigate('PaymentScreen')}>
             <Text style={styles.reserveText}>예약하기</Text>
           </TouchableOpacity>
         </View>
@@ -246,6 +276,11 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
   },
+  priceContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   price: {
     fontSize: 18,
     fontWeight: 'bold',
@@ -290,6 +325,12 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between', // ← 핵심!
     alignItems: 'center',
     marginBottom: 10,
+  },
+  heartButton: {
+    padding: 4,
+  },
+  heartIcon: {
+    fontSize: 24,
   },
 });
 

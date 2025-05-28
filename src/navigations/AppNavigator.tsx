@@ -11,6 +11,8 @@ import ResultScreen from '../screens/mbti/ResultScreen';
 import Practice from '../screens/practice/Practice';
 import Practice1 from '../screens/practice/Practice_detail page';
 import MyReviewList from '../screens/mypage/MyReviewList';
+import PaymentScreen from '../screens/payment/PaymentScreen';
+import PaymentCompleteScreen from '../screens/payment/PaymentCompleteScreen';
 import {NativeStackScreenProps} from '@react-navigation/native-stack';
 
 export type AppStackParamList = {
@@ -27,6 +29,8 @@ export type AppStackParamList = {
   };
   Practice: undefined;
   MyReviewList: undefined;
+  PaymentScreen: undefined;
+  PaymentComplete: undefined;
 };
 
 export type AppStackScreenProps<T extends keyof AppStackParamList> =
@@ -124,6 +128,24 @@ const AppNavigator = () => {
         options={{
           headerShown: true,
           title: '내가 쓴 리뷰',
+          headerTitleStyle: {fontSize: 20},
+        }}
+      />
+      <Stack.Screen
+        name="PaymentScreen"
+        component={PaymentScreen}
+        options={{
+          headerShown: true,
+          title: '결제',
+          headerTitleStyle: {fontSize: 20},
+        }}
+      />
+      <Stack.Screen
+        name="PaymentComplete"
+        component={PaymentCompleteScreen}
+        options={{
+          headerShown: true,
+          title: '결제 완료',
           headerTitleStyle: {fontSize: 20},
         }}
       />
