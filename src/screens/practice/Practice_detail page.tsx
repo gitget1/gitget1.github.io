@@ -31,6 +31,7 @@ type Schedule = {
 };
 
 type TourData = {
+  id: number;
   title: string;
   region: string;
   thumbnailUrl: string;
@@ -49,13 +50,13 @@ const Practice = () => {
   const [loading, setLoading] = useState(true);
   const navigation = useNavigation<StackNavigationProp<AppStackParamList>>();
   const route = useRoute<RouteProp<AppStackParamList, 'Practice'>>();
-  const {tourProgramId} = route.params;
+  const tourProgramId = route.params?.tourProgramId ?? 1; 
 
   useEffect(() => {
     const fetchData = async () => {
       try {
         const res = await axios.get(
-          `http://localhost:8080/api/tour-program/${tourProgramId}`,
+          `http://localhost:8080/api/tour-program/${tourProgramId}`, 
           {
             headers: {
               Authorization: `Bearer ${process.env.API_TOKEN}`,
@@ -72,7 +73,29 @@ const Practice = () => {
     fetchData();
   }, [tourProgramId]);
 
-  const toggleLike = () => setIsLiked(prev => !prev);
+  const toggleLike = async () => {
+    try {
+      const response = await axios.post('/api/wishlist/toggle', {
+        tourId: data?.id, // 투어 ID가 필요합니다. TourData 타입에 id 필드를 추가해야 합니다.
+      });
+
+      if (response.data.status === '100 CONTINUE') {
+        setIsLiked(prev => !prev);
+        // 위시리스트 카운트 업데이트
+        if (data) {
+          setData({
+            ...data,
+            wishlistCount: isLiked
+              ? data.wishlistCount - 1
+              : data.wishlistCount + 1,
+          });
+        }
+      }
+    } catch (error) {
+      console.error('위시리스트 토글 에러:', error);
+      // 에러 발생 시 UI는 변경하지 않음
+    }
+  };
 
   const getTotalDistance = (schedules: Schedule[]) => {
     let total = 0;
@@ -110,10 +133,7 @@ const Practice = () => {
             <Text style={styles.region}>📍 {data.region}</Text>
 
             <View style={styles.rowRight}>
-              <TouchableOpacity
-                onPress={() =>
-                  navigation.navigate('FunctionStack', {screen: 'Practice'})
-                }>
+              <TouchableOpacity onPress={() => navigation.navigate('Practice')}>
                 <Text style={styles.review}>💬 리뷰 {data.reviewCount}</Text>
               </TouchableOpacity>
               <TouchableOpacity onPress={toggleLike}>
@@ -212,7 +232,9 @@ const Practice = () => {
           <TouchableOpacity style={styles.chatBtn}>
             <Text style={styles.chatText}>상담하기</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.reserveBtn}>
+          <TouchableOpacity
+            style={styles.reserveBtn}
+            onPress={() => navigation.navigate('PaymentScreen')}>
             <Text style={styles.reserveText}>예약하기</Text>
           </TouchableOpacity>
         </View>

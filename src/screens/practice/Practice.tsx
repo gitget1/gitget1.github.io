@@ -6,6 +6,10 @@ import {
   ScrollView,
   Image,
   ActivityIndicator,
+  TextInput,
+  TouchableOpacity,
+  Alert,
+  Pressable,
 } from 'react-native';
 import {Picker} from '@react-native-picker/picker';
 import axios from 'axios';
@@ -18,21 +22,38 @@ const ratingData = [
   {score: 1, count: 1},
 ];
 
+// 별점 텍스트 매핑
+const ratingTexts = [
+  '선택하세요',
+  '최악이에요',
+  '별로예요',
+  '보통이에요',
+  '좋아요',
+  '최고예요!',
+];
+
 function renderStars(rating: number) {
   const fullStars = Math.floor(rating);
   const emptyStars = 5 - fullStars;
   return '⭐'.repeat(fullStars) + '☆'.repeat(emptyStars);
 }
 
-export default function ReviewScreen() {
+interface ReviewScreenProps {
+  tourProgramId: number;
+}
+
+export default function ReviewScreen({tourProgramId}: ReviewScreenProps) {
   const maxCount = Math.max(...ratingData.map(r => r.count));
-  // Removed unused totalCount variable
 
   const [sortOrder, setSortOrder] = useState<'latest' | 'rating' | 'lowRating'>(
     'latest',
   );
   const [reviews, setReviews] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [newRating, setNewRating] = useState(5);
+  const [newContent, setNewContent] = useState('');
+  const [newImageUrl, setNewImageUrl] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const sortMap = React.useMemo(
     () => ({
@@ -70,8 +91,118 @@ export default function ReviewScreen() {
     return <ActivityIndicator size="large" style={{marginTop: 50}} />;
   }
 
+  // 별점 렌더링 함수
+  const renderStarInput = () => {
+    const stars: JSX.Element[] = [];
+    for (let i = 1; i <= 5; i++) {
+      // 0.5 단위로 두 개의 Pressable
+      const leftValue = i - 0.5;
+      const rightValue = i;
+      stars.push(
+        <Pressable
+          key={leftValue}
+          onPress={() => setNewRating(leftValue)}
+          hitSlop={8}
+          style={{marginRight: -8}}>
+          <Text
+            style={{
+              fontSize: 32,
+              color: newRating >= leftValue ? '#FFD700' : '#ccc',
+            }}>
+            {newRating >= rightValue ? '★' : newRating >= leftValue ? '⯨' : '☆'}
+          </Text>
+        </Pressable>,
+      );
+    }
+    return (
+      <View style={{flexDirection: 'row', alignItems: 'center'}}>{stars}</View>
+    );
+  };
+
+  // 리뷰 작성 핸들러
+  const handleSubmit = async () => {
+    if (!newContent.trim()) {
+      Alert.alert('리뷰 내용을 입력해주세요.');
+      return;
+    }
+    setIsSubmitting(true);
+    try {
+      const response = await axios.post('/api/review', {
+        rating: `${newRating}!0`,
+        content: newContent,
+        tourProgramId,
+        imageUrls: newImageUrl ? [newImageUrl] : [],
+      });
+
+      if (response.status === 200) {
+        // 성공 시 프론트에 추가
+        setReviews([
+          {
+            name: '나',
+            count: 1,
+            avg: newRating,
+            avatar: 'https://via.placeholder.com/36x36.png?text=🧑',
+            date: new Date().toISOString().slice(0, 10),
+            text: newContent,
+            tags: [],
+            images: newImageUrl ? [newImageUrl] : [],
+          },
+          ...reviews,
+        ]);
+        setNewContent('');
+        setNewImageUrl('');
+        setNewRating(5);
+        Alert.alert('리뷰가 등록되었습니다!');
+      }
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        Alert.alert(
+          '리뷰 등록 실패',
+          error.response?.data?.message || '알 수 없는 오류가 발생했습니다.',
+        );
+      } else {
+        Alert.alert('리뷰 등록 실패', '알 수 없는 오류가 발생했습니다.');
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   return (
     <ScrollView style={{flex: 1, backgroundColor: '#fff'}}>
+      {/* 리뷰 작성 폼 */}
+      <View style={styles.writeBox}>
+        <Text style={styles.writeTitle}>리뷰 작성</Text>
+        <View style={styles.writeRow}>
+          <Text style={{marginRight: 8}}>별점</Text>
+          {renderStarInput()}
+        </View>
+        <Text style={{marginBottom: 8, color: '#1976d2', fontWeight: 'bold'}}>
+          {ratingTexts[Math.round(newRating)]}
+        </Text>
+        <TextInput
+          style={styles.input}
+          placeholder="리뷰 내용을 입력하세요"
+          value={newContent}
+          onChangeText={setNewContent}
+          multiline
+        />
+        <TextInput
+          style={styles.input}
+          placeholder="이미지 URL (선택)"
+          value={newImageUrl}
+          onChangeText={setNewImageUrl}
+        />
+        <TouchableOpacity
+          style={styles.submitBtn}
+          onPress={handleSubmit}
+          disabled={isSubmitting}>
+          <Text style={styles.submitBtnText}>
+            {isSubmitting ? '등록 중...' : '리뷰 등록'}
+          </Text>
+        </TouchableOpacity>
+      </View>
+
       {/* ⭐ 평균 평점 영역 */}
       <View style={styles.ratingSummary}>
         <View style={{alignItems: 'center', marginRight: 24}}>
@@ -162,6 +293,46 @@ export default function ReviewScreen() {
 }
 
 const styles = StyleSheet.create({
+  writeBox: {
+    backgroundColor: '#f9f9f9',
+    padding: 16,
+    borderRadius: 12,
+    margin: 16,
+    marginBottom: 0,
+  },
+  writeTitle: {
+    fontWeight: 'bold',
+    fontSize: 16,
+    marginBottom: 8,
+  },
+  writeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: '#ccc',
+    borderRadius: 8,
+    padding: 8,
+    marginBottom: 8,
+    fontSize: 14,
+    backgroundColor: '#fff',
+  },
+  submitBtn: {
+    backgroundColor: '#1976d2',
+    paddingVertical: 10,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  submitBtnDisabled: {
+    backgroundColor: '#ccc',
+  },
+  submitBtnText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
   ratingSummary: {
     flexDirection: 'row',
     padding: 20,
