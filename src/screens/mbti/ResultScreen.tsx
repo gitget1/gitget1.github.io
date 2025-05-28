@@ -23,13 +23,13 @@ export default function ResultScreen({
     try {
       // 예시 데이터: 실제로는 result에서 꺼내서 전달해야 함
       const payload = {
-        mbti: result.mbti,
-        tags: result.tags,
-        recommended_regions: result.recommended_regions,
+        travelMbti: result.mbti,
+        hashtags: result.tags,
+        regions: result.recommended_regions,
       };
 
       const response = await axios.post(
-        'http://10.0.2.2:8003/save_mbti',
+        'http://localhost:8080/api/travel-mbti/mbti',
         payload,
         {
           headers: {

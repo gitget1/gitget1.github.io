@@ -1,3 +1,5 @@
+// ✅ Practice.tsx - 개선된 전체 코드 (보안, 안정성, 시각화 향상)
+
 import React, {useState, useEffect} from 'react';
 import {
   View,
@@ -7,20 +9,23 @@ import {
   SafeAreaView,
   TouchableOpacity,
   Image,
+  ActivityIndicator,
 } from 'react-native';
-import {useNavigation} from '@react-navigation/native';
-import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
+import {useNavigation, useRoute} from '@react-navigation/native';
+import type {StackNavigationProp} from '@react-navigation/stack';
+import type {RouteProp} from '@react-navigation/native';
 import type {AppStackParamList} from '../../navigations/AppNavigator';
 import axios from 'axios';
+import MapView, {Marker, Polyline, PROVIDER_GOOGLE} from 'react-native-maps';
+import haversine from 'haversine-distance';
 
-// Removed unused 'width' variable
+const dayColors = ['#0288d1', '#43a047', '#fbc02d', '#e64a19', '#8e24aa'];
 
 type Schedule = {
   day: number;
-  scheduleSequence: number;
-  placeName: string;
   lat: number;
   lon: number;
+  placeName: string;
   placeDescription: string;
   travelTime: number;
 };
@@ -28,68 +33,45 @@ type Schedule = {
 type TourData = {
   id: number;
   title: string;
-  description: string;
   region: string;
-  guidePrice: number;
   thumbnailUrl: string;
-  user: {name: string};
-  schedules: Schedule[];
   reviewCount: number;
   wishlistCount: number;
   hashtags: string[];
+  schedules: Schedule[];
+  user: {name: string};
+  description: string;
+  guidePrice: number;
 };
 
 const Practice = () => {
   const [data, setData] = useState<TourData | null>(null);
   const [isLiked, setIsLiked] = useState(false);
-  const navigation =
-    useNavigation<NativeStackNavigationProp<AppStackParamList>>();
+  const [loading, setLoading] = useState(true);
+  const navigation = useNavigation<StackNavigationProp<AppStackParamList>>();
+  const route = useRoute<RouteProp<AppStackParamList, 'Practice'>>();
+  const {tourProgramId} = route.params;
 
   useEffect(() => {
-    const mockResponse = {
-      id: 1,
-      title: '전주 한옥마을 투어',
-      description: '전주의 멋과 맛을 함께 즐길 수 있는 투어입니다.',
-      region: '전주',
-      guidePrice: 50000,
-      thumbnailUrl: 'https://via.placeholder.com/600x400.png?text=썸네일',
-      user: {name: '김경탁'},
-      reviewCount: 3,
-      wishlistCount: 12,
-      hashtags: ['한옥마을', '맛집투어', '전주'],
-      schedules: [
-        {
-          day: 1,
-          scheduleSequence: 1,
-          placeName: '전주 한옥마을 입구',
-          lat: 35.81,
-          lon: 127.15,
-          placeDescription: '한옥마을의 시작점',
-          travelTime: 10,
-        },
-        {
-          day: 1,
-          scheduleSequence: 2,
-          placeName: '비빔밥 거리',
-          lat: 35.82,
-          lon: 127.151,
-          placeDescription: '전통 비빔밥 식사',
-          travelTime: 20,
-        },
-        {
-          day: 2,
-          scheduleSequence: 1,
-          placeName: '전동성당',
-          lat: 35.83,
-          lon: 127.152,
-          placeDescription: '역사적 성당 방문',
-          travelTime: 15,
-        },
-      ],
+    const fetchData = async () => {
+      try {
+        const res = await axios.get(
+          `http://localhost:8080/api/tour-program/${tourProgramId}`,
+          {
+            headers: {
+              Authorization: `Bearer ${process.env.API_TOKEN}`,
+            },
+          },
+        );
+        setData(res.data.data);
+      } catch (error) {
+        console.error('데이터 불러오기 실패:', error);
+      } finally {
+        setLoading(false);
+      }
     };
-
-    setData(mockResponse);
-  }, []);
+    fetchData();
+  }, [tourProgramId]);
 
   const toggleLike = async () => {
     try {
@@ -115,8 +97,23 @@ const Practice = () => {
     }
   };
 
+  const getTotalDistance = (schedules: Schedule[]) => {
+    let total = 0;
+    for (let i = 1; i < schedules.length; i++) {
+      total += haversine(
+        {latitude: schedules[i - 1].lat, longitude: schedules[i - 1].lon},
+        {latitude: schedules[i].lat, longitude: schedules[i].lon},
+      );
+    }
+    return (total / 1000).toFixed(1);
+  };
+
+  if (loading)
+    return <ActivityIndicator style={{marginTop: 40}} size="large" />;
   if (!data)
-    return <Text style={{marginTop: 40, textAlign: 'center'}}>로딩 중...</Text>;
+    return (
+      <Text style={{marginTop: 40, textAlign: 'center'}}>데이터 없음</Text>
+    );
 
   const groupedSchedules = data.schedules.reduce((acc, cur) => {
     const key = `Day ${cur.day}`;
@@ -128,9 +125,7 @@ const Practice = () => {
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView>
-        {/* 상단 이미지 */}
-        <Image source={require('../../assets/풍경1.jpg')} style={styles.map} />
-        {/* 흰 배경 box (라운드) */}
+        <Image source={{uri: data.thumbnailUrl}} style={styles.map} />
         <View style={styles.whiteBox}>
           <Text style={styles.title}>{data.title}</Text>
 
@@ -156,6 +151,7 @@ const Practice = () => {
               </Text>
             ))}
           </View>
+
           <Text style={styles.sectionTitle}>🗓️ 일정</Text>
           {Object.entries(groupedSchedules).map(([day, items], i) => (
             <View key={i} style={styles.scheduleCard}>
@@ -168,14 +164,59 @@ const Practice = () => {
               ))}
             </View>
           ))}
-          <Text style={styles.sectionTitle}>🗺 지도 (샘플)</Text>
-          <Image
-            source={require('../../assets/풍경1.jpg')}
-            style={styles.map}
-          />
+
+          <Text style={styles.sectionTitle}>🗺 지도</Text>
+          <View
+            style={{
+              height: 300,
+              marginBottom: 20,
+              borderRadius: 12,
+              overflow: 'hidden',
+            }}>
+            <MapView
+              style={{flex: 1}}
+              provider={PROVIDER_GOOGLE}
+              initialRegion={
+                data.schedules.length > 0
+                  ? {
+                      latitude: data.schedules[0].lat,
+                      longitude: data.schedules[0].lon,
+                      latitudeDelta: 0.05,
+                      longitudeDelta: 0.05,
+                    }
+                  : {
+                      latitude: 37.5665,
+                      longitude: 126.978,
+                      latitudeDelta: 0.05,
+                      longitudeDelta: 0.05,
+                    }
+              }>
+              {data.schedules.map((s, idx) => (
+                <Marker
+                  key={idx}
+                  coordinate={{latitude: s.lat, longitude: s.lon}}
+                  title={`Day ${s.day} - ${s.placeName}`}
+                  description={s.placeDescription}
+                  pinColor={dayColors[(s.day - 1) % dayColors.length]}
+                />
+              ))}
+              <Polyline
+                coordinates={data.schedules.map(s => ({
+                  latitude: s.lat,
+                  longitude: s.lon,
+                }))}
+                strokeColor="#0288d1"
+                strokeWidth={3}
+              />
+            </MapView>
+            <Text style={{textAlign: 'right', marginTop: 6}}>
+              총 거리: {getTotalDistance(data.schedules)}km
+            </Text>
+          </View>
 
           <Text style={styles.sectionTitle}>🧑‍💼 호스트 정보</Text>
           <Text style={styles.description}>호스트: {data.user.name}</Text>
+
           <Text style={styles.sectionTitle}>📖 투어 설명</Text>
           <Text style={styles.description}>{data.description}</Text>
 
@@ -183,17 +224,10 @@ const Practice = () => {
         </View>
       </ScrollView>
 
-      {/* 하단 예약 바 */}
       <View style={styles.bottomBar}>
-        <View style={styles.priceContainer}>
-          <TouchableOpacity onPress={toggleLike} style={styles.heartButton}>
-            <Text style={styles.heartIcon}>{isLiked ? '❤️' : '🤍'}</Text>
-          </TouchableOpacity>
-          <Text style={styles.price}>
-            ₩{data.guidePrice.toLocaleString()} /인
-          </Text>
-        </View>
-
+        <Text style={styles.price}>
+          ₩{data.guidePrice.toLocaleString()} /인
+        </Text>
         <View style={styles.buttonGroup}>
           <TouchableOpacity style={styles.chatBtn}>
             <Text style={styles.chatText}>상담하기</Text>
@@ -221,11 +255,6 @@ const styles = StyleSheet.create({
   },
   title: {fontSize: 22, fontWeight: 'bold'},
   region: {fontSize: 14, color: '#666', marginBottom: 6},
-  statsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 1,
-  },
   review: {fontSize: 14},
   like: {fontSize: 14},
   tags: {
@@ -276,11 +305,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  priceContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
   price: {
     fontSize: 18,
     fontWeight: 'bold',
@@ -295,11 +319,6 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: 'bold',
     fontSize: 15,
-  },
-  divider: {
-    borderBottomWidth: 1,
-    borderColor: '#e0e0e0',
-    marginVertical: 16,
   },
   chatBtn: {
     backgroundColor: '#ddd',
@@ -318,19 +337,13 @@ const styles = StyleSheet.create({
   rowRight: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10, // React Native 0.71 이상에서만 동작. 낮은 버전이면 marginLeft 써도 됨
+    gap: 10,
   },
   rightAlignRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between', // ← 핵심!
+    justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 10,
-  },
-  heartButton: {
-    padding: 4,
-  },
-  heartIcon: {
-    fontSize: 24,
   },
 });
 

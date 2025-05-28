@@ -1,10 +1,11 @@
-import React, {useState} from 'react';
+import React, {useState, useEffect} from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
   Image,
+  ActivityIndicator,
   TextInput,
   TouchableOpacity,
   Alert,
@@ -12,84 +13,6 @@ import {
 } from 'react-native';
 import {Picker} from '@react-native-picker/picker';
 import axios from 'axios';
-
-const mockReviewsInit = [
-  {
-    name: '하늘이',
-    count: 12,
-    avg: 4.9,
-    avatar: 'https://via.placeholder.com/36x36.png?text=😀',
-    date: '2024-06-20',
-    text: '바다 전망이 정말 환상적이었어요! 사진으로는 담기지 않는 감동🥺🌊',
-    tags: ['제주도', '오션뷰숙소', '힐링여행'],
-    images: [
-      'https://via.placeholder.com/120x120.png?text=🌊1',
-      'https://via.placeholder.com/120x120.png?text=🌊2',
-    ],
-  },
-  {
-    name: '트래블러',
-    count: 27,
-    avg: 5.0,
-    avatar: 'https://via.placeholder.com/36x36.png?text=😊',
-    date: '2024-06-15',
-    text: '한옥마을의 고즈넉한 분위기와 전통음식까지 완벽한 여행이었어요❤️',
-    tags: ['한옥마을', '전통여행', '맛집투어'],
-    images: [],
-  },
-  {
-    name: '하늘이',
-    count: 12,
-    avg: 4.9,
-    avatar: 'https://via.placeholder.com/36x36.png?text=😀',
-    date: '2024-06-20',
-    text: '바다 전망이 정말 환상적이었어요! 사진으로는 담기지 않는 감동🥺🌊',
-    tags: ['제주도', '오션뷰숙소', '힐링여행'],
-    images: [
-      'https://via.placeholder.com/120x120.png?text=🌊1',
-      'https://via.placeholder.com/120x120.png?text=🌊2',
-    ],
-  },
-  {
-    name: '하늘이',
-    count: 12,
-    avg: 4.9,
-    avatar: 'https://via.placeholder.com/36x36.png?text=😀',
-    date: '2024-06-20',
-    text: '바다 전망이 정말 환상적이었어요! 사진으로는 담기지 않는 감동🥺🌊',
-    tags: ['제주도', '오션뷰숙소', '힐링여행'],
-    images: [
-      'https://via.placeholder.com/120x120.png?text=🌊1',
-      'https://via.placeholder.com/120x120.png?text=🌊2',
-    ],
-  },
-  {
-    name: '하늘이',
-    count: 12,
-    avg: 4.9,
-    avatar: 'https://via.placeholder.com/36x36.png?text=😀',
-    date: '2024-06-20',
-    text: '바다 전망이 정말 환상적이었어요! 사진으로는 담기지 않는 감동🥺🌊',
-    tags: ['제주도', '오션뷰숙소', '힐링여행'],
-    images: [
-      'https://via.placeholder.com/120x120.png?text=🌊1',
-      'https://via.placeholder.com/120x120.png?text=🌊2',
-    ],
-  },
-  {
-    name: '하늘이',
-    count: 12,
-    avg: 4.9,
-    avatar: 'https://via.placeholder.com/36x36.png?text=😀',
-    date: '2024-06-20',
-    text: '바다 전망이 정말 환상적이었어요! 사진으로는 담기지 않는 감동🥺🌊',
-    tags: ['제주도', '오션뷰숙소', '힐링여행'],
-    images: [
-      'https://via.placeholder.com/120x120.png?text=🌊1',
-      'https://via.placeholder.com/120x120.png?text=🌊2',
-    ],
-  },
-];
 
 const ratingData = [
   {score: 5, count: 39},
@@ -121,27 +44,52 @@ interface ReviewScreenProps {
 
 export default function ReviewScreen({tourProgramId}: ReviewScreenProps) {
   const maxCount = Math.max(...ratingData.map(r => r.count));
-  const totalCount = ratingData.reduce((sum, r) => sum + r.count, 0);
-  const [sortOrder, setSortOrder] = useState<'latest' | 'oldest' | 'rating'>(
+
+  const [sortOrder, setSortOrder] = useState<'latest' | 'rating' | 'lowRating'>(
     'latest',
   );
-  const [mockReviews, setMockReviews] = useState(mockReviewsInit);
-
-  // 리뷰 작성 상태
+  const [reviews, setReviews] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
   const [newRating, setNewRating] = useState(5);
   const [newContent, setNewContent] = useState('');
   const [newImageUrl, setNewImageUrl] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const sortedReviews = [...mockReviews].sort((a, b) => {
-    if (sortOrder === 'latest') {
-      return new Date(b.date).getTime() - new Date(a.date).getTime();
-    } else if (sortOrder === 'oldest') {
-      return new Date(a.date).getTime() - new Date(b.date).getTime();
-    } else {
-      return b.avg - a.avg;
-    }
-  });
+  const sortMap = React.useMemo(
+    () => ({
+      latest: 'addedDesc',
+      rating: 'ratingDesc',
+      lowRating: 'ratingAsc', // ⭐ 별점 낮은 순
+    }),
+    [],
+  );
+
+  useEffect(() => {
+    const fetchReviews = async () => {
+      try {
+        setLoading(true);
+        const res = await axios.get(
+          `http://localhost:8080/api/review?page=0&size=10&sortOption=${sortMap[sortOrder]}`,
+          {
+            headers: {
+              Authorization: 'Bearer YOUR_ACCESS_TOKEN', // 여기에 토큰 입력
+            },
+          },
+        );
+        setReviews(res.data.data);
+      } catch (error) {
+        console.error('리뷰 불러오기 실패:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchReviews();
+  }, [sortOrder, sortMap]);
+
+  if (loading) {
+    return <ActivityIndicator size="large" style={{marginTop: 50}} />;
+  }
 
   // 별점 렌더링 함수
   const renderStarInput = () => {
@@ -188,7 +136,7 @@ export default function ReviewScreen({tourProgramId}: ReviewScreenProps) {
 
       if (response.status === 200) {
         // 성공 시 프론트에 추가
-        setMockReviews([
+        setReviews([
           {
             name: '나',
             count: 1,
@@ -199,7 +147,7 @@ export default function ReviewScreen({tourProgramId}: ReviewScreenProps) {
             tags: [],
             images: newImageUrl ? [newImageUrl] : [],
           },
-          ...mockReviews,
+          ...reviews,
         ]);
         setNewContent('');
         setNewImageUrl('');
@@ -281,46 +229,50 @@ export default function ReviewScreen({tourProgramId}: ReviewScreenProps) {
 
       {/* ⬇️ 총 리뷰 수 + 정렬 드롭다운 */}
       <View style={styles.reviewHeaderRow}>
-        <Text style={styles.totalReviewText}>총 리뷰 {totalCount}개</Text>
+        <Text style={styles.totalReviewText}>총 리뷰 {reviews.length}개</Text>
         <View style={styles.pickerContainer}>
           <Picker
             selectedValue={sortOrder}
             onValueChange={value => setSortOrder(value)}
             style={styles.picker}>
             <Picker.Item label="최신순" value="latest" />
-            <Picker.Item label="오래된순" value="oldest" />
-            <Picker.Item label="별점순" value="rating" />
+            <Picker.Item label="별점 높은순" value="rating" />
+            <Picker.Item label="별점 낮은순" value="lowRating" />
           </Picker>
         </View>
       </View>
 
       {/* 💬 리뷰 카드들 */}
-      {sortedReviews.map((review, i) => (
+      {reviews.map((review, i) => (
         <View key={i} style={styles.reviewCard}>
           <View style={styles.profileRow}>
-            <Image source={{uri: review.avatar}} style={styles.avatar} />
+            <Image
+              source={{
+                uri: `https://via.placeholder.com/36x36.png?text=${encodeURIComponent(
+                  review.name.charAt(0),
+                )}`,
+              }}
+              style={styles.avatar}
+            />
             <View>
               <Text style={styles.nickname}>{review.name}</Text>
               <View style={styles.metaRow}>
-                <Text style={styles.smallText}>{renderStars(review.avg)}</Text>
-                <Text style={styles.date}>{review.date}</Text>
+                <Text style={styles.smallText}>
+                  {renderStars(review.rating)}
+                </Text>
+                <Text style={styles.date}>
+                  {new Date(review.createdAt).toLocaleDateString()}
+                </Text>
               </View>
             </View>
           </View>
-          <Text style={styles.content}>{review.text}</Text>
-          <View style={styles.tagBox}>
-            {review.tags.map((tag, j) => (
-              <Text key={j} style={styles.tag}>
-                #{tag}
-              </Text>
-            ))}
-          </View>
-          {review.images.length > 0 && (
+          <Text style={styles.content}>{review.content}</Text>
+          {review.imageUrls.length > 0 && (
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
               style={{marginTop: 10}}>
-              {review.images.map((img, idx) => (
+              {review.imageUrls.map((img: string, idx: number) => (
                 <Image
                   key={idx}
                   source={{uri: img}}
@@ -446,7 +398,6 @@ const styles = StyleSheet.create({
   },
   reviewCard: {
     padding: 16,
-    // borderBottomWidth: 1,
     marginTop: 12,
     borderColor: '#eee',
   },
@@ -472,7 +423,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#aaa',
     textAlign: 'right',
-    minWidth: 240, // ← 필요시 고정 너비로 위치 안정
+    minWidth: 240,
   },
   content: {
     fontSize: 14,

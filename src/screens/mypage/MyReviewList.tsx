@@ -1,40 +1,125 @@
-import React from 'react';
-import {View, Text, StyleSheet, FlatList, SafeAreaView} from 'react-native';
+import React, {useState, useEffect} from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  FlatList,
+  SafeAreaView,
+  TouchableOpacity,
+  Alert,
+  Modal,
+  TextInput,
+} from 'react-native';
+import axios from 'axios';
 
-// 샘플 리뷰 데이터
-const reviews = [
-  {
-    id: '1',
-    title: '전주 한옥마을 투어',
-    content: '정말 재밌었어요!',
-    date: '2024-05-01',
-  },
-  {
-    id: '2',
-    title: '강릉 바다 여행',
-    content: '바다가 너무 예뻤어요.',
-    date: '2024-04-20',
-  },
-  {
-    id: '3',
-    title: '서울 야경 투어',
-    content: '야경이 멋졌어요.',
-    date: '2024-03-15',
-  },
-];
+type Review = {
+  tourProgramId: number;
+  title: string;
+  content: string;
+  createdAt: string;
+};
 
 const MyReviewList = () => {
+  const [reviews, setReviews] = useState<Review[]>([]);
+  const [editingReview, setEditingReview] = useState<Review | null>(null);
+  const [modalVisible, setModalVisible] = useState(false);
+  const [editedContent, setEditedContent] = useState('');
+
+  useEffect(() => {
+    fetchReviews();
+  }, []);
+
+  const fetchReviews = async () => {
+    try {
+      const res = await axios.get('http://localhost:8080/api/review', {
+        params: {
+          page: 0,
+          size: 10,
+          sortOption: 'ratingDesc',
+        },
+        headers: {
+          Authorization: `Bearer ${process.env.API_TOKEN}`,
+        },
+      });
+
+      const mapped = res.data.data.map((r: any) => ({
+        tourProgramId: r.tourProgramId,
+        title: r.title,
+        content: r.content,
+        createdAt: r.createdAt.slice(0, 10),
+      }));
+      setReviews(mapped);
+    } catch (error) {
+      console.error('리뷰 불러오기 실패:', error);
+    }
+  };
+
+  const handleDelete = (id: number) => {
+    Alert.alert('리뷰 삭제', '정말 삭제하시겠습니까?', [
+      {
+        text: '취소',
+        style: 'cancel',
+      },
+      {
+        text: '삭제',
+        onPress: async () => {
+          try {
+            await axios.delete(`http://localhost:8080/api/review/${id}`, {
+              headers: {
+                Authorization: `Bearer ${process.env.API_TOKEN}`,
+              },
+            });
+            setReviews(prev => prev.filter(r => r.tourProgramId !== id));
+          } catch (error) {
+            Alert.alert('오류', '리뷰 삭제 중 오류 발생');
+          }
+        },
+        style: 'destructive',
+      },
+    ]);
+  };
+
+  const handleEdit = (review: Review) => {
+    setEditingReview(review);
+    setEditedContent(review.content);
+    setModalVisible(true);
+  };
+
+  const saveEdited = () => {
+    setReviews(prev =>
+      prev.map(r =>
+        r.tourProgramId === editingReview?.tourProgramId
+          ? {...r, content: editedContent}
+          : r,
+      ),
+    );
+    setModalVisible(false);
+    setEditingReview(null);
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <Text style={styles.header}>내가 쓴 리뷰</Text>
+
       <FlatList
         data={reviews}
-        keyExtractor={item => item.id}
+        keyExtractor={item => item.tourProgramId.toString()}
         renderItem={({item}) => (
           <View style={styles.reviewCard}>
-            <Text style={styles.title}>{item.title}</Text>
+            <View style={styles.cardTop}>
+              <Text style={styles.title}>{item.title}</Text>
+              <View style={styles.actions}>
+                <TouchableOpacity onPress={() => handleEdit(item)}>
+                  <Text style={styles.actionText}>수정</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => handleDelete(item.tourProgramId)}>
+                  <Text style={[styles.actionText, {color: 'red'}]}>삭제</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
             <Text style={styles.content}>{item.content}</Text>
-            <Text style={styles.date}>{item.date}</Text>
+            <Text style={styles.date}>{item.createdAt}</Text>
           </View>
         )}
         ListEmptyComponent={
@@ -44,6 +129,36 @@ const MyReviewList = () => {
           reviews.length === 0 ? styles.emptyContainer : undefined
         }
       />
+
+      <Modal visible={modalVisible} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalBox}>
+            <Text style={styles.modalTitle}>리뷰 수정</Text>
+            <TextInput
+              style={styles.input}
+              multiline
+              numberOfLines={4}
+              value={editedContent}
+              onChangeText={setEditedContent}
+            />
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.modalBtn, {backgroundColor: '#ccc'}]}
+                onPress={() => {
+                  setModalVisible(false);
+                  setEditingReview(null);
+                }}>
+                <Text>취소</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalBtn, {backgroundColor: '#0288d1'}]}
+                onPress={saveEdited}>
+                <Text style={{color: 'white'}}>저장</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 };
@@ -68,16 +183,21 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 3,
   },
-  title: {
-    fontWeight: 'bold',
-    fontSize: 17,
-    marginBottom: 8,
-    color: '#222',
+  cardTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  title: {fontWeight: 'bold', fontSize: 17, color: '#222'},
+  actions: {flexDirection: 'row', gap: 12},
+  actionText: {
+    fontSize: 14,
+    color: '#0288d1',
   },
   content: {
     fontSize: 15,
     color: '#444',
-    marginBottom: 8,
+    marginVertical: 8,
   },
   date: {
     fontSize: 13,
@@ -93,6 +213,43 @@ const styles = StyleSheet.create({
   emptyContainer: {
     flex: 1,
     justifyContent: 'center',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalBox: {
+    width: '85%',
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 20,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    marginBottom: 12,
+  },
+  input: {
+    borderColor: '#ccc',
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 10,
+    minHeight: 80,
+    textAlignVertical: 'top',
+    fontSize: 15,
+  },
+  modalButtons: {
+    marginTop: 16,
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 12,
+  },
+  modalBtn: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 6,
   },
 });
 
