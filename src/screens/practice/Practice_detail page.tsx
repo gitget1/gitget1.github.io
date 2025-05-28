@@ -50,13 +50,13 @@ const Practice = () => {
   const [loading, setLoading] = useState(true);
   const navigation = useNavigation<StackNavigationProp<AppStackParamList>>();
   const route = useRoute<RouteProp<AppStackParamList, 'Practice'>>();
-  const {tourProgramId} = route.params;
+  const tourProgramId = route.params?.tourProgramId ?? 1; 
 
   useEffect(() => {
     const fetchData = async () => {
       try {
         const res = await axios.get(
-          `http://localhost:8080/api/tour-program/${tourProgramId}`,
+          `http://localhost:8080/api/tour-program/${tourProgramId}`, 
           {
             headers: {
               Authorization: `Bearer ${process.env.API_TOKEN}`,
