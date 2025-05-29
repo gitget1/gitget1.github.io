@@ -10,6 +10,7 @@ import {
   TouchableOpacity,
 } from 'react-native';
 import axios from 'axios';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {NativeStackScreenProps} from '@react-navigation/native-stack';
 import {RootStackParamList} from '../../navigations/root/RootNavigator';
 
@@ -20,7 +21,6 @@ type Question = {
 };
 
 type Props = NativeStackScreenProps<RootStackParamList, 'QuestionScreen'>;
-
 export default function QuestionScreen({navigation}: Props) {
   const [questions, setQuestions] = useState<Question[]>([]);
   const [currentIndex, setCurrentIndex] = useState<number>(0);
@@ -31,12 +31,29 @@ export default function QuestionScreen({navigation}: Props) {
   useEffect(() => {
     const fetchQuestions = async () => {
       try {
-        const res = await axios.get(`${API_URL}/generate_question`);
+        const accessToken = await AsyncStorage.getItem('accessToken');
+        if (!accessToken) {
+          Alert.alert('알림', '로그인이 필요한 서비스입니다.');
+          return;
+        }
+
+        const res = await axios.get(`${API_URL}/generate_question`, {
+          withCredentials: true,
+          headers: {
+            'Content-Type': 'application/json',
+            Accept: 'application/json',
+            Authorization: `Bearer ${accessToken}`,
+          },
+        });
 
         setQuestions(res.data.questions);
       } catch (error) {
         console.error(error);
-        Alert.alert('오류', '질문을 불러오는 데 실패했어요.');
+        if (axios.isAxiosError(error) && error.response?.status === 401) {
+          Alert.alert('알림', '로그인이 필요한 서비스입니다.');
+        } else {
+          Alert.alert('오류', '질문을 불러오는 데 실패했어요.');
+        }
       }
     };
     fetchQuestions();
@@ -55,13 +72,34 @@ export default function QuestionScreen({navigation}: Props) {
       } else {
         setLoading(true);
         try {
-          const res = await axios.post(`${API_URL}/rag_recommend`, {
-            answers: updatedAnswers,
-          });
+          const accessToken = await AsyncStorage.getItem('accessToken');
+          if (!accessToken) {
+            Alert.alert('알림', '로그인이 필요한 서비스입니다.');
+            return;
+          }
+
+          const res = await axios.post(
+            `${API_URL}/rag_recommend`,
+            {
+              answers: updatedAnswers,
+            },
+            {
+              withCredentials: true,
+              headers: {
+                'Content-Type': 'application/json',
+                Accept: 'application/json',
+                Authorization: `Bearer ${accessToken}`,
+              },
+            },
+          );
           navigation.navigate('Result', {result: res.data});
         } catch (error) {
           console.error(error);
-          Alert.alert('오류', '분석 중 문제가 발생했어요.');
+          if (axios.isAxiosError(error) && error.response?.status === 401) {
+            Alert.alert('알림', '로그인이 필요한 서비스입니다.');
+          } else {
+            Alert.alert('오류', '분석 중 문제가 발생했어요.');
+          }
         } finally {
           setLoading(false);
         }

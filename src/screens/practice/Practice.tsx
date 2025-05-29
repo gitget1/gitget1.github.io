@@ -13,6 +13,10 @@ import {
 } from 'react-native';
 import {Picker} from '@react-native-picker/picker';
 import axios from 'axios';
+import {useRoute} from '@react-navigation/native';
+import type {RouteProp} from '@react-navigation/native';
+import type {AppStackParamList} from '../../navigations/AppNavigator';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const ratingData = [
   {score: 5, count: 39},
@@ -38,11 +42,10 @@ function renderStars(rating: number) {
   return '⭐'.repeat(fullStars) + '☆'.repeat(emptyStars);
 }
 
-interface ReviewScreenProps {
-  tourProgramId: number;
-}
+export default function ReviewScreen() {
+  const route = useRoute<RouteProp<AppStackParamList, 'Practice'>>();
+  const tourProgramId = route.params?.tourProgramId ?? 1;
 
-export default function ReviewScreen({tourProgramId}: ReviewScreenProps) {
   const maxCount = Math.max(...ratingData.map(r => r.count));
 
   const [sortOrder, setSortOrder] = useState<'latest' | 'rating' | 'lowRating'>(
@@ -59,33 +62,72 @@ export default function ReviewScreen({tourProgramId}: ReviewScreenProps) {
     () => ({
       latest: 'addedDesc',
       rating: 'ratingDesc',
-      lowRating: 'ratingAsc', // ⭐ 별점 낮은 순
+      lowRating: 'ratingAsc',
     }),
     [],
   );
 
   useEffect(() => {
     const fetchReviews = async () => {
+      if (!tourProgramId) {
+        console.error('tourProgramId가 없습니다.');
+        return;
+      }
+
       try {
         setLoading(true);
-        const res = await axios.get(
-          `http://localhost:8080/api/review?page=0&size=10&sortOption=${sortMap[sortOrder]}`,
-          {
-            headers: {
-              Authorization: 'Bearer YOUR_ACCESS_TOKEN', // 여기에 토큰 입력
-            },
+        console.log('리뷰 요청 tourProgramId:', tourProgramId);
+
+        // 로컬 스토리지에서 토큰 가져오기
+        const token = await AsyncStorage.getItem('userToken');
+
+        const res = await axios.get(`http://10.0.2.2:8080/api/review`, {
+          params: {
+            page: 0,
+            size: 10,
+            sortOption: sortMap[sortOrder],
+            tourProgramId: tourProgramId,
           },
-        );
-        setReviews(res.data.data);
+          headers: token
+            ? {
+                Authorization: `Bearer ${token}`,
+              }
+            : undefined,
+        });
+        if (
+          res.data.status === '100 CONTINUE' ||
+          res.data.status === 'Success' ||
+          res.data.status === 'OK'
+        ) {
+          const processedReviews = res.data.data.map((review: any) => ({
+            ...review,
+            imageUrls: Array.isArray(review.imageUrls) ? review.imageUrls : [],
+            rating: typeof review.rating === 'number' ? review.rating : 0,
+            content: review.content || '',
+            name: review.user?.name || '익명',
+            createdAt: review.createdAt || new Date().toISOString(),
+          }));
+          setReviews(processedReviews);
+        } else {
+          console.error('API 응답 상태:', res.data.status);
+          throw new Error(
+            res.data.message || '리뷰를 불러오는데 실패했습니다.',
+          );
+        }
       } catch (error) {
         console.error('리뷰 불러오기 실패:', error);
+        if (axios.isAxiosError(error) && error.response?.status === 401) {
+          Alert.alert('알림', '로그인이 필요한 서비스입니다.');
+        } else {
+          Alert.alert('오류', '리뷰를 불러오는데 실패했습니다.');
+        }
       } finally {
         setLoading(false);
       }
     };
 
     fetchReviews();
-  }, [sortOrder, sortMap]);
+  }, [sortOrder, sortMap, tourProgramId]);
 
   if (loading) {
     return <ActivityIndicator size="large" style={{marginTop: 50}} />;
@@ -122,44 +164,66 @@ export default function ReviewScreen({tourProgramId}: ReviewScreenProps) {
   // 리뷰 작성 핸들러
   const handleSubmit = async () => {
     if (!newContent.trim()) {
-      Alert.alert('리뷰 내용을 입력해주세요.');
+      Alert.alert('알림', '리뷰 내용을 입력해주세요.');
       return;
     }
+
+    // 로그인 상태 확인
+    const token = await AsyncStorage.getItem('userToken');
+    if (!token) {
+      Alert.alert('알림', '리뷰를 작성하려면 로그인이 필요합니다.');
+      return;
+    }
+
     setIsSubmitting(true);
     try {
-      const response = await axios.post('/api/review', {
-        rating: `${newRating}!0`,
-        content: newContent,
-        tourProgramId,
-        imageUrls: newImageUrl ? [newImageUrl] : [],
-      });
-
-      if (response.status === 200) {
-        // 성공 시 프론트에 추가
-        setReviews([
-          {
-            name: '나',
-            count: 1,
-            avg: newRating,
-            avatar: 'https://via.placeholder.com/36x36.png?text=🧑',
-            date: new Date().toISOString().slice(0, 10),
-            text: newContent,
-            tags: [],
-            images: newImageUrl ? [newImageUrl] : [],
+      const response = await axios.post(
+        `http://10.0.2.2:8080/api/review`,
+        {
+          tourProgramId: tourProgramId,
+          rating: newRating,
+          content: newContent,
+          imageUrls: newImageUrl ? [newImageUrl] : [],
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
           },
-          ...reviews,
-        ]);
+        },
+      );
+
+      if (
+        response.data.status === '100 CONTINUE' ||
+        response.data.status === 'Success' ||
+        response.data.status === 'OK'
+      ) {
+        // 성공 시 프론트에 추가
+        const newReview = {
+          rating: newRating,
+          content: newContent,
+          createdAt: new Date().toISOString(),
+          imageUrls: newImageUrl ? [newImageUrl] : [],
+          name: '나',
+          user: {name: '나'},
+        };
+        setReviews([newReview, ...reviews]);
         setNewContent('');
         setNewImageUrl('');
         setNewRating(5);
-        Alert.alert('리뷰가 등록되었습니다!');
+        Alert.alert('성공', '리뷰가 등록되었습니다!');
+      } else {
+        throw new Error(response.data.message || '리뷰 등록에 실패했습니다.');
       }
     } catch (error) {
       if (axios.isAxiosError(error)) {
-        Alert.alert(
-          '리뷰 등록 실패',
-          error.response?.data?.message || '알 수 없는 오류가 발생했습니다.',
-        );
+        if (error.response?.status === 401) {
+          Alert.alert('알림', '로그인이 필요한 서비스입니다.');
+        } else {
+          Alert.alert(
+            '리뷰 등록 실패',
+            error.response?.data?.message || '알 수 없는 오류가 발생했습니다.',
+          );
+        }
       } else {
         Alert.alert('리뷰 등록 실패', '알 수 없는 오류가 발생했습니다.');
       }
@@ -248,17 +312,19 @@ export default function ReviewScreen({tourProgramId}: ReviewScreenProps) {
           <View style={styles.profileRow}>
             <Image
               source={{
-                uri: `https://via.placeholder.com/36x36.png?text=${encodeURIComponent(
-                  review.name.charAt(0),
-                )}`,
+                uri:
+                  review.user?.avatar ||
+                  `https://via.placeholder.com/36x36.png?text=${encodeURIComponent(
+                    (review.name || '익명').charAt(0),
+                  )}`,
               }}
               style={styles.avatar}
             />
             <View>
-              <Text style={styles.nickname}>{review.name}</Text>
+              <Text style={styles.nickname}>{review.name || '익명'}</Text>
               <View style={styles.metaRow}>
                 <Text style={styles.smallText}>
-                  {renderStars(review.rating)}
+                  {renderStars(review.rating || 0)}
                 </Text>
                 <Text style={styles.date}>
                   {new Date(review.createdAt).toLocaleDateString()}
@@ -267,7 +333,7 @@ export default function ReviewScreen({tourProgramId}: ReviewScreenProps) {
             </View>
           </View>
           <Text style={styles.content}>{review.content}</Text>
-          {review.imageUrls.length > 0 && (
+          {review.imageUrls && review.imageUrls.length > 0 && (
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}

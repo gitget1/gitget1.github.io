@@ -1,4 +1,4 @@
-import React, {useEffect, useState} from 'react';
+import React, {useEffect, useState, useCallback} from 'react';
 import {
   View,
   Text,
@@ -6,349 +6,161 @@ import {
   StyleSheet,
   Alert,
   Modal,
+  Linking,
 } from 'react-native';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import WebView from 'react-native-webview';
+import {useNavigation} from '@react-navigation/native';
 
-// 버튼 컴포넌트의 props 타입 정의
-interface ButtonProps {
-  backendUrl: string;
-}
+// 백엔드 URL 설정
+const backendUrl = 'http://124.60.137.10:80';
 
-// URL 파라미터 파싱 함수
-function getQueryParams(url: string) {
-  const params: Record<string, string> = {};
-  const queryString = url.split('?')[1];
-  if (!queryString) return params;
-
-  queryString.split('&').forEach(pair => {
-    const [key, value] = pair.split('=');
-    if (key && value) {
-      params[key] = decodeURIComponent(value);
-    }
-  });
-  return params;
-}
-
-const App: React.FC = () => {
-  // 백엔드 서버 URL 설정
-  const backendUrl: string = 'http://124.60.137.10:8080';
-  // WebView 모달 표시 여부를 관리하는 상태
+const App = () => {
+  console.log('start');
   const [isWebViewVisible, setIsWebViewVisible] = useState(false);
+  const navigation = useNavigation();
 
-  // 컴포넌트 마운트 시 토큰 체크 및 갱신
-  useEffect(() => {
-    console.log('useEffect 실행1');
-    checkAndRefreshToken();
-  }, []);
-
-  // 토큰 체크 및 갱신 함수
-  const checkAndRefreshToken = async () => {
-    try {
-      // AsyncStorage에서 토큰 확인
-      const accessToken = await AsyncStorage.getItem('accessToken');
-
-      if (!accessToken) {
-        console.log('useEffect 실행2');
-        // 토큰이 없으면 갱신 요청
-        const response = await axios.post(
-          `${backendUrl}/reissue`,
-          {},
+  // getTokenByCode 함수를 useCallback으로 감싸서 메모이제이션
+  const getTokenByCode = useCallback(
+    async code => {
+      try {
+        const response = await axios.get(
+          `${backendUrl}/auth/token?code=${code}`,
           {
             withCredentials: true,
-            timeout: 10000,
-            headers: {
-              'Content-Type': 'application/json',
-              Accept: 'application/json',
-            },
           },
         );
 
-        const newAccessToken = response.headers['authorization'];
-        console.log('Access Token 확인:', newAccessToken);
+        const accessToken = response.headers.authorization;
+        console.log('받은 accessToken:', accessToken);
 
-        if (newAccessToken) {
-          // 새 토큰 저장
-          await AsyncStorage.setItem('accessToken', newAccessToken);
-          console.log('Access Token 갱신 완료:', newAccessToken);
-        } else {
-          console.error('Access Token 갱신 실패');
+        if (accessToken) {
+          await AsyncStorage.setItem('accessToken', accessToken);
+          Alert.alert('로그인 완료', '토큰 저장 완료');
+          Alert.alert('accessToken 값 출력', accessToken);
+          navigation.replace('Main');
         }
+      } catch (error) {
+        console.error('토큰 요청 실패:', error);
+        Alert.alert('로그인 실패', '토큰을 받을 수 없습니다.');
       }
-    } catch (error) {
-      // 에러 처리
-      if (axios.isAxiosError(error)) {
-        if (error.code === 'ECONNABORTED') {
-          Alert.alert(
-            '알림',
-            '서버 연결 시간이 초과되었습니다. 다시 시도해주세요.',
-          );
-        } else if (error.response?.status === 401) {
-          Alert.alert(
-            '알림',
-            '로그인이 되어 있지 않습니다. 로그인을 해주세요.',
-          );
-        } else if (error.code === 'ERR_NETWORK') {
-          Alert.alert(
-            '알림',
-            '서버에 연결할 수 없습니다. 인터넷 연결을 확인해주세요.',
-          );
-        } else {
-          console.error('네트워크 오류:', error.message);
-          Alert.alert('알림', '서버 연결 중 오류가 발생했습니다.');
+    },
+    [navigation],
+  );
+
+  useEffect(() => {
+    const getInitialLink = async () => {
+      const initialUrl = await Linking.getInitialURL();
+      console.log('딥링크 감지됨:', initialUrl);
+
+      if (initialUrl && initialUrl.startsWith('travellocal://login/callback')) {
+        const code = extractCodeFromUrl(initialUrl);
+        if (code) {
+          console.log('추출된 authCode:', code);
+          getTokenByCode(code);
         }
       } else {
-        console.error('알 수 없는 오류:', error);
-        Alert.alert('알림', '알 수 없는 오류가 발생했습니다.');
+        checkAndRefreshToken(); // 일반적인 재발급 흐름
+      }
+    };
+
+    getInitialLink();
+
+    // 앱이 백그라운드 → 포그라운드로 전환될 때도 딥링크 처리
+    const subscription = Linking.addEventListener('url', ({url}) => {
+      console.log('앱 재활성화로 URL 감지됨:', url);
+      if (url && url.startsWith('travellocal://login/callback')) {
+        const code = extractCodeFromUrl(url);
+        if (code) {
+          getTokenByCode(code);
+        }
+      }
+    });
+
+    return () => subscription.remove();
+  }, [getTokenByCode]);
+
+  // URLSearchParams 대신 직접 파싱
+  const extractCodeFromUrl = url => {
+    const queryString = url.split('?')[1];
+    if (!queryString) {
+      return null;
+    }
+    const params = queryString.split('&');
+    for (let param of params) {
+      const [key, value] = param.split('=');
+      if (key === 'code') {
+        return decodeURIComponent(value);
       }
     }
+    return null;
   };
 
-  // 네이버 로그인 버튼 클릭 시 WebView 모달 표시
-  const onNaverLogin = (): void => {
-    setIsWebViewVisible(true);
-  };
-
-  // WebView 네비게이션 상태 변경 처리
-  const handleWebViewNavigationStateChange = (navState: any) => {
-    console.log('Navigation State:', navState);
-    // 네이버 로그인 콜백 URL 처리
-    if (navState.url.includes('login/oauth2/code/naver')) {
-      const params = getQueryParams(navState.url);
-      const code = params.code;
-      const state = params.state;
-      if (code && state) {
-        // 토큰 교환 요청
-        axios
-          .post(
-            `${backendUrl}/login/oauth2/code/naver`,
-            {code, state},
-            {
-              headers: {
-                'Content-Type': 'application/json',
-              },
-            },
-          )
-          .then(async response => {
-            const token = response.headers['authorization'];
-            if (token) {
-              await AsyncStorage.setItem('accessToken', token);
-              setIsWebViewVisible(false);
-              Alert.alert('알림', '네이버 로그인이 완료되었습니다.');
-            }
-          })
-          .catch(error => {
-            console.error('토큰 교환 실패:', error);
-            Alert.alert('알림', '로그인 처리 중 오류가 발생했습니다.');
-          });
-      }
-    }
-  };
-
-  // WebView 에러 처리
-  const handleWebViewError = (syntheticEvent: any) => {
-    const {nativeEvent} = syntheticEvent;
-    console.error('WebView Error:', nativeEvent);
-    Alert.alert('알림', '페이지 로딩 중 오류가 발생했습니다.');
-  };
-
-  // 로그아웃 처리
-  const handleLogout = async (): Promise<void> => {
+  // reissue로 토큰 재발급
+  const checkAndRefreshToken = async () => {
     try {
       const accessToken = await AsyncStorage.getItem('accessToken');
-
       if (!accessToken) {
-        Alert.alert(
-          '알림',
-          '로그인 되어 있지 않기 때문에 로그아웃할 수 없습니다.',
+        const response = await axios.post(
+          `${backendUrl}/reissue`,
+          {},
+          {withCredentials: true},
         );
-        return;
-      }
-
-      // 로그아웃 요청
-      const response = await axios.get(`${backendUrl}/logout`, {
-        withCredentials: true,
-      });
-
-      if (response.status === 200) {
-        console.log('로그아웃 성공');
-        // 토큰 제거
-        await AsyncStorage.removeItem('accessToken');
-        Alert.alert('알림', '로그아웃되었습니다.');
-      } else {
-        console.error('로그아웃 실패:', response);
-        Alert.alert('알림', '로그아웃에 실패했습니다. 다시 시도해주세요.');
+        const newAccessToken = response.headers.authorization;
+        console.log('재발급된 accessToken:', newAccessToken);
+        if (newAccessToken) {
+          await AsyncStorage.setItem('accessToken', newAccessToken);
+        }
       }
     } catch (error) {
-      console.error('로그아웃 요청 중 오류 발생:', error);
-      Alert.alert('알림', '로그아웃 처리 중 문제가 발생했습니다.');
+      console.error('reissue 실패:', error);
     }
+  };
+
+  const onNaverLogin = () => {
+    setIsWebViewVisible(true);
   };
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>OAuth2 네이버 로그인 및 데이터 요청</Text>
-      {/* 네이버 로그인 버튼 */}
+      <Text style={styles.title}>OAuth2 네이버 로그인</Text>
       <TouchableOpacity style={styles.button} onPress={onNaverLogin}>
         <Text style={styles.buttonText}>NAVER LOGIN</Text>
       </TouchableOpacity>
-      {/* 테스트 버튼 */}
-      <TestButton backendUrl={backendUrl} />
-      {/* 메인 버튼 */}
-      <MainButton backendUrl={backendUrl} />
-      {/* 로그아웃 버튼 */}
-      <TouchableOpacity style={styles.button} onPress={handleLogout}>
-        <Text style={styles.buttonText}>LOGOUT</Text>
-      </TouchableOpacity>
 
-      {/* WebView 모달 */}
       <Modal
         visible={isWebViewVisible}
-        onRequestClose={() => setIsWebViewVisible(false)}
-        animationType="slide"
-        transparent={true}>
-        <View style={styles.modalContainer}>
-          <View style={styles.webViewContainer}>
-            {/* 닫기 버튼 */}
-            <TouchableOpacity
-              style={styles.closeButton}
-              onPress={() => setIsWebViewVisible(false)}>
-              <Text style={styles.closeButtonText}>닫기</Text>
-            </TouchableOpacity>
-            {/* 네이버 로그인 WebView */}
-            <WebView
-              source={{uri: `${backendUrl}/oauth2/authorization/naver`}}
-              onNavigationStateChange={handleWebViewNavigationStateChange}
-              onError={handleWebViewError}
-              style={styles.webView}
-            />
-          </View>
+        onRequestClose={() => setIsWebViewVisible(false)}>
+        <View style={styles.webViewContainer}>
+          <TouchableOpacity
+            style={styles.closeButton}
+            onPress={() => setIsWebViewVisible(false)}>
+            <Text style={styles.closeButtonText}>닫기</Text>
+          </TouchableOpacity>
+          <WebView
+            source={{uri: `${backendUrl}/oauth2/authorization/naver`}}
+            style={styles.webView}
+          />
         </View>
       </Modal>
     </View>
   );
 };
 
-// 테스트 API 호출 버튼 컴포넌트
-const TestButton: React.FC<ButtonProps> = ({backendUrl}) => {
-  const TestData = async (): Promise<void> => {
-    try {
-      const accessToken = await AsyncStorage.getItem('accessToken');
-      if (!accessToken) {
-        Alert.alert('알림', 'Access Token이 없습니다.');
-        return;
-      }
-
-      // 테스트 API 호출
-      const response = await axios.get(`${backendUrl}/test`, {
-        headers: {
-          Authorization: `${accessToken}`,
-        },
-        withCredentials: true,
-      });
-
-      console.log('응답 데이터 (/test):', response.data);
-      Alert.alert('응답', `응답 데이터: ${response.data}`);
-    } catch (error) {
-      console.error('데이터 요청 실패:', error);
-      Alert.alert('알림', '데이터 요청에 실패했습니다.');
-    }
-  };
-
-  return (
-    <TouchableOpacity style={styles.button} onPress={TestData}>
-      <Text style={styles.buttonText}>TEST 요청</Text>
-    </TouchableOpacity>
-  );
-};
-
-// 메인 API 호출 버튼 컴포넌트
-const MainButton: React.FC<ButtonProps> = ({backendUrl}) => {
-  const MainData = async (): Promise<void> => {
-    try {
-      const accessToken = await AsyncStorage.getItem('accessToken');
-      if (!accessToken) {
-        Alert.alert('알림', 'Access Token이 없습니다. 다시 로그인하세요.');
-        return;
-      }
-
-      // 메인 API 호출
-      const response = await axios.get(`${backendUrl}/`, {
-        headers: {
-          Authorization: `${accessToken}`,
-        },
-        withCredentials: true,
-      });
-
-      console.log('응답 데이터 (/):', response.data);
-      Alert.alert('응답', `응답 데이터: ${response.data}`);
-    } catch (error) {
-      console.error(
-        '데이터 요청 실패 (/):',
-        error instanceof Error ? error.message : '알 수 없는 오류',
-      );
-      Alert.alert('알림', '데이터 요청에 실패했습니다.');
-    }
-  };
-
-  return (
-    <TouchableOpacity style={styles.button} onPress={MainData}>
-      <Text style={styles.buttonText}>HOME 요청</Text>
-    </TouchableOpacity>
-  );
-};
-
-// 스타일 정의
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 20,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 20,
-  },
-  button: {
-    backgroundColor: 'blue',
-    padding: 15,
-    borderRadius: 5,
-    marginVertical: 10,
-    width: '80%',
-  },
-  buttonText: {
-    color: 'white',
-    textAlign: 'center',
-    fontSize: 16,
-  },
-  modalContainer: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  webViewContainer: {
-    width: '90%',
-    height: '80%',
-    backgroundColor: 'white',
-    borderRadius: 10,
-    overflow: 'hidden',
-  },
-  webView: {
-    flex: 1,
-  },
+  container: {flex: 1, justifyContent: 'center', alignItems: 'center'},
+  title: {fontSize: 20, marginBottom: 20},
+  button: {padding: 15, backgroundColor: 'blue', borderRadius: 5},
+  buttonText: {color: 'white', fontSize: 16},
+  webViewContainer: {flex: 1},
+  webView: {flex: 1},
   closeButton: {
     padding: 10,
-    backgroundColor: '#f0f0f0',
+    backgroundColor: 'lightgray',
     alignItems: 'center',
   },
-  closeButtonText: {
-    color: 'blue',
-    fontSize: 16,
-  },
+  closeButtonText: {fontSize: 16},
 });
 
 export default App;

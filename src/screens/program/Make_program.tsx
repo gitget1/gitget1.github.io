@@ -18,6 +18,8 @@ import Geolocation from '@react-native-community/geolocation';
 import {GooglePlacesAutocomplete} from 'react-native-google-places-autocomplete';
 import haversine from 'haversine-distance';
 import axios from 'axios';
+import {useNavigation} from '@react-navigation/native';
+import polyline from '@mapbox/polyline';
 
 interface DayPlan {
   place: string;
@@ -75,6 +77,10 @@ function Make_program() {
   });
   const mapRef = useRef<MapView>(null);
   const [placeModalVisible, setPlaceModalVisible] = useState(false);
+  const navigation = useNavigation();
+  const [routes, setRoutes] = useState<{
+    [key: string]: {latitude: number; longitude: number}[];
+  }>({});
 
   useEffect(() => {
     // 현재 위치 가져오기
@@ -145,32 +151,75 @@ function Make_program() {
     return total / 1000; // km
   };
 
+  // Directions API로 경로 가져오기
+  const getRouteCoordinates = async (
+    origin: {latitude: number; longitude: number},
+    destination: {latitude: number; longitude: number},
+    key: string,
+  ) => {
+    try {
+      const url = `https://maps.googleapis.com/maps/api/directions/json?origin=${origin.latitude},${origin.longitude}&destination=${destination.latitude},${destination.longitude}&key=${GOOGLE_API_KEY}&mode=driving`;
+      const response = await fetch(url);
+      const data = await response.json();
+      if (data.routes.length) {
+        const points = polyline
+          .decode(data.routes[0].overview_polyline.points)
+          .map(([latitude, longitude]: [number, number]) => ({
+            latitude,
+            longitude,
+          }));
+        setRoutes(prev => ({...prev, [key]: points}));
+      }
+    } catch (e) {
+      console.error('경로 가져오기 실패:', e);
+    }
+  };
+
+  // Day별 장소 쌍마다 경로 요청
+  useEffect(() => {
+    days.forEach((day, dayIdx) => {
+      for (let i = 1; i < day.plans.length; i++) {
+        const prev = day.plans[i - 1].coordinate;
+        const curr = day.plans[i].coordinate;
+        if (prev && curr) {
+          const key = `${dayIdx}-${i - 1}-${i}`;
+          getRouteCoordinates(prev, curr, key);
+        }
+      }
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [days]);
+
   // 여행 일정 데이터 백엔드로 전송
   const handleSubmit = async () => {
+    // 필수 입력값 검증
+    if (!title || !description || !regionInput || !guidePrice) {
+      Alert.alert(
+        '입력 오류',
+        '제목, 소개, 지역, 가이드 가격은 필수 입력 항목입니다.',
+      );
+      return;
+    }
+
     // days → schedules 변환
-    const schedules: any[] = [];
-    days.forEach((day, dayIdx) => {
-      day.plans.forEach((plan, seq) => {
-        if (plan.coordinate) {
-          schedules.push({
-            day: dayIdx + 1,
-            scheduleSequence: seq,
-            placeName: plan.place,
-            lat: plan.coordinate.latitude,
-            lon: plan.coordinate.longitude,
-            placeDescription: plan.memo,
-            travelTime: 10, // 필요시 계산 또는 입력값으로 대체
-          });
-        }
-      });
-    });
+    const schedules = days.flatMap((day, dayIdx) =>
+      day.plans.map((plan, seq) => ({
+        day: dayIdx + 1,
+        scheduleSequence: seq,
+        placeName: plan.place,
+        lat: plan.coordinate?.latitude ?? 0,
+        lon: plan.coordinate?.longitude ?? 0,
+        placeDescription: plan.memo,
+        travelTime: 0, // 기본값 0으로 설정
+      })),
+    );
 
     // 전체 데이터 구성
     const data = {
       title,
       description,
-      guidePrice: Number(guidePrice) || 10,
-      region: regionInput || 'string',
+      guidePrice: Number(guidePrice),
+      region: regionInput,
       thumbnailUrl: thumbnail ?? '',
       hashtags: hashtags
         ? hashtags
@@ -182,8 +231,8 @@ function Make_program() {
     };
 
     try {
-      await axios.post(
-        'http://114.71.220.195:8080/api/tour-program', // 실제 엔드포인트로 변경
+      const response = await axios.post(
+        'http://124.60.137.10:80/api/tour-program',
         data,
         {
           headers: {
@@ -191,7 +240,25 @@ function Make_program() {
           },
         },
       );
-      Alert.alert('성공', '여행 일정이 등록되었습니다!');
+
+      if (response.data.status === '100 CONTINUE') {
+        Alert.alert('성공', '여행 일정이 등록되었습니다!', [
+          {
+            text: '확인',
+            onPress: () => {
+              // 상세 페이지로 이동
+              navigation.navigate('Practice', {
+                tourProgramId: response.data.data.tourProgramId,
+              });
+            },
+          },
+        ]);
+      } else {
+        Alert.alert(
+          '오류',
+          response.data.message || '등록 중 오류가 발생했습니다.',
+        );
+      }
     } catch (error) {
       console.error(error);
       Alert.alert('오류', '등록 중 오류가 발생했습니다.');
@@ -326,18 +393,22 @@ function Make_program() {
                         />
                       ),
                   )}
-                  {/* Polyline (장소 연결) */}
-                  {day.plans.length > 1 && (
-                    <Polyline
-                      key={`polyline-${dayIdx}`}
-                      coordinates={day.plans.map(
-                        p =>
-                          p.coordinate as {latitude: number; longitude: number},
-                      )}
-                      strokeColor={dayColors[dayIdx % dayColors.length]}
-                      strokeWidth={3}
-                    />
-                  )}
+                  {/* Directions API 경로 Polyline */}
+                  {day.plans.length > 1 &&
+                    day.plans.slice(1).map((p, idx) => {
+                      const key = `${dayIdx}-${idx}-${idx + 1}`;
+                      const routeCoords = routes[key];
+                      return (
+                        routeCoords && (
+                          <Polyline
+                            key={`route-${key}`}
+                            coordinates={routeCoords}
+                            strokeColor={dayColors[dayIdx % dayColors.length]}
+                            strokeWidth={3}
+                          />
+                        )
+                      );
+                    })}
                   {/* 거리 표시 */}
                   {day.plans.length > 1 &&
                     day.plans.slice(1).map((p, idx) => {
@@ -590,17 +661,25 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   distanceBox: {
-    backgroundColor: 'white',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: '#0288d1',
+    backgroundColor: '#fffbe6',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+    borderWidth: 2,
+    borderColor: '#ff9800',
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 2},
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+    elevation: 3,
   },
   distanceText: {
-    color: '#0288d1',
+    color: '#ff9800',
     fontWeight: 'bold',
-    fontSize: 13,
+    fontSize: 15,
+    textShadowColor: '#fff',
+    textShadowOffset: {width: 1, height: 1},
+    textShadowRadius: 2,
   },
   totalDistanceBox: {
     position: 'absolute',

@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -27,6 +27,18 @@ interface Message {
   sender: 'me' | 'other';
   timestamp: string;
   isRead: boolean;
+  //채팅 메세지아이디, 유저 아이디, 메세지 내용, 시간(보낸시간) 
+}
+
+interface Participant {
+  userId: number;
+  userName: string;
+}
+
+interface ChatRoomInfo {
+  roomId: number;
+  participants: Participant[];
+  createdAt: string;
 }
 
 // 더미 데이터
@@ -66,12 +78,34 @@ const ChatRoom = () => {
   const navigation = useNavigation<ChatRoomNavigationProp>();
   const [message, setMessage] = useState('');
   const [messages, setMessages] = useState<Message[]>(dummyMessages);
+  const [roomInfo, setRoomInfo] = useState<ChatRoomInfo | null>(null);
   const [roomTitle, _setRoomTitle] = useState(() => {
     // roomId에 따라 채팅방 제목을 설정
     // 실제로는 API나 데이터베이스에서 가져올 수 있음
     return params.roomId === '1' ? '여행 친구 모임' : '제주도 여행팸';
   });
   const flatListRef = useRef<FlatList>(null);
+
+  // 채팅방 생성 API 호출 (예시)
+  useEffect(() => {
+    const createRoom = async () => {
+      try {
+        // 예시: userIds는 실제 참여자 id 배열로 대체
+        const response = await fetch('http://124.60.137.10:8080/api/chat/rooms', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ userIds: [1, 2] }), // 실제 참여자 id로 대체
+        });
+        const data = await response.json();
+        setRoomInfo(data);
+      } catch (e) {
+        console.error('채팅방 생성 실패:', e);
+      }
+    };
+    createRoom();
+  }, []);
 
   // 메시지 전송
   const handleSend = () => {
@@ -129,8 +163,12 @@ const ChatRoom = () => {
           <Ionicons name="chevron-back" size={24} color="#000" />
         </TouchableOpacity>
         <View style={styles.headerInfo}>
-          <Text style={styles.headerTitle}>{roomTitle}</Text>
-          <Text style={styles.headerSubtitle}>2명</Text>
+          <Text style={styles.headerTitle}>{roomInfo ? `채팅방 #${roomInfo.roomId}` : roomTitle}</Text>
+          <Text style={styles.headerSubtitle}>
+            {roomInfo
+              ? `${roomInfo.participants.map(p => p.userName).join(', ')} | 생성: ${roomInfo.createdAt}`
+              : '2명'}
+          </Text>
         </View>
         <TouchableOpacity style={styles.menuButton}>
           <Ionicons name="menu" size={24} color="#000" />
