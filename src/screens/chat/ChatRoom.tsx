@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, {useState, useRef, useEffect} from 'react';
 import {
   View,
   Text,
@@ -10,12 +10,12 @@ import {
   Platform,
   SafeAreaView,
 } from 'react-native';
-import { useRoute, useNavigation, RouteProp } from '@react-navigation/native';
-import { StackNavigationProp } from '@react-navigation/stack';
+import {useRoute, useNavigation, RouteProp} from '@react-navigation/native';
+import {StackNavigationProp} from '@react-navigation/stack';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 
 type RootStackParamList = {
-  ChatRoom: { roomId: string };
+  ChatRoom: {roomId: string};
 };
 
 type ChatRoomRouteProp = RouteProp<RootStackParamList, 'ChatRoom'>;
@@ -27,7 +27,7 @@ interface Message {
   sender: 'me' | 'other';
   timestamp: string;
   isRead: boolean;
-  //채팅 메세지아이디, 유저 아이디, 메세지 내용, 시간(보낸시간) 
+  //채팅 메세지아이디, 유저 아이디, 메세지 내용, 시간(보낸시간)
 }
 
 interface Participant {
@@ -74,7 +74,7 @@ const dummyMessages: Message[] = [
 ];
 
 const ChatRoom = () => {
-  const { params } = useRoute<ChatRoomRouteProp>();
+  const {params} = useRoute<ChatRoomRouteProp>();
   const navigation = useNavigation<ChatRoomNavigationProp>();
   const [message, setMessage] = useState('');
   const [messages, setMessages] = useState<Message[]>(dummyMessages);
@@ -91,13 +91,16 @@ const ChatRoom = () => {
     const createRoom = async () => {
       try {
         // 예시: userIds는 실제 참여자 id 배열로 대체
-        const response = await fetch('http://124.60.137.10:8080/api/chat/rooms', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
+        const response = await fetch(
+          'http://124.60.137.10:8080/api/chat/rooms',
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({userIds: [1, 2]}), // 실제 참여자 id로 대체
           },
-          body: JSON.stringify({ userIds: [1, 2] }), // 실제 참여자 id로 대체
-        });
+        );
         const data = await response.json();
         setRoomInfo(data);
       } catch (e) {
@@ -123,24 +126,26 @@ const ChatRoom = () => {
       };
       setMessages([...messages, newMessage]);
       setMessage('');
-      
+
       // 스크롤을 최신 메시지로 이동
       setTimeout(() => {
-        flatListRef.current?.scrollToEnd({ animated: true });
+        flatListRef.current?.scrollToEnd({animated: true});
       }, 100);
     }
   };
 
   // 메시지 렌더링
-  const renderMessage = ({ item }: { item: Message }) => (
-    <View style={[
-      styles.messageContainer,
-      item.sender === 'me' ? styles.myMessage : styles.otherMessage
-    ]}>
-      <View style={[
-        styles.messageBubble,
-        item.sender === 'me' ? styles.myBubble : styles.otherBubble
+  const renderMessage = ({item}: {item: Message}) => (
+    <View
+      style={[
+        styles.messageContainer,
+        item.sender === 'me' ? styles.myMessage : styles.otherMessage,
       ]}>
+      <View
+        style={[
+          styles.messageBubble,
+          item.sender === 'me' ? styles.myBubble : styles.otherBubble,
+        ]}>
         <Text style={styles.messageText}>{item.text}</Text>
       </View>
       <View style={styles.messageFooter}>
@@ -158,15 +163,18 @@ const ChatRoom = () => {
       <View style={styles.header}>
         <TouchableOpacity
           style={styles.backButton}
-          onPress={() => navigation.goBack()}
-        >
+          onPress={() => navigation.goBack()}>
           <Ionicons name="chevron-back" size={24} color="#000" />
         </TouchableOpacity>
         <View style={styles.headerInfo}>
-          <Text style={styles.headerTitle}>{roomInfo ? `채팅방 #${roomInfo.roomId}` : roomTitle}</Text>
+          <Text style={styles.headerTitle}>
+            {roomInfo ? `채팅방 #${roomInfo.roomId}` : roomTitle}
+          </Text>
           <Text style={styles.headerSubtitle}>
             {roomInfo
-              ? `${roomInfo.participants.map(p => p.userName).join(', ')} | 생성: ${roomInfo.createdAt}`
+              ? `${roomInfo.participants
+                  .map(p => p.userName)
+                  .join(', ')} | 생성: ${roomInfo.createdAt}`
               : '2명'}
           </Text>
         </View>
@@ -180,7 +188,7 @@ const ChatRoom = () => {
         ref={flatListRef}
         data={messages}
         renderItem={renderMessage}
-        keyExtractor={(item) => item.id}
+        keyExtractor={item => item.id}
         contentContainerStyle={styles.messagesList}
         onContentSizeChange={() => flatListRef.current?.scrollToEnd()}
       />
@@ -188,8 +196,7 @@ const ChatRoom = () => {
       {/* 메시지 입력 */}
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 60 : 0}
-      >
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 60 : 0}>
         <View style={styles.inputContainer}>
           <TouchableOpacity style={styles.attachButton}>
             <Ionicons name="add-circle-outline" size={24} color="#666" />
@@ -202,10 +209,12 @@ const ChatRoom = () => {
             multiline
           />
           <TouchableOpacity
-            style={[styles.sendButton, !message.trim() && styles.sendButtonDisabled]}
+            style={[
+              styles.sendButton,
+              !message.trim() && styles.sendButtonDisabled,
+            ]}
             onPress={handleSend}
-            disabled={!message.trim()}
-          >
+            disabled={!message.trim()}>
             <Ionicons
               name="send"
               size={24}
@@ -320,4 +329,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default ChatRoom; 
+export default ChatRoom;
