@@ -29,7 +29,7 @@ export default function ResultScreen({
       };
 
       const response = await axios.post(
-        'http://localhost:8080/api/travel-mbti/mbti',
+        'http://localhost:8080/api/Travel_Mbti/mbti',
         payload,
         {
           headers: {
