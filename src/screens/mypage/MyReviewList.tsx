@@ -31,7 +31,7 @@ const MyReviewList = () => {
 
   const fetchReviews = async () => {
     try {
-      const res = await axios.get('http://localhost:8080/api/review', {
+      const res = await axios.get('http://124.60.137.10:80/api/review', {
         params: {
           page: 0,
           size: 10,
@@ -64,7 +64,7 @@ const MyReviewList = () => {
         text: '삭제',
         onPress: async () => {
           try {
-            await axios.delete(`http://localhost:8080/api/review/${id}`, {
+            await axios.delete(`http://124.60.137.10:80/api/review/${id}`, {
               headers: {
                 Authorization: `Bearer ${process.env.API_TOKEN}`,
               },

@@ -10,6 +10,7 @@ import {
   TouchableOpacity,
   Image,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import {useNavigation, useRoute} from '@react-navigation/native';
 import type {StackNavigationProp} from '@react-navigation/stack';
@@ -39,7 +40,7 @@ type TourData = {
   wishlistCount: number;
   hashtags: string[];
   schedules: Schedule[];
-  user: {name: string};
+  user: {id: number; name: string};
   description: string;
   guidePrice: number;
 };
@@ -53,47 +54,57 @@ const Practice = () => {
   const tourProgramId = route.params?.tourProgramId ?? 1;
 
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const res = await axios.get(
-          `http://124.60.137.10:80/api/tour-program/${tourProgramId}`,
-          {
-            headers: {
-              Authorization: `Bearer ${process.env.API_TOKEN}`,
-            },
-          },
-        );
-        setData(res.data.data);
-      } catch (error) {
-        console.error('데이터 불러오기 실패:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchData();
+    // 더미 데이터로 대체
+    setData({
+      id: 1,
+      title: '예시 투어 프로그램',
+      region: '서울',
+      thumbnailUrl: 'https://via.placeholder.com/400x200?text=No+Image',
+      reviewCount: 5,
+      wishlistCount: 10,
+      hashtags: ['서울', '맛집', '관광'],
+      schedules: [
+        {
+          day: 1,
+          lat: 37.5665,
+          lon: 126.978,
+          placeName: '광화문',
+          placeDescription: '서울의 중심',
+          travelTime: 30,
+        },
+        {
+          day: 1,
+          lat: 37.5702,
+          lon: 126.983,
+          placeName: '경복궁',
+          placeDescription: '조선의 궁궐',
+          travelTime: 20,
+        },
+        {
+          day: 2,
+          lat: 37.5796,
+          lon: 126.977,
+          placeName: '북촌한옥마을',
+          placeDescription: '전통 한옥',
+          travelTime: 15,
+        },
+      ],
+      user: {id: 2, name: '홍길동'},
+      description: '서울의 명소를 둘러보는 투어입니다.',
+      guidePrice: 30000,
+    });
+    setLoading(false);
   }, [tourProgramId]);
 
-  const toggleLike = async () => {
-    try {
-      const response = await axios.post('/api/wishlist/toggle', {
-        tourId: data?.id, // 투어 ID가 필요합니다. TourData 타입에 id 필드를 추가해야 합니다.
+  const toggleLike = () => {
+    setIsLiked(prev => !prev);
+    if (data) {
+      setData({
+        ...data,
+        wishlistCount: isLiked
+          ? data.wishlistCount - 1
+          : data.wishlistCount + 1,
       });
-
-      if (response.data.status === '100 CONTINUE') {
-        setIsLiked(prev => !prev);
-        // 위시리스트 카운트 업데이트
-        if (data) {
-          setData({
-            ...data,
-            wishlistCount: isLiked
-              ? data.wishlistCount - 1
-              : data.wishlistCount + 1,
-          });
-        }
-      }
-    } catch (error) {
-      console.error('위시리스트 토글 에러:', error);
-      // 에러 발생 시 UI는 변경하지 않음
     }
   };
 
@@ -106,6 +117,68 @@ const Practice = () => {
       );
     }
     return (total / 1000).toFixed(1);
+  };
+
+  // 상담하기 버튼 클릭 시 채팅방 생성 및 입장
+  const handleChat = async () => {
+    try {
+      const userId = 1; // 내 아이디(로그인 유저)
+      const hostId = data?.user?.id || 2; // 상대방 아이디(호스트)
+      const res = await axios.post('/api/chat/rooms', {
+        user1Id: userId,
+        user2Id: hostId,
+      });
+      const roomId = res.data.id;
+      navigation.navigate('Main', {
+        screen: '채팅',
+        params: {
+          screen: 'ChatRoomScreen',
+          params: {roomId, userId},
+        },
+      });
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  // 투어 수정
+  const handleEdit = async () => {
+    if (!data) return;
+    try {
+      const body = {
+        title: data.title,
+        description: data.description,
+        guidePrice: data.guidePrice,
+        region: data.region,
+        thumbnailUrl: data.thumbnailUrl,
+        hashtags: data.hashtags,
+        schedules: data.schedules.map((s, idx) => ({
+          day: s.day,
+          scheduleSequence: idx,
+          placeName: s.placeName,
+          lat: s.lat,
+          lon: s.lon,
+          placeDescription: s.placeDescription,
+          travelTime: s.travelTime,
+        })),
+      };
+      await axios.put(`/api/tour-program/${data.id}`, body);
+      Alert.alert('수정 완료', '투어 정보가 수정되었습니다.');
+    } catch (e) {
+      Alert.alert('수정 실패', '투어 정보 수정에 실패했습니다.');
+    }
+  };
+
+  // 투어 삭제
+  const handleDelete = async () => {
+    if (!data) return;
+    try {
+      await axios.delete(`/api/tour-program/${data.id}`);
+      Alert.alert('삭제 완료', '투어가 삭제되었습니다.');
+      // 필요시 목록 등으로 이동
+    } catch (e) {
+      Alert.alert('삭제 실패', '투어 삭제에 실패했습니다.');
+    }
   };
 
   if (loading)
@@ -129,9 +202,17 @@ const Practice = () => {
         <View style={styles.whiteBox}>
           <Text style={styles.title}>{data.title}</Text>
 
+          <View style={styles.editDeleteRow}>
+            <TouchableOpacity onPress={handleEdit} style={styles.editBtn}>
+              <Text style={styles.editText}>수정</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={handleDelete} style={styles.deleteBtn}>
+              <Text style={styles.deleteText}>삭제</Text>
+            </TouchableOpacity>
+          </View>
+
           <View style={styles.rightAlignRow}>
             <Text style={styles.region}>📍 {data.region}</Text>
-
             <View style={styles.rowRight}>
               <TouchableOpacity onPress={() => navigation.navigate('Practice')}>
                 <Text style={styles.review}>💬 리뷰 {data.reviewCount}</Text>
@@ -229,7 +310,7 @@ const Practice = () => {
           ₩{data.guidePrice.toLocaleString()} /인
         </Text>
         <View style={styles.buttonGroup}>
-          <TouchableOpacity style={styles.chatBtn}>
+          <TouchableOpacity style={styles.chatBtn} onPress={handleChat}>
             <Text style={styles.chatText}>상담하기</Text>
           </TouchableOpacity>
           <TouchableOpacity
@@ -344,6 +425,34 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 10,
+  },
+  editBtn: {
+    backgroundColor: '#4caf50',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  editText: {
+    color: '#fff',
+    fontWeight: 'bold',
+  },
+  deleteBtn: {
+    backgroundColor: '#f44336',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    marginLeft: 6,
+  },
+  deleteText: {
+    color: '#fff',
+    fontWeight: 'bold',
+  },
+  editDeleteRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 16,
+    marginTop: 18,
+    marginBottom: 12,
   },
 });
 

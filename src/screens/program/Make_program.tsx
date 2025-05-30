@@ -18,12 +18,16 @@ import Geolocation from '@react-native-community/geolocation';
 import {GooglePlacesAutocomplete} from 'react-native-google-places-autocomplete';
 import haversine from 'haversine-distance';
 import axios from 'axios';
-import {useNavigation} from '@react-navigation/native';
+import {useNavigation, useRoute} from '@react-navigation/native';
+import type {RouteProp} from '@react-navigation/native';
+import type {AppStackParamList} from '../../navigations/AppNavigator';
 import polyline from '@mapbox/polyline';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface DayPlan {
   place: string;
   memo: string;
+  travelTime?: number;
   coordinate?: {
     latitude: number;
     longitude: number;
@@ -60,12 +64,20 @@ const dayColors = [
 ];
 
 function Make_program() {
+  const route = useRoute<RouteProp<AppStackParamList, 'Make_program'>>();
+  const editData = route.params?.editData;
+  const tourProgramId = route.params?.tourProgramId;
+
   const [thumbnail, setThumbnail] = useState<string | null>(null);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [days, setDays] = useState<DaySchedule[]>([{plans: []}]);
   const [selectedDay, setSelectedDay] = useState(0);
-  const [plan, setPlan] = useState<DayPlan>({place: '', memo: ''});
+  const [plan, setPlan] = useState<DayPlan>({
+    place: '',
+    memo: '',
+    travelTime: 0,
+  });
   const [regionInput, setRegionInput] = useState('');
   const [guidePrice, setGuidePrice] = useState('');
   const [hashtags, setHashtags] = useState('');
@@ -81,6 +93,43 @@ function Make_program() {
   const [routes, setRoutes] = useState<{
     [key: string]: {latitude: number; longitude: number}[];
   }>({});
+
+  useEffect(() => {
+    if (editData) {
+      setThumbnail(editData.thumbnailUrl);
+      setTitle(editData.title);
+      setDescription(editData.description);
+      setRegionInput(editData.region);
+      setGuidePrice(editData.guidePrice.toString());
+      setHashtags(editData.hashtags.join(', '));
+
+      // 일정 데이터 변환
+      const convertedDays = [
+        {
+          plans: editData.schedules.map(schedule => ({
+            place: schedule.placeName,
+            memo: schedule.placeDescription,
+            travelTime: schedule.travelTime,
+            coordinate: {
+              latitude: schedule.lat,
+              longitude: schedule.lon,
+            },
+          })),
+        },
+      ];
+      setDays(convertedDays);
+
+      // 지도 위치 설정
+      if (editData.schedules.length > 0) {
+        setRegion({
+          latitude: editData.schedules[0].lat,
+          longitude: editData.schedules[0].lon,
+          latitudeDelta: 0.0922,
+          longitudeDelta: 0.0421,
+        });
+      }
+    }
+  }, [editData]);
 
   useEffect(() => {
     // 현재 위치 가져오기
@@ -127,7 +176,7 @@ function Make_program() {
     const newDays = [...days];
     newDays[dayIdx].plans.push({...plan});
     setDays(newDays);
-    setPlan({place: '', memo: ''});
+    setPlan({place: '', memo: '', travelTime: 0});
   };
 
   // Day별 일정 삭제
@@ -192,76 +241,165 @@ function Make_program() {
 
   // 여행 일정 데이터 백엔드로 전송
   const handleSubmit = async () => {
-    // 필수 입력값 검증
-    if (!title || !description || !regionInput || !guidePrice) {
-      Alert.alert(
-        '입력 오류',
-        '제목, 소개, 지역, 가이드 가격은 필수 입력 항목입니다.',
-      );
-      return;
-    }
-
-    // days → schedules 변환
-    const schedules = days.flatMap((day, dayIdx) =>
-      day.plans.map((plan, seq) => ({
-        day: dayIdx + 1,
-        scheduleSequence: seq,
-        placeName: plan.place,
-        lat: plan.coordinate?.latitude ?? 0,
-        lon: plan.coordinate?.longitude ?? 0,
-        placeDescription: plan.memo,
-        travelTime: 0, // 기본값 0으로 설정
-      })),
-    );
-
-    // 전체 데이터 구성
-    const data = {
-      title,
-      description,
-      guidePrice: Number(guidePrice),
-      region: regionInput,
-      thumbnailUrl: thumbnail ?? '',
-      hashtags: hashtags
-        ? hashtags
-            .split(',')
-            .map(tag => tag.trim())
-            .filter(tag => tag.length > 0)
-        : [],
-      schedules,
-    };
-
     try {
-      const response = await axios.post(
-        'http://124.60.137.10:80/api/tour-program',
-        data,
-        {
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        },
-      );
+      const token = await AsyncStorage.getItem('accessToken');
+      if (!token) {
+        Alert.alert('오류', '로그인이 필요합니다.');
+        return;
+      }
 
-      if (response.data.status === '100 CONTINUE') {
-        Alert.alert('성공', '여행 일정이 등록되었습니다!', [
+      // 데이터 구성
+      const data = {
+        title,
+        description,
+        guidePrice: Number(guidePrice),
+        region: regionInput,
+        thumbnailUrl: thumbnail || '',
+        hashtags: hashtags
+          ? hashtags
+              .split(',')
+              .map(tag => tag.trim())
+              .filter(tag => tag.length > 0)
+          : [],
+        schedules: days.flatMap((day, dayIdx) =>
+          day.plans.map((plan, seq) => ({
+            day: dayIdx + 1,
+            scheduleSequence: seq,
+            placeName: plan.place,
+            lat: plan.coordinate?.latitude ?? 0,
+            lon: plan.coordinate?.longitude ?? 0,
+            placeDescription: plan.memo,
+            travelTime: plan.travelTime ?? 0,
+          })),
+        ),
+      };
+
+      console.log('전송할 데이터:', JSON.stringify(data, null, 2));
+      console.log('tourProgramId:', tourProgramId);
+
+      let response;
+      if (tourProgramId) {
+        try {
+          // 먼저 프로그램 존재 여부 확인
+          const checkResponse = await axios.get(
+            `http://124.60.137.10:80/api/tour-program/${tourProgramId}`,
+            {
+              headers: {
+                Authorization: `Bearer ${token.replace('Bearer ', '')}`,
+              },
+            },
+          );
+
+          if (checkResponse.data) {
+            // 수정 요청
+            console.log('수정 요청 시작');
+            response = await axios.put(
+              `http://124.60.137.10:80/api/tour-program/${tourProgramId}`,
+              data,
+              {
+                headers: {
+                  'Content-Type': 'application/json',
+                  Authorization: `Bearer ${token.replace('Bearer ', '')}`,
+                },
+              },
+            );
+            console.log('수정 응답:', response.data);
+          }
+        } catch (checkError) {
+          console.error('프로그램 확인 중 오류:', checkError.response?.data);
+          Alert.alert(
+            '오류',
+            '해당 프로그램을 찾을 수 없습니다. 새로운 프로그램으로 등록하시겠습니까?',
+            [
+              {
+                text: '취소',
+                style: 'cancel',
+              },
+              {
+                text: '새로 등록',
+                onPress: async () => {
+                  try {
+                    response = await axios.post(
+                      'http://124.60.137.10:80/api/tour-program',
+                      data,
+                      {
+                        headers: {
+                          'Content-Type': 'application/json',
+                          Authorization: `Bearer ${token.replace(
+                            'Bearer ',
+                            '',
+                          )}`,
+                        },
+                      },
+                    );
+                    if (response.data.status === 'OK') {
+                      Alert.alert('성공', '여행 일정이 등록되었습니다!', [
+                        {
+                          text: '확인',
+                          onPress: () => {
+                            navigation.navigate('TestPost', {
+                              data: response.data.data,
+                              tourProgramId: response.data.data.tourProgramId,
+                            });
+                          },
+                        },
+                      ]);
+                    }
+                  } catch (error) {
+                    console.error('새로 등록 중 오류:', error.response?.data);
+                    Alert.alert('오류', '새로운 프로그램 등록에 실패했습니다.');
+                  }
+                },
+              },
+            ],
+          );
+          return;
+        }
+      } else {
+        // 새로 등록
+        console.log('새로 등록 요청 시작');
+        response = await axios.post(
+          'http://124.60.137.10:80/api/tour-program',
+          data,
           {
-            text: '확인',
-            onPress: () => {
-              // 상세 페이지로 이동
-              navigation.navigate('Practice', {
-                tourProgramId: response.data.data.tourProgramId,
-              });
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token.replace('Bearer ', '')}`,
             },
           },
-        ]);
-      } else {
+        );
+        console.log('등록 응답:', response.data);
+      }
+
+      if (response?.data.status === 'OK') {
         Alert.alert(
-          '오류',
-          response.data.message || '등록 중 오류가 발생했습니다.',
+          '성공',
+          tourProgramId
+            ? '투어 프로그램이 수정되었습니다!'
+            : '여행 일정이 등록되었습니다!',
+          [
+            {
+              text: '확인',
+              onPress: () => {
+                navigation.navigate('TestPost', {
+                  data: response.data.data,
+                  tourProgramId:
+                    tourProgramId || response.data.data.tourProgramId,
+                });
+              },
+            },
+          ],
         );
       }
-    } catch (error) {
-      console.error(error);
-      Alert.alert('오류', '등록 중 오류가 발생했습니다.');
+    } catch (error: any) {
+      console.error('에러 상세:', error.response?.data || error);
+      console.error('요청 데이터:', error.config?.data);
+      Alert.alert(
+        '오류',
+        `등록 중 오류가 발생했습니다.\n${
+          error.response?.data?.message || error.message
+        }`,
+      );
     }
   };
 
@@ -560,6 +698,16 @@ function Make_program() {
                     setSelectedDay(idx);
                     setPlan(p => ({...p, memo: text}));
                   }}
+                />
+                <TextInput
+                  style={[styles.input, {flex: 1}]}
+                  placeholder="소요시간(분)"
+                  value={selectedDay === idx ? plan.travelTime?.toString() : ''}
+                  onChangeText={text => {
+                    setSelectedDay(idx);
+                    setPlan(p => ({...p, travelTime: parseInt(text) || 0}));
+                  }}
+                  keyboardType="numeric"
                 />
                 <Button title="추가" onPress={() => addPlan(idx)} />
               </View>

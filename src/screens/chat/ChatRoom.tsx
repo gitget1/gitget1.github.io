@@ -13,146 +13,66 @@ import {
 import {useRoute, useNavigation, RouteProp} from '@react-navigation/native';
 import {StackNavigationProp} from '@react-navigation/stack';
 import Ionicons from 'react-native-vector-icons/Ionicons';
+import {
+  connectWebSocket,
+  disconnectWebSocket,
+  sendMessage,
+} from '../../api/chatsocket';
+
+// 메시지 타입 정의
+interface Message {
+  id: number;
+  userId: number;
+  message: string;
+  createdAt?: string;
+}
 
 type RootStackParamList = {
-  ChatRoom: {roomId: string};
+  ChatRoom: {roomId: string; userId?: number};
 };
 
 type ChatRoomRouteProp = RouteProp<RootStackParamList, 'ChatRoom'>;
 type ChatRoomNavigationProp = StackNavigationProp<RootStackParamList>;
 
-interface Message {
-  id: string;
-  text: string;
-  sender: 'me' | 'other';
-  timestamp: string;
-  isRead: boolean;
-  //채팅 메세지아이디, 유저 아이디, 메세지 내용, 시간(보낸시간)
-}
-
-interface Participant {
-  userId: number;
-  userName: string;
-}
-
-interface ChatRoomInfo {
-  roomId: number;
-  participants: Participant[];
-  createdAt: string;
-}
-
-// 더미 데이터
-const dummyMessages: Message[] = [
-  {
-    id: '1',
-    text: '안녕하세요! 여행 계획 세우실 분 구해요~',
-    sender: 'other',
-    timestamp: '오후 2:30',
-    isRead: true,
-  },
-  {
-    id: '2',
-    text: '저도 참여하고 싶어요! 어디로 가실 예정인가요?',
-    sender: 'me',
-    timestamp: '오후 2:31',
-    isRead: true,
-  },
-  {
-    id: '3',
-    text: '제주도로 가려고 해요! 3박 4일 정도 생각하고 있어요.',
-    sender: 'other',
-    timestamp: '오후 2:32',
-    isRead: true,
-  },
-  {
-    id: '4',
-    text: '좋네요! 저도 제주도 가보고 싶었어요. 언제쯤 계획하고 계신가요?',
-    sender: 'me',
-    timestamp: '오후 2:33',
-    isRead: true,
-  },
-];
-
 const ChatRoom = () => {
   const {params} = useRoute<ChatRoomRouteProp>();
   const navigation = useNavigation<ChatRoomNavigationProp>();
-  const [message, setMessage] = useState('');
-  const [messages, setMessages] = useState<Message[]>(dummyMessages);
-  const [roomInfo, setRoomInfo] = useState<ChatRoomInfo | null>(null);
-  const [roomTitle, _setRoomTitle] = useState(() => {
-    // roomId에 따라 채팅방 제목을 설정
-    // 실제로는 API나 데이터베이스에서 가져올 수 있음
-    return params.roomId === '1' ? '여행 친구 모임' : '제주도 여행팸';
-  });
+  const [input, setInput] = useState('');
+  const [messages, setMessages] = useState<Message[]>([]);
+  const userId = params.userId || 1; // 실제 로그인 유저 id로 대체
   const flatListRef = useRef<FlatList>(null);
 
-  // 채팅방 생성 API 호출 (예시)
   useEffect(() => {
-    const createRoom = async () => {
-      try {
-        // 예시: userIds는 실제 참여자 id 배열로 대체
-        const response = await fetch(
-          'http://124.60.137.10:8080/api/chat/rooms',
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({userIds: [1, 2]}), // 실제 참여자 id로 대체
-          },
-        );
-        const data = await response.json();
-        setRoomInfo(data);
-      } catch (e) {
-        console.error('채팅방 생성 실패:', e);
-      }
+    connectWebSocket(params.roomId, (msg: Message) => {
+      setMessages(prev => [...prev, msg]);
+    });
+    return () => {
+      disconnectWebSocket();
     };
-    createRoom();
-  }, []);
+  }, [params.roomId]);
 
-  // 메시지 전송
   const handleSend = () => {
-    if (message.trim()) {
-      const newMessage: Message = {
-        id: Date.now().toString(),
-        text: message,
-        sender: 'me',
-        timestamp: new Date().toLocaleTimeString('ko-KR', {
-          hour: 'numeric',
-          minute: 'numeric',
-          hour12: true,
-        }),
-        isRead: false,
-      };
-      setMessages([...messages, newMessage]);
-      setMessage('');
-
-      // 스크롤을 최신 메시지로 이동
-      setTimeout(() => {
-        flatListRef.current?.scrollToEnd({animated: true});
-      }, 100);
+    if (input.trim()) {
+      sendMessage(params.roomId, userId, input);
+      setInput('');
     }
   };
 
-  // 메시지 렌더링
   const renderMessage = ({item}: {item: Message}) => (
     <View
       style={[
         styles.messageContainer,
-        item.sender === 'me' ? styles.myMessage : styles.otherMessage,
+        item.userId === userId ? styles.myMessage : styles.otherMessage,
       ]}>
       <View
         style={[
           styles.messageBubble,
-          item.sender === 'me' ? styles.myBubble : styles.otherBubble,
+          item.userId === userId ? styles.myBubble : styles.otherBubble,
         ]}>
-        <Text style={styles.messageText}>{item.text}</Text>
+        <Text style={styles.messageText}>{item.message}</Text>
       </View>
       <View style={styles.messageFooter}>
-        {item.sender === 'me' && item.isRead && (
-          <Text style={styles.readStatus}>읽음</Text>
-        )}
-        <Text style={styles.timestamp}>{item.timestamp}</Text>
+        <Text style={styles.timestamp}>{item.createdAt || ''}</Text>
       </View>
     </View>
   );
@@ -167,16 +87,7 @@ const ChatRoom = () => {
           <Ionicons name="chevron-back" size={24} color="#000" />
         </TouchableOpacity>
         <View style={styles.headerInfo}>
-          <Text style={styles.headerTitle}>
-            {roomInfo ? `채팅방 #${roomInfo.roomId}` : roomTitle}
-          </Text>
-          <Text style={styles.headerSubtitle}>
-            {roomInfo
-              ? `${roomInfo.participants
-                  .map(p => p.userName)
-                  .join(', ')} | 생성: ${roomInfo.createdAt}`
-              : '2명'}
-          </Text>
+          <Text style={styles.headerTitle}>채팅방</Text>
         </View>
         <TouchableOpacity style={styles.menuButton}>
           <Ionicons name="menu" size={24} color="#000" />
@@ -188,7 +99,7 @@ const ChatRoom = () => {
         ref={flatListRef}
         data={messages}
         renderItem={renderMessage}
-        keyExtractor={item => item.id}
+        keyExtractor={item => String(item.id)}
         contentContainerStyle={styles.messagesList}
         onContentSizeChange={() => flatListRef.current?.scrollToEnd()}
       />
@@ -203,22 +114,22 @@ const ChatRoom = () => {
           </TouchableOpacity>
           <TextInput
             style={styles.input}
-            value={message}
-            onChangeText={setMessage}
+            value={input}
+            onChangeText={setInput}
             placeholder="메시지를 입력하세요"
             multiline
           />
           <TouchableOpacity
             style={[
               styles.sendButton,
-              !message.trim() && styles.sendButtonDisabled,
+              !input.trim() && styles.sendButtonDisabled,
             ]}
             onPress={handleSend}
-            disabled={!message.trim()}>
+            disabled={!input.trim()}>
             <Ionicons
               name="send"
               size={24}
-              color={message.trim() ? '#0288d1' : '#ccc'}
+              color={input.trim() ? '#0288d1' : '#ccc'}
             />
           </TouchableOpacity>
         </View>
@@ -249,10 +160,6 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-  },
-  headerSubtitle: {
-    fontSize: 12,
-    color: '#666',
   },
   menuButton: {
     padding: 5,
@@ -288,11 +195,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginTop: 2,
-  },
-  readStatus: {
-    fontSize: 12,
-    color: '#666',
-    marginRight: 5,
   },
   timestamp: {
     fontSize: 12,

@@ -13,6 +13,7 @@ import Practice1 from '../screens/practice/Practice_detail page';
 import MyReviewList from '../screens/mypage/MyReviewList';
 import PaymentScreen from '../screens/payment/PaymentScreen';
 import PaymentCompleteScreen from '../screens/payment/PaymentCompleteScreen';
+import TestPost from '../screens/practice/test_post';
 import {NativeStackScreenProps} from '@react-navigation/native-stack';
 
 export type AppStackParamList = {
@@ -22,7 +23,26 @@ export type AppStackParamList = {
     screen: 'Test' | 'TourByPreference' | 'TourByRegion' | 'TodayRecommend';
   };
   QuestionScreen: undefined;
-  MakeProgram: undefined;
+  Make_program: {
+    editData?: {
+      title: string;
+      description: string;
+      guidePrice: number;
+      region: string;
+      thumbnailUrl: string;
+      hashtags: string[];
+      schedules: Array<{
+        day: number;
+        scheduleSequence: number;
+        placeName: string;
+        lat: number;
+        lon: number;
+        placeDescription: string;
+        travelTime: number;
+      }>;
+    };
+    tourProgramId?: string;
+  };
   TraitSelection: undefined;
   Result: {
     result: any;
@@ -31,6 +51,7 @@ export type AppStackParamList = {
   MyReviewList: undefined;
   PaymentScreen: undefined;
   PaymentComplete: undefined;
+  TestPost: undefined;
 };
 
 export type AppStackScreenProps<T extends keyof AppStackParamList> =
@@ -112,7 +133,7 @@ const AppNavigator = () => {
         }}
       />
       <Stack.Screen
-        name="MakeProgram"
+        name="Make_program"
         component={Make_program}
         options={{
           headerShown: true,
@@ -147,6 +168,13 @@ const AppNavigator = () => {
           headerShown: true,
           title: '결제 완료',
           headerTitleStyle: {fontSize: 20},
+        }}
+      />
+      <Stack.Screen
+        name="TestPost"
+        component={TestPost}
+        options={{
+          title: '투어 등록 테스트',
         }}
       />
     </Stack.Navigator>

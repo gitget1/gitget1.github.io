@@ -60,7 +60,7 @@ const MainHomeScreen = () => {
 
   const handleTest = () => navigation.navigate('QuestionScreen');
   const handleTraitSelection = () => navigation.navigate('TraitSelection');
-  const handleTourByRegion = () => navigation.navigate('Practice');
+  const handleTourByRegion = () => navigation.navigate('TestPost');
   const handleTodayRecommend = () => navigation.navigate('PracticeDetail');
 
   const renderDots = () => (

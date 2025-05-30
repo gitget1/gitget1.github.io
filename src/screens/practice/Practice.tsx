@@ -81,7 +81,7 @@ export default function ReviewScreen() {
         // 로컬 스토리지에서 토큰 가져오기
         const token = await AsyncStorage.getItem('userToken');
 
-        const res = await axios.get(`http://10.0.2.2:8080/api/review`, {
+        const res = await axios.get(`http://124.60.137.10:80/api/review/{toruProgramId}}`, {
           params: {
             page: 0,
             size: 10,
