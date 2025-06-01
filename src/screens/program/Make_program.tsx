@@ -164,10 +164,19 @@ function Make_program() {
 
       const localUri = result.assets[0].uri;
       const fileType = result.assets[0].type || 'image/jpeg'; // fallback
-      const fileName =
-        result.assets[0].fileName ||
-        localUri.split('/').pop() ||
-        'thumbnail.jpg';
+
+      // ✅ MIME 타입 → 확장자 매핑
+      const extensionMap: {[key: string]: string} = {
+        'image/jpeg': 'jpeg',
+        'image/jpg': 'jpg',
+        'image/png': 'png',
+        'image/webp': 'webp',
+        'image/heic': 'heic',
+      };
+      const extension = extensionMap[fileType] || 'jpg';
+
+      // ✅ 고정된 파일명 (timestamp 기반)
+      const fileName = `thumbnail_${Date.now()}.${extension}`;
 
       console.log('📷 localUri:', localUri);
       console.log('🖼️ fileName:', fileName);
@@ -188,7 +197,7 @@ function Make_program() {
       console.log('📡 presignedURL:', presignedUrl);
       console.log('📡 downloadUrl:', downloadUrl);
 
-      // ✅ fetch 방식으로 Blob 가져오기 (iOS 대응)
+      // ✅ fetch 방식으로 Blob 가져오기 (iOS 대응 포함)
       const response = await fetch(localUri);
       const blob = await response.blob();
 
