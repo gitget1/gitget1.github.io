@@ -305,7 +305,7 @@ function Make_program() {
             );
             console.log('수정 응답:', response.data);
           }
-        } catch (checkError) {
+        } catch (checkError: any) {
           console.error('프로그램 확인 중 오류:', checkError.response?.data);
           Alert.alert(
             '오류',
@@ -345,7 +345,7 @@ function Make_program() {
                         },
                       ]);
                     }
-                  } catch (error) {
+                  } catch (error: any) {
                     console.error('새로 등록 중 오류:', error.response?.data);
                     Alert.alert('오류', '새로운 프로그램 등록에 실패했습니다.');
                   }
