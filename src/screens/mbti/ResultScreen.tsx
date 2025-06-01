@@ -1,4 +1,5 @@
 import React, {useState} from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {API_URL} from '@env';
 import {
   Text,
@@ -16,24 +17,27 @@ export default function ResultScreen({
   navigation,
 }: AppStackScreenProps<'Result'>) {
   const {result} = route.params;
-  const userName = '홍길동'; // Replace with actual user name
   const [selectedFeedback, setSelectedFeedback] = useState<string | null>(null);
 
   const handleSave = async () => {
     try {
-      // 예시 데이터: 실제로는 result에서 꺼내서 전달해야 함
       const payload = {
         travelMbti: result.mbti,
         hashtags: result.tags,
         regions: result.recommended_regions,
       };
 
+      // ✅ 토큰 가져오기
+      const token = await AsyncStorage.getItem('accessToken');
+      console.log('📦 저장 요청용 Access Token:', token);
+      console.log('📤 서버로 보낼 payload:', payload);
       const response = await axios.post(
-        'http://localhost:8080/api/Travel_Mbti/mbti',
+        'http://124.60.137.10:80/api/mbti',
         payload,
         {
           headers: {
             'Content-Type': 'application/json',
+            ...(token && {Authorization: `Bearer ${token}`}), // 토큰이 있으면 추가
           },
         },
       );
@@ -96,7 +100,6 @@ export default function ResultScreen({
   return (
     <ScrollView contentContainerStyle={styles.container}>
       <View style={styles.headerWrapper}>
-        <Text style={styles.headerEmoji}>{userName}님의</Text>
         <Text style={styles.title}>여행 성향 분석 결과</Text>
       </View>
 

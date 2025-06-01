@@ -1,5 +1,5 @@
-// ✅ TraitDropdown.tsx - 전체 API 연동 완료 버전
-
+// ✅ TraitDropdown.tsx - 해시태그 선택 가능 + 추천지역 UI 개선
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, {useEffect, useState} from 'react';
 import {
   View,
@@ -19,12 +19,13 @@ interface MbtiItem {
 interface MbtiDetail {
   mbti: string;
   hashtags: string[];
-  recommended_regions: string[];
+  regions: string[];
 }
 
 const TraitDropdown = () => {
   const [mbtiList, setMbtiList] = useState<MbtiItem[]>([]);
   const [selectedMbti, setSelectedMbti] = useState<MbtiDetail | null>(null);
+  const [selectedHashtags, setSelectedHashtags] = useState<string[]>([]);
   const [selectedRegionName, setSelectedRegionName] = useState<string | null>(
     null,
   );
@@ -35,29 +36,49 @@ const TraitDropdown = () => {
   const [loadingMore, setLoadingMore] = useState(false);
 
   useEffect(() => {
-    axios
-      .get('http://localhost:8080/api/mbti/all-mbti', {
-        headers: {Authorization: `Bearer ${process.env.API_TOKEN}`},
-      })
-      .then(res => setMbtiList(res.data.data))
-      .catch(err => console.error('MBTI 리스트 로딩 실패:', err));
+    const fetchMbtiList = async () => {
+      try {
+        const token = await AsyncStorage.getItem('accessToken');
+        console.log('🟢 MBTI 목록 요청용 토큰:', token);
+
+        const res = await axios.get(
+          'http://124.60.137.10:80/api/mbti/all-mbti',
+          {
+            headers: token ? {Authorization: `Bearer ${token}`} : {},
+          },
+        );
+        setMbtiList(res.data.data);
+      } catch (err) {
+        console.error('MBTI 리스트 로딩 실패:', err);
+      }
+    };
+    fetchMbtiList();
   }, []);
 
   const handleSelectMbti = async (item: MbtiItem) => {
     try {
+      const token = await AsyncStorage.getItem('accessToken');
+      console.log('🟢 MBTI 상세 요청용 토큰:', token);
+
       const res = await axios.get(
-        `http://localhost:8080/api/mbti/detail-mbti?mbtiId=${item.mbtiId}&mbti=${item.mbti}`,
-        {
-          headers: {Authorization: `Bearer ${process.env.API_TOKEN}`},
-        },
+        `http://124.60.137.10:80/api/mbti/detail-mbti?mbtiId=${item.mbtiId}&mbti=${item.mbti}`,
+        {headers: token ? {Authorization: `Bearer ${token}`} : {}},
       );
+
       setSelectedMbti(res.data.data);
+      setSelectedHashtags([]); // 새로 선택 시 초기화
       setShowDropdown(false);
       setSelectedRegionName(null);
       setDisplayedPosts(7);
     } catch (err) {
-      console.error('MBTI 상세정보 로딩 실패:', err);
+      console.error('❌ MBTI 상세정보 로딩 실패:', err);
     }
+  };
+
+  const toggleHashtag = (tag: string) => {
+    setSelectedHashtags(prev =>
+      prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag],
+    );
   };
 
   const dummyPosts = [
@@ -188,20 +209,35 @@ const TraitDropdown = () => {
             {selectedMbti && (
               <>
                 <Text style={styles.sectionTitle}>해시태그</Text>
-                <View style={styles.hashtagBox}>
+                <View style={styles.hashtagWrapper}>
                   {selectedMbti.hashtags.map((tag, i) => (
-                    <Text key={i} style={styles.hashtagText}>
-                      #{tag}
-                    </Text>
-                  ))}
-                </View>
-                <Text style={styles.sectionTitle}>추천 지역</Text>
-                <View style={styles.regionGrid}>
-                  {selectedMbti.recommended_regions.map((region, i) => (
                     <TouchableOpacity
                       key={i}
                       style={[
-                        styles.regionItem,
+                        styles.hashtagBox,
+                        selectedHashtags.includes(tag) &&
+                          styles.selectedHashtagBox,
+                      ]}
+                      onPress={() => toggleHashtag(tag)}>
+                      <Text
+                        style={[
+                          styles.hashtagText,
+                          selectedHashtags.includes(tag) &&
+                            styles.selectedHashtagText,
+                        ]}>
+                        {tag}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+
+                <Text style={styles.sectionTitle}>추천 지역</Text>
+                <View style={styles.regionGridCentered}>
+                  {selectedMbti.regions.map((region, i) => (
+                    <TouchableOpacity
+                      key={i}
+                      style={[
+                        styles.regionItemFixed,
                         selectedRegionName === region &&
                           styles.selectedRegionItem,
                       ]}
@@ -272,17 +308,42 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginTop: 20,
     marginBottom: 10,
+    textAlign: 'center',
   },
-  hashtagBox: {flexDirection: 'row', flexWrap: 'wrap', gap: 8},
-  hashtagText: {
-    fontSize: 14,
-    backgroundColor: '#e0e0e0',
-    padding: 6,
-    borderRadius: 5,
-    marginRight: 8,
+  hashtagWrapper: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    backgroundColor: '#fff',
+    padding: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#ccc',
   },
-  regionGrid: {flexDirection: 'row', flexWrap: 'wrap', gap: 10},
-  regionItem: {padding: 10, backgroundColor: '#f0f0f0', borderRadius: 5},
+  hashtagBox: {
+    width: '30%',
+    margin: '1.5%',
+    backgroundColor: '#eee',
+    padding: 10,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  selectedHashtagBox: {backgroundColor: '#4fc3f7'},
+  hashtagText: {fontSize: 14, color: '#444'},
+  selectedHashtagText: {color: '#fff', fontWeight: 'bold'},
+  regionGridCentered: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginTop: 10,
+  },
+  regionItemFixed: {
+    width: '28%',
+    padding: 10,
+    marginHorizontal: 5,
+    backgroundColor: '#f0f0f0',
+    borderRadius: 6,
+    alignItems: 'center',
+  },
   selectedRegionItem: {backgroundColor: '#d0e0f0'},
   regionText: {fontSize: 14, color: '#000'},
   postContainer: {

@@ -158,10 +158,64 @@ function Make_program() {
       });
 
       if (result.assets && result.assets[0]?.uri) {
-        setThumbnail(result.assets[0].uri);
+        const localUri = result.assets[0].uri;
+        const fileName = localUri.split('/').pop() || 'thumbnail.jpg';
+        const fileType = result.assets[0].type || 'image/jpeg';
+
+        console.log('📷 localUri:', localUri);
+        console.log('🖼️ fileType:', fileType);
+
+        // ✅ Presigned URL 요청
+        const presignedRes = await axios.get(
+          `http://124.60.137.10:80/api/upload`,
+          {
+            params: {
+              fileName,
+              contentType: fileType,
+            },
+          },
+        );
+
+        const {presignedUrl, downloadUrl} = presignedRes.data.data;
+        console.log('📡 presignedURL:', presignedUrl);
+
+        // ✅ XMLHttpRequest로 로컬 이미지 → Blob 변환
+        const xhr = new XMLHttpRequest();
+        xhr.open('GET', localUri, true);
+        xhr.responseType = 'blob';
+
+        xhr.onload = async () => {
+          const blob = xhr.response;
+
+          try {
+            // ✅ Presigned URL로 PUT 요청 (이미지 업로드)
+            await fetch(presignedUrl, {
+              method: 'PUT',
+              body: blob,
+              headers: {
+                'Content-Type': fileType,
+              },
+            });
+
+            // ✅ 썸네일 URL 저장
+            setThumbnail(downloadUrl);
+            Alert.alert('✅ 업로드 완료', '썸네일이 업로드되었습니다!');
+          } catch (uploadError) {
+            console.error('🛑 PUT 업로드 실패:', uploadError);
+            Alert.alert('오류', '이미지 업로드 실패');
+          }
+        };
+
+        xhr.onerror = err => {
+          console.error('🛑 로컬 이미지 읽기 실패:', err);
+          Alert.alert('오류', '로컬 이미지 읽기 중 오류 발생');
+        };
+
+        xhr.send();
       }
     } catch (error) {
-      Alert.alert('오류', '이미지를 선택하는 중 오류가 발생했습니다.');
+      console.error('썸네일 업로드 오류:', error);
+      Alert.alert('오류', '썸네일 업로드 중 문제가 발생했습니다.');
     }
   };
 
@@ -306,7 +360,11 @@ function Make_program() {
             console.log('수정 응답:', response.data);
           }
         } catch (checkError) {
-          console.error('프로그램 확인 중 오류:', checkError.response?.data);
+          if (axios.isAxiosError(checkError)) {
+            console.error('프로그램 확인 중 오류:', checkError.response?.data);
+          } else {
+            console.error('프로그램 확인 중 알 수 없는 오류:', checkError);
+          }
           Alert.alert(
             '오류',
             '해당 프로그램을 찾을 수 없습니다. 새로운 프로그램으로 등록하시겠습니까?',
@@ -346,7 +404,11 @@ function Make_program() {
                       ]);
                     }
                   } catch (error) {
-                    console.error('새로 등록 중 오류:', error.response?.data);
+                    if (axios.isAxiosError(error)) {
+                      console.error('새로 등록 중 오류:', error.response?.data);
+                    } else {
+                      console.error('새로 등록 중 알 수 없는 오류:', error);
+                    }
                     Alert.alert('오류', '새로운 프로그램 등록에 실패했습니다.');
                   }
                 },
