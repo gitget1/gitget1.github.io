@@ -81,19 +81,22 @@ export default function ReviewScreen() {
         // 로컬 스토리지에서 토큰 가져오기
         const token = await AsyncStorage.getItem('userToken');
 
-        const res = await axios.get(`http://124.60.137.10:80/api/review/{toruProgramId}}`, {
-          params: {
-            page: 0,
-            size: 10,
-            sortOption: sortMap[sortOrder],
-            tourProgramId: tourProgramId,
+        const res = await axios.get(
+          `http://124.60.137.10:80/api/review/{toruProgramId}}`,
+          {
+            params: {
+              page: 0,
+              size: 10,
+              sortOption: sortMap[sortOrder],
+              tourProgramId: tourProgramId,
+            },
+            headers: token
+              ? {
+                  Authorization: `Bearer ${token}`,
+                }
+              : undefined,
           },
-          headers: token
-            ? {
-                Authorization: `Bearer ${token}`,
-              }
-            : undefined,
-        });
+        );
         if (
           res.data.status === '100 CONTINUE' ||
           res.data.status === 'Success' ||

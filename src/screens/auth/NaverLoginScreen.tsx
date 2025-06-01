@@ -32,7 +32,10 @@ const App = () => {
           },
         );
 
-        const accessToken = response.headers.authorization;
+        const accessToken = response.headers.authorization.replace(
+          'Bearer ',
+          '',
+        );
         console.log('받은 accessToken:', accessToken);
 
         if (accessToken) {

@@ -10,6 +10,7 @@ import {
   TouchableOpacity,
 } from 'react-native';
 import axios from 'axios';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {NativeStackScreenProps} from '@react-navigation/native-stack';
 import {RootStackParamList} from '../../navigations/root/RootNavigator';
 
@@ -32,7 +33,6 @@ export default function QuestionScreen({navigation}: Props) {
     const fetchQuestions = async () => {
       try {
         const res = await axios.get(`${API_URL}/generate_question`);
-
         setQuestions(res.data.questions);
       } catch (error) {
         console.error(error);
@@ -55,13 +55,49 @@ export default function QuestionScreen({navigation}: Props) {
       } else {
         setLoading(true);
         try {
+          // 🔍 1. MBTI 분석 결과 요청
           const res = await axios.post(`${API_URL}/rag_recommend`, {
             answers: updatedAnswers,
           });
+
+          // 🔐 2. 토큰 가져오기
+          const token = await AsyncStorage.getItem('userToken');
+
+          // 📦 3. 결과 저장 요청
+          const payload = {
+            travelMbti: res.data.mbti,
+            hashtags: res.data.tags,
+            regions: res.data.recommended_regions,
+          };
+
+          const saveRes = await axios.post(
+            'http://124.60.137.10:80/api/mbti',
+            payload,
+            {
+              headers: {
+                'Content-Type': 'application/json',
+                ...(token && {Authorization: `Bearer ${token}`}),
+              },
+            },
+          );
+
+          if (saveRes.status === 200) {
+            Alert.alert(
+              '✅ 저장 성공',
+              'MBTI 분석 결과가 성공적으로 저장되었습니다.',
+            );
+          } else {
+            Alert.alert('⚠️ 저장 실패', '서버 응답이 올바르지 않습니다.');
+          }
+
+          // 📍 결과 페이지 이동
           navigation.navigate('Result', {result: res.data});
-        } catch (error) {
-          console.error(error);
-          Alert.alert('오류', '분석 중 문제가 발생했어요.');
+        } catch (error: any) {
+          console.error('MBTI 저장 실패:', error);
+          Alert.alert(
+            '❌ 저장 실패',
+            error?.response?.data?.detail || '서버 오류가 발생했습니다.',
+          );
         } finally {
           setLoading(false);
         }
