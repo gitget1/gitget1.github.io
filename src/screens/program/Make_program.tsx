@@ -157,65 +157,67 @@ function Make_program() {
         selectionLimit: 1,
       });
 
-      if (result.assets && result.assets[0]?.uri) {
-        const localUri = result.assets[0].uri;
-        const fileName = localUri.split('/').pop() || 'thumbnail.jpg';
-        const fileType = result.assets[0].type || 'image/jpeg';
-
-        console.log('📷 localUri:', localUri);
-        console.log('🖼️ fileType:', fileType);
-
-        // ✅ Presigned URL 요청
-        const presignedRes = await axios.get(
-          `http://124.60.137.10:80/api/upload`,
-          {
-            params: {
-              fileName,
-              contentType: fileType,
-            },
-          },
-        );
-
-        const {presignedUrl, downloadUrl} = presignedRes.data.data;
-        console.log('📡 presignedURL:', presignedUrl);
-
-        // ✅ XMLHttpRequest로 로컬 이미지 → Blob 변환
-        const xhr = new XMLHttpRequest();
-        xhr.open('GET', localUri, true);
-        xhr.responseType = 'blob';
-
-        xhr.onload = async () => {
-          const blob = xhr.response;
-
-          try {
-            // ✅ Presigned URL로 PUT 요청 (이미지 업로드)
-            await fetch(presignedUrl, {
-              method: 'PUT',
-              body: blob,
-              headers: {
-                'Content-Type': fileType,
-              },
-            });
-
-            // ✅ 썸네일 URL 저장
-            setThumbnail(downloadUrl);
-            Alert.alert('✅ 업로드 완료', '썸네일이 업로드되었습니다!');
-          } catch (uploadError) {
-            console.error('🛑 PUT 업로드 실패:', uploadError);
-            Alert.alert('오류', '이미지 업로드 실패');
-          }
-        };
-
-        xhr.onerror = err => {
-          console.error('🛑 로컬 이미지 읽기 실패:', err);
-          Alert.alert('오류', '로컬 이미지 읽기 중 오류 발생');
-        };
-
-        xhr.send();
+      if (!result.assets || !result.assets[0]?.uri) {
+        Alert.alert('오류', '이미지를 선택하지 않았습니다.');
+        return;
       }
-    } catch (error) {
-      console.error('썸네일 업로드 오류:', error);
-      Alert.alert('오류', '썸네일 업로드 중 문제가 발생했습니다.');
+
+      const localUri = result.assets[0].uri;
+      const fileType = result.assets[0].type || 'image/jpeg'; // fallback
+
+      // ✅ MIME 타입 → 확장자 매핑
+      const extensionMap: {[key: string]: string} = {
+        'image/jpeg': 'jpeg',
+        'image/jpg': 'jpg',
+        'image/png': 'png',
+        'image/webp': 'webp',
+        'image/heic': 'heic',
+      };
+      const extension = extensionMap[fileType] || 'jpg';
+
+      // ✅ 고정된 파일명 (timestamp 기반)
+      const fileName = `thumbnail_${Date.now()}.${extension}`;
+
+      console.log('📷 localUri:', localUri);
+      console.log('🖼️ fileName:', fileName);
+      console.log('🧾 fileType:', fileType);
+
+      // ✅ Presigned URL 요청
+      const presignedRes = await axios.get(
+        `http://124.60.137.10:80/api/upload`,
+        {
+          params: {
+            fileName,
+            contentType: fileType,
+          },
+        },
+      );
+
+      const {presignedUrl, downloadUrl} = presignedRes.data.data;
+      console.log('📡 presignedURL:', presignedUrl);
+      console.log('📡 downloadUrl:', downloadUrl);
+
+      // ✅ fetch 방식으로 Blob 가져오기 (iOS 대응 포함)
+      const response = await fetch(localUri);
+      const blob = await response.blob();
+
+      // ✅ Presigned URL로 PUT 요청
+      await fetch(presignedUrl, {
+        method: 'PUT',
+        body: blob,
+        headers: {
+          'Content-Type': fileType,
+        },
+      });
+
+      setThumbnail(downloadUrl);
+      Alert.alert('✅ 업로드 완료', '썸네일이 업로드되었습니다!');
+    } catch (error: any) {
+      console.error(
+        '🛑 이미지 업로드 오류:',
+        error.response?.data || error.message || error,
+      );
+      Alert.alert('오류', '썸네일 업로드에 실패했습니다.');
     }
   };
 
@@ -395,9 +397,11 @@ function Make_program() {
                         {
                           text: '확인',
                           onPress: () => {
-                            navigation.navigate('TestPost', {
-                              data: response.data.data,
-                              tourProgramId: response.data.data.tourProgramId,
+                            navigation.navigate('TraitSelection', {
+                              newPost: {
+                                data: response.data.data,
+                                tourProgramId: response.data.data.tourProgramId,
+                              },
                             });
                           },
                         },
@@ -443,10 +447,12 @@ function Make_program() {
             {
               text: '확인',
               onPress: () => {
-                navigation.navigate('TestPost', {
-                  data: response.data.data,
-                  tourProgramId:
-                    tourProgramId || response.data.data.tourProgramId,
+                navigation.navigate('TraitSelection', {
+                  newPost: {
+                    data: response.data.data,
+                    tourProgramId:
+                      tourProgramId || response.data.data.tourProgramId,
+                  },
                 });
               },
             },

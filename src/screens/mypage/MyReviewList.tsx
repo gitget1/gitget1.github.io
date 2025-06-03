@@ -11,6 +11,7 @@ import {
   TextInput,
 } from 'react-native';
 import axios from 'axios';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 type Review = {
   tourProgramId: number;
@@ -31,6 +32,15 @@ const MyReviewList = () => {
 
   const fetchReviews = async () => {
     try {
+      const token = await AsyncStorage.getItem('accessToken');
+      if (!token) {
+        Alert.alert('알림', '로그인이 필요한 서비스입니다.');
+        return;
+      }
+
+      // 토큰에서 'Bearer ' 접두사 제거
+      const cleanToken = token.replace('Bearer ', '');
+
       const res = await axios.get('http://124.60.137.10:80/api/review', {
         params: {
           page: 0,
@@ -38,19 +48,58 @@ const MyReviewList = () => {
           sortOption: 'ratingDesc',
         },
         headers: {
-          Authorization: `Bearer ${process.env.API_TOKEN}`,
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${cleanToken}`,
         },
+        timeout: 10000,
       });
 
-      const mapped = res.data.data.map((r: any) => ({
-        tourProgramId: r.tourProgramId,
-        title: r.title,
-        content: r.content,
-        createdAt: r.createdAt.slice(0, 10),
-      }));
-      setReviews(mapped);
+      console.log('리뷰 리스트 응답:', res.data);
+
+      if (res.data && Array.isArray(res.data)) {
+        const mapped = res.data.map((r: any) => ({
+          tourProgramId: r.tourProgramId,
+          title: r.title,
+          content: r.content,
+          createdAt: r.createdAt.slice(0, 10),
+        }));
+        setReviews(mapped);
+      } else if (res.data && res.data.content) {
+        const mapped = res.data.content.map((r: any) => ({
+          tourProgramId: r.tourProgramId,
+          title: r.title,
+          content: r.content,
+          createdAt: r.createdAt.slice(0, 10),
+        }));
+        setReviews(mapped);
+      } else if (res.data && res.data.data) {
+        const mapped = res.data.data.map((r: any) => ({
+          tourProgramId: r.tourProgramId,
+          title: r.title,
+          content: r.content,
+          createdAt: r.createdAt.slice(0, 10),
+        }));
+        setReviews(mapped);
+      } else {
+        console.error('예상치 못한 응답 구조:', res.data);
+        Alert.alert('오류', '리뷰 데이터 형식이 올바르지 않습니다.');
+      }
     } catch (error) {
       console.error('리뷰 불러오기 실패:', error);
+      if (axios.isAxiosError(error)) {
+        if (error.response?.status === 401) {
+          Alert.alert('알림', '로그인이 필요한 서비스입니다.');
+        } else if (error.code === 'ECONNABORTED') {
+          Alert.alert(
+            '오류',
+            '서버 응답 시간이 초과되었습니다. 다시 시도해주세요.',
+          );
+        } else {
+          Alert.alert('오류', '리뷰를 불러오는데 실패했습니다.');
+        }
+      } else {
+        Alert.alert('오류', '네트워크 연결을 확인해주세요.');
+      }
     }
   };
 

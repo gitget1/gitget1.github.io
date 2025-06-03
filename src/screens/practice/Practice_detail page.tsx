@@ -19,6 +19,7 @@ import type {AppStackParamList} from '../../navigations/AppNavigator';
 import axios from 'axios';
 import MapView, {Marker, Polyline, PROVIDER_GOOGLE} from 'react-native-maps';
 import haversine from 'haversine-distance';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const dayColors = ['#0288d1', '#43a047', '#fbc02d', '#e64a19', '#8e24aa'];
 
@@ -54,57 +55,157 @@ const Practice = () => {
   const tourProgramId = route.params?.tourProgramId ?? 1;
 
   useEffect(() => {
-    // 더미 데이터로 대체
-    setData({
-      id: 1,
-      title: '예시 투어 프로그램',
-      region: '서울',
-      thumbnailUrl: 'https://via.placeholder.com/400x200?text=No+Image',
-      reviewCount: 5,
-      wishlistCount: 10,
-      hashtags: ['서울', '맛집', '관광'],
-      schedules: [
-        {
-          day: 1,
-          lat: 37.5665,
-          lon: 126.978,
-          placeName: '광화문',
-          placeDescription: '서울의 중심',
-          travelTime: 30,
-        },
-        {
-          day: 1,
-          lat: 37.5702,
-          lon: 126.983,
-          placeName: '경복궁',
-          placeDescription: '조선의 궁궐',
-          travelTime: 20,
-        },
-        {
-          day: 2,
-          lat: 37.5796,
-          lon: 126.977,
-          placeName: '북촌한옥마을',
-          placeDescription: '전통 한옥',
-          travelTime: 15,
-        },
-      ],
-      user: {id: 2, name: '홍길동'},
-      description: '서울의 명소를 둘러보는 투어입니다.',
-      guidePrice: 30000,
-    });
-    setLoading(false);
-  }, [tourProgramId]);
+    const fetchTourData = async () => {
+      try {
+        const token = await AsyncStorage.getItem('accessToken');
+        if (!token) {
+          Alert.alert('알림', '로그인이 필요한 서비스입니다.');
+          navigation.goBack();
+          return;
+        }
 
-  const toggleLike = () => {
-    setIsLiked(prev => !prev);
-    if (data) {
-      setData({
-        ...data,
-        wishlistCount: isLiked
-          ? data.wishlistCount - 1
-          : data.wishlistCount + 1,
-      });
+        const cleanToken = token.replace('Bearer ', '');
+        console.log('🟢 투어 상세 정보 요청:', {
+          tourProgramId,
+          token: cleanToken.substring(0, 10) + '...',
+        });
+
+        const response = await axios.get(
+          `http://124.60.137.10:80/api/tour-program/${tourProgramId}`,
+          {
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${cleanToken}`,
+            },
+            timeout: 10000,
+          },
+        );
+
+        console.log('🟢 서버 응답:', response.data);
+
+        if (response.data.status === 'OK') {
+          setData(response.data.data);
+        } else {
+          console.error('❌ 서버 응답 에러:', response.data);
+          throw new Error(
+            response.data.message || '투어 정보를 불러오는데 실패했습니다.',
+          );
+        }
+      } catch (error) {
+        console.error('❌ 투어 정보 로딩 실패:', error);
+        if (axios.isAxiosError(error)) {
+          console.error('❌ Axios 에러 상세:', {
+            status: error.response?.status,
+            data: error.response?.data,
+            message: error.message,
+          });
+
+          if (error.code === 'ECONNABORTED') {
+            Alert.alert('오류', '서버 응답 시간이 초과되었습니다.');
+          } else if (error.response?.status === 401) {
+            Alert.alert('오류', '로그인이 만료되었습니다.');
+            navigation.goBack();
+          } else if (error.response?.status === 404) {
+            Alert.alert('오류', '해당 투어를 찾을 수 없습니다.');
+            navigation.goBack();
+          } else if (error.response?.status === 500) {
+            Alert.alert(
+              '오류',
+              '서버 오류가 발생했습니다. 잠시 후 다시 시도해주세요.',
+            );
+            navigation.goBack();
+          } else {
+            Alert.alert('오류', '투어 정보를 불러오는데 실패했습니다.');
+            navigation.goBack();
+          }
+        } else {
+          Alert.alert('오류', '네트워크 연결을 확인해주세요.');
+          navigation.goBack();
+        }
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchTourData();
+  }, [tourProgramId, navigation]);
+
+  const toggleLike = async () => {
+    try {
+      const token = await AsyncStorage.getItem('accessToken');
+      if (!token) {
+        Alert.alert('알림', '로그인이 필요한 서비스입니다.');
+        return;
+      }
+
+      // 토큰에서 'Bearer ' 접두사 제거
+      const cleanToken = token.replace('Bearer ', '');
+
+      if (!isLiked) {
+        // 찜하기 추가
+        const response = await axios.post(
+          `http://124.60.137.10:80/api/wishlist/${data?.id}`,
+          {}, // 빈 객체로 변경 (tourProgramId는 URL에 포함)
+          {
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${cleanToken}`,
+            },
+            timeout: 10000,
+          },
+        );
+
+        if (response.data.status === 'OK') {
+          setIsLiked(true);
+          if (data) {
+            setData({
+              ...data,
+              wishlistCount: data.wishlistCount + 1,
+            });
+          }
+          Alert.alert('성공', '위시리스트에 추가되었습니다.');
+        }
+      } else {
+        // 찜하기 삭제
+        const response = await axios.delete(
+          `http://124.60.137.10:80/api/wishlist/${data?.id}`,
+          {
+            headers: {
+              Authorization: `Bearer ${cleanToken}`,
+            },
+            timeout: 10000,
+          },
+        );
+
+        if (response.data.status === 'OK') {
+          setIsLiked(false);
+          if (data) {
+            setData({
+              ...data,
+              wishlistCount: data.wishlistCount - 1,
+            });
+          }
+          Alert.alert('성공', '위시리스트에서 제거되었습니다.');
+        }
+      }
+    } catch (error) {
+      console.error('찜하기 처리 중 오류:', error);
+      if (axios.isAxiosError(error)) {
+        if (error.code === 'ECONNABORTED') {
+          Alert.alert(
+            '오류',
+            '서버 응답 시간이 초과되었습니다. 다시 시도해주세요.',
+          );
+        } else if (error.response?.status === 401) {
+          Alert.alert('오류', '로그인이 만료되었습니다. 다시 로그인해주세요.');
+        } else if (error.response?.status === 404) {
+          Alert.alert('오류', '해당 투어를 찾을 수 없습니다.');
+        } else {
+          Alert.alert('오류', '찜하기 처리에 실패했습니다. 다시 시도해주세요.');
+        }
+      } else {
+        Alert.alert('오류', '네트워크 연결을 확인해주세요.');
+      }
     }
   };
 
@@ -178,6 +279,68 @@ const Practice = () => {
       // 필요시 목록 등으로 이동
     } catch (e) {
       Alert.alert('삭제 실패', '투어 삭제에 실패했습니다.');
+    }
+  };
+
+  const handleReservation = async () => {
+    try {
+      const token = await AsyncStorage.getItem('accessToken');
+      if (!token) {
+        Alert.alert('알림', '로그인이 필요한 서비스입니다.');
+        return;
+      }
+
+      const cleanToken = token.replace('Bearer ', '');
+      console.log('🟢 사용자 정보 요청:', {
+        token: cleanToken.substring(0, 10) + '...',
+      });
+
+      const response = await axios.get('http://124.60.137.10:80/api/users/me', {
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${cleanToken}`,
+        },
+        timeout: 10000,
+      });
+
+      console.log('🟢 사용자 정보 응답:', response.data);
+
+      if (response.data.status === 'OK') {
+        navigation.navigate('PaymentScreen', {
+          tourData: data,
+          userData: response.data.data,
+        });
+      } else {
+        throw new Error(
+          response.data.message || '사용자 정보를 불러오는데 실패했습니다.',
+        );
+      }
+    } catch (error) {
+      console.error('❌ 사용자 정보 로딩 실패:', error);
+      if (axios.isAxiosError(error)) {
+        console.error('❌ Axios 에러 상세:', {
+          status: error.response?.status,
+          data: error.response?.data,
+          message: error.message,
+        });
+
+        if (error.code === 'ECONNABORTED') {
+          Alert.alert('오류', '서버 응답 시간이 초과되었습니다.');
+        } else if (error.response?.status === 401) {
+          Alert.alert('오류', '로그인이 만료되었습니다.');
+        } else if (error.response?.status === 404) {
+          Alert.alert('오류', '사용자 정보를 찾을 수 없습니다.');
+        } else if (error.response?.status === 500) {
+          Alert.alert(
+            '오류',
+            '서버 오류가 발생했습니다. 잠시 후 다시 시도해주세요.',
+          );
+        } else {
+          Alert.alert('오류', '사용자 정보를 불러오는데 실패했습니다.');
+        }
+      } else {
+        Alert.alert('오류', '네트워크 연결을 확인해주세요.');
+      }
     }
   };
 
@@ -315,7 +478,7 @@ const Practice = () => {
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.reserveBtn}
-            onPress={() => navigation.navigate('PaymentScreen')}>
+            onPress={handleReservation}>
             <Text style={styles.reserveText}>예약하기</Text>
           </TouchableOpacity>
         </View>

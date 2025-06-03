@@ -37,7 +37,7 @@ export default function QuestionScreen({navigation}: Props) {
           return;
         }
 
-        const res = await axios.get(`${API_URL}/generate_question`, {
+        const res = await axios.get(`http://10.147.17.48:8000/generate_question`, {
           withCredentials: true,
           headers: {
             'Content-Type': 'application/json',
