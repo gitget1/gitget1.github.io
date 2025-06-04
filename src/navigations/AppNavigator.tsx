@@ -15,6 +15,7 @@ import PaymentScreen from '../screens/payment/PaymentScreen';
 import PaymentCompleteScreen from '../screens/payment/PaymentCompleteScreen';
 import TestPost from '../screens/practice/test_post';
 import {NativeStackScreenProps} from '@react-navigation/native-stack';
+import IamportPaymentScreen from '../screens/payment/IamportPaymentScreen';
 
 export type AppStackParamList = {
   AuthStack: undefined;
@@ -46,6 +47,19 @@ export type AppStackParamList = {
   TraitSelection: undefined;
   Result: {
     result: any;
+  };
+  IamportPayment: {
+    userCode: string;
+    data: {
+      pg: string;
+      pay_method: string;
+      name: string;
+      amount: number;
+      merchant_uid: string;
+      buyer_name: string;
+      buyer_tel: string;
+      buyer_email: string;
+    };
   };
   Practice: undefined;
   MyReviewList: undefined;
@@ -176,6 +190,11 @@ const AppNavigator = () => {
         options={{
           title: '투어 등록 테스트',
         }}
+      />
+      <Stack.Screen
+        name="IamportPayment"
+        component={IamportPaymentScreen}
+        options={{headerShown: false}}
       />
     </Stack.Navigator>
   );

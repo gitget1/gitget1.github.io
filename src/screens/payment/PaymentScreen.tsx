@@ -1,23 +1,19 @@
-import React, {useState, useEffect, useCallback} from 'react';
+// ✅ PaymentScreen.tsx (fixed - /api/users/me 호출 제거됨)
+import React, {useState, useEffect} from 'react';
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
   ScrollView,
-  ActivityIndicator,
   Alert,
 } from 'react-native';
 import {Picker} from '@react-native-picker/picker';
 import {useNavigation, useRoute} from '@react-navigation/native';
 import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import type {AppStackParamList} from '../../navigations/AppNavigator';
-import IMP from 'iamport-react-native';
-import axios from 'axios';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const API_BASE_URL = 'http://124.60.137.10:80';
-const IMP_USER_CODE = 'imp33770537'; // 아임포트 가맹점 식별코드
+const paymentMethods = ['네이버 페이', '카카오 페이', '카드 추가'];
 
 const refundTable = Array.from({length: 11}, (_, i) => ({
   day: 10 - i,
@@ -25,168 +21,106 @@ const refundTable = Array.from({length: 11}, (_, i) => ({
 }));
 
 const PaymentScreen = () => {
-  const navigation =
-    useNavigation<NativeStackNavigationProp<AppStackParamList>>();
-  const route = useRoute();
-  const tourData = route.params?.tourData;
+  const post = {
+    title: '제주 바다',
+    region: '제주',
+    rating: 4.5,
+    pricePerNight: 100,
+    nights: 1,
+  };
 
-  // 날짜 상태
   const [year, setYear] = useState(2024);
   const [month, setMonth] = useState(1);
   const [day, setDay] = useState(1);
-
-  // 인원 상태
   const [people, setPeople] = useState(1);
   const [appliedPeople, setAppliedPeople] = useState<number | null>(null);
+  const [payment, setPayment] = useState(paymentMethods[0]);
+  const totalPrice = appliedPeople
+    ? post.pricePerNight * post.nights * appliedPeople
+    : 0;
 
-  // 총 금액 계산
-  const totalPrice = appliedPeople ? tourData.guidePrice * appliedPeople : 0;
+  const navigation =
+    useNavigation<NativeStackNavigationProp<AppStackParamList>>();
+  const route = useRoute();
+  const resultParam = route.params?.result as 'success' | 'fail' | undefined;
 
-  const [isLoading, setIsLoading] = useState(false);
-  const [userInfo, setUserInfo] = useState<{
-    id: number;
-    name: string;
-    email: string;
-    phone: string;
-  } | null>(null);
-
-  const fetchUserInfo = useCallback(async () => {
-    try {
-      const token = await AsyncStorage.getItem('accessToken');
-      if (!token) {
-        Alert.alert('오류', '로그인이 필요합니다.');
-        navigation.goBack();
-        return;
-      }
-
-      const cleanToken = token.replace('Bearer ', '');
-      const response = await axios.get(`${API_BASE_URL}/api/users/me`, {
-        headers: {
-          Authorization: `Bearer ${cleanToken}`,
-          'Content-Type': 'application/json',
-        },
-        timeout: 10000,
-      });
-
-      if (response.data.status === 'OK') {
-        setUserInfo(response.data.data);
-      } else {
-        throw new Error(
-          response.data.message || '사용자 정보를 불러오는데 실패했습니다.',
-        );
-      }
-    } catch (error) {
-      console.error('사용자 정보 로딩 실패:', error);
-      Alert.alert('오류', '사용자 정보를 불러오는데 실패했습니다.');
-      navigation.goBack();
-    }
-  }, [navigation]);
+  const [result, setResult] = useState<'success' | 'fail' | null>(null);
 
   useEffect(() => {
-    fetchUserInfo();
-  }, [fetchUserInfo]);
+    if (resultParam) {
+      setResult(resultParam);
+    }
+  }, [resultParam]);
 
-  const handlePayment = async () => {
-    if (!userInfo) {
-      Alert.alert('오류', '사용자 정보를 불러오는 중입니다.');
+  const handlePayment = () => {
+    if (appliedPeople === null) {
+      Alert.alert('알림', '인원 수를 설정하고 "적용" 버튼을 눌러주세요.');
       return;
     }
 
-    if (!appliedPeople) {
-      Alert.alert('오류', '인원을 선택해주세요.');
-      return;
-    }
+    const calculatedTotalPrice =
+      post.pricePerNight * post.nights * appliedPeople;
 
-    setIsLoading(true);
-    try {
-      const token = await AsyncStorage.getItem('accessToken');
-      if (!token) {
-        throw new Error('로그인이 필요합니다.');
-      }
+    console.log('🧮 최종 totalPrice:', calculatedTotalPrice);
+    console.log('📌 appliedPeople:', appliedPeople);
 
-      const cleanToken = token.replace('Bearer ', '');
-      const merchantUid = `mid_${new Date().getTime()}`;
+    const paymentData = {
+      pg: 'html5_inicis', // ✅ 정확한 PG사 코드 사용
+      pay_method: 'card',
+      name: post.title,
+      amount: totalPrice,
+      merchant_uid: `mid_${new Date().getTime()}`,
+      buyer_name: '홍길동',
+      buyer_tel: '01012345678',
+      buyer_email: 'test@example.com',
+      app_scheme: 'tourapps', // ✅ 반드시 추가! AndroidManifest와 일치해야 함
+      // ✅ 가이드 ID 설정
+    };
 
-      return (
-        <IMP.Payment
-          userCode={IMP_USER_CODE}
-          data={{
-            pg: 'html5_inicis',
-            pay_method: 'card',
-            merchant_uid: merchantUid,
-            name: tourData.title,
-            amount: totalPrice,
-            buyer_name: userInfo.name,
-            buyer_tel: userInfo.phone,
-            buyer_email: userInfo.email,
-            app_scheme: 'tourapps1',
-            escrow: false,
-          }}
-          loading={<ActivityIndicator size="large" color="#1976d2" />}
-          callback={async response => {
-            if (response.success) {
-              try {
-                const reservationResponse = await axios.post(
-                  `${API_BASE_URL}/api/reservations`,
-                  {
-                    reservation: {
-                      tourProgramId: tourData.id,
-                      userId: userInfo.id,
-                      numOfPeople: appliedPeople,
-                      totalPrice: totalPrice,
-                      guideStartDate: `${year}-${month
-                        .toString()
-                        .padStart(2, '0')}-${day
-                        .toString()
-                        .padStart(2, '0')}T10:00:00`,
-                      guideEndDate: `${year}-${month
-                        .toString()
-                        .padStart(2, '0')}-${day
-                        .toString()
-                        .padStart(2, '0')}T13:00:00`,
-                      paymentMethod: 'kakaoPay',
-                    },
-                    impUid: response.imp_uid,
-                    merchantUid: merchantUid,
-                    userId: userInfo.id,
-                  },
-                  {
-                    headers: {
-                      Authorization: `Bearer ${cleanToken}`,
-                      'Content-Type': 'application/json',
-                    },
-                  },
-                );
-
-                if (reservationResponse.data.status === 'OK') {
-                  navigation.navigate('PaymentComplete', {success: true});
-                } else {
-                  navigation.navigate('PaymentComplete', {success: false});
-                }
-              } catch (error) {
-                console.error('예약 정보 저장 실패:', error);
-                navigation.navigate('PaymentComplete', {success: false});
-              }
-            } else {
-              console.error('결제 실패:', response);
-              navigation.navigate('PaymentComplete', {success: false});
-            }
-          }}
-        />
-      );
-    } catch (error) {
-      console.error('결제 처리 실패:', error);
-      navigation.navigate('PaymentComplete', {success: false});
-    } finally {
-      setIsLoading(false);
-    }
+    navigation.navigate('IamportPayment', {
+      userCode: 'imp33770537',
+      data: paymentData,
+      reservationInfo: {
+        tourProgramId: 1,
+        userId: 1,
+        numOfPeople: appliedPeople,
+        totalPrice,
+        guideStartDate: `${year}-${String(month).padStart(2, '0')}-${String(
+          day,
+        ).padStart(2, '0')}T10:00:00`,
+        guideEndDate: `${year}-${String(month).padStart(2, '0')}-${String(
+          day,
+        ).padStart(2, '0')}T13:00:00`,
+        paymentMethod: 'card',
+        guideId: 1,
+      },
+    });
   };
 
-  if (isLoading) {
+  if (result === 'success') {
     return (
       <View style={styles.resultContainer}>
-        <ActivityIndicator size="large" color="#1976d2" />
-        <Text style={styles.resultText}>결제 처리 중...</Text>
+        <Text style={styles.resultIcon}>✅</Text>
+        <Text style={styles.resultText}>결제에 성공하였습니다!</Text>
+        <TouchableOpacity
+          style={styles.resultBtn}
+          onPress={() => navigation.navigate('Main')}>
+          <Text style={styles.resultBtnText}>메인으로</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  if (result === 'fail') {
+    return (
+      <View style={styles.resultContainer}>
+        <Text style={styles.resultIcon}>❌</Text>
+        <Text style={styles.resultText}>결제에 실패하였습니다.</Text>
+        <TouchableOpacity
+          style={styles.resultBtn}
+          onPress={() => setResult(null)}>
+          <Text style={styles.resultBtnText}>다시 시도</Text>
+        </TouchableOpacity>
       </View>
     );
   }
@@ -196,13 +130,11 @@ const PaymentScreen = () => {
       <ScrollView
         style={styles.container}
         contentContainerStyle={{paddingBottom: 120}}>
-        {/* 제목, 지역 */}
         <View style={styles.box}>
-          <Text style={styles.title}>{tourData.title}</Text>
-          <Text style={styles.region}>{tourData.region}</Text>
+          <Text style={styles.title}>{post.title}</Text>
+          <Text style={styles.region}>{post.region}</Text>
         </View>
 
-        {/* 날짜 선택 */}
         <View style={styles.box}>
           <Text style={styles.label}>날짜</Text>
           <View style={styles.row}>
@@ -233,7 +165,6 @@ const PaymentScreen = () => {
           </View>
         </View>
 
-        {/* 인원 선택 */}
         <View style={styles.box}>
           <Text style={styles.label}>인원</Text>
           <View style={styles.row}>
@@ -263,7 +194,6 @@ const PaymentScreen = () => {
           )}
         </View>
 
-        {/* 총 금액 */}
         {appliedPeople !== null && (
           <View style={styles.box}>
             <Text style={styles.label}>총 금액</Text>
@@ -273,7 +203,23 @@ const PaymentScreen = () => {
           </View>
         )}
 
-        {/* 환불제도 */}
+        <View style={styles.box}>
+          <Text style={styles.label}>결제수단</Text>
+          <View style={styles.payMethodCol}>
+            {paymentMethods.map(method => (
+              <TouchableOpacity
+                key={method}
+                style={[
+                  styles.payBtn,
+                  payment === method && styles.payBtnSelected,
+                ]}
+                onPress={() => setPayment(method)}>
+                <Text style={styles.payBtnText}>{method}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+
         <View style={styles.box}>
           <Text style={styles.label}>환불제도</Text>
           <Text style={styles.refundInfo}>
@@ -295,6 +241,7 @@ const PaymentScreen = () => {
           </View>
         </View>
       </ScrollView>
+
       <TouchableOpacity style={styles.payButtonFixed} onPress={handlePayment}>
         <Text style={styles.payButtonText}>결제하기</Text>
       </TouchableOpacity>
@@ -343,6 +290,26 @@ const styles = StyleSheet.create({
   totalPeopleBox: {position: 'absolute', right: 20, bottom: 20},
   totalPeopleText: {fontSize: 15, color: '#1976d2', fontWeight: 'bold'},
   totalPrice: {fontWeight: 'bold', color: '#d32f2f', fontSize: 18},
+  payMethodCol: {
+    flexDirection: 'column',
+    gap: 12,
+  },
+  payBtn: {
+    backgroundColor: '#eee',
+    paddingVertical: 14,
+    borderRadius: 8,
+    marginBottom: 0,
+    alignItems: 'center',
+    width: '100%',
+    marginTop: 0,
+  },
+  payBtnSelected: {
+    backgroundColor: '#ffd6e0',
+  },
+  payBtnText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
   refundInfo: {color: '#d32f2f', marginBottom: 8},
   refundTable: {borderWidth: 1, borderColor: '#ccc', borderRadius: 6},
   refundRow: {
@@ -373,11 +340,26 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 32,
   },
+  resultIcon: {
+    fontSize: 60,
+    marginBottom: 16,
+  },
   resultText: {
     fontSize: 20,
     fontWeight: 'bold',
     marginBottom: 24,
     color: '#222',
+  },
+  resultBtn: {
+    backgroundColor: '#1976d2',
+    paddingHorizontal: 32,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  resultBtnText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 16,
   },
 });
 
