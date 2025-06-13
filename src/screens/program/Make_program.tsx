@@ -438,26 +438,36 @@ function Make_program() {
       }
 
       if (response?.data.status === 'OK') {
-        Alert.alert(
-          '성공',
-          tourProgramId
-            ? '투어 프로그램이 수정되었습니다!'
-            : '여행 일정이 등록되었습니다!',
-          [
+        if (tourProgramId) {
+          // 수정 모드: 상세 페이지로 돌아가기
+          Alert.alert('성공', '투어 프로그램이 수정되었습니다!', [
+            {
+              text: '확인',
+              onPress: () => {
+                // 상세 페이지로 돌아가면서 데이터 새로고침
+                navigation.navigate('PracticeDetail', {
+                  tourProgramId: tourProgramId,
+                  refresh: true, // 새로고침 플래그
+                });
+              },
+            },
+          ]);
+        } else {
+          // 새로 등록 모드: 기존 로직 유지
+          Alert.alert('성공', '여행 일정이 등록되었습니다!', [
             {
               text: '확인',
               onPress: () => {
                 navigation.navigate('TraitSelection', {
                   newPost: {
                     data: response.data.data,
-                    tourProgramId:
-                      tourProgramId || response.data.data.tourProgramId,
+                    tourProgramId: response.data.data.tourProgramId,
                   },
                 });
               },
             },
-          ],
-        );
+          ]);
+        }
       }
     } catch (error: any) {
       console.error('에러 상세:', error.response?.data || error);
@@ -546,13 +556,6 @@ function Make_program() {
                 placeholder="제목"
                 value={title}
                 onChangeText={setTitle}
-              />
-              <TextInput
-                style={styles.descInput}
-                placeholder="소개"
-                value={description}
-                onChangeText={setDescription}
-                multiline
               />
               <TextInput
                 style={styles.input}
@@ -667,6 +670,18 @@ function Make_program() {
                 </Text>
               </View>
             )}
+          </View>
+
+          {/* 본문 입력 */}
+          <View style={styles.contentBox}>
+            <TextInput
+              style={styles.contentInput}
+              placeholder="본문을 입력하세요"
+              value={description}
+              onChangeText={setDescription}
+              multiline
+              textAlignVertical="top"
+            />
           </View>
 
           {/* Day별 일정 */}
@@ -842,15 +857,6 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     padding: 4,
   },
-  descInput: {
-    fontSize: 15,
-    borderWidth: 1,
-    borderColor: '#ccc',
-    borderRadius: 6,
-    padding: 8,
-    minHeight: 40,
-    textAlignVertical: 'top',
-  },
   mapBox: {
     height: 300,
     borderRadius: 10,
@@ -943,6 +949,19 @@ const styles = StyleSheet.create({
     marginRight: 5,
     fontSize: 15,
     backgroundColor: '#fff',
+  },
+  contentBox: {
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 10,
+    backgroundColor: '#fff',
+  },
+  contentInput: {
+    minHeight: 150,
+    padding: 15,
+    fontSize: 16,
+    lineHeight: 24,
   },
 });
 

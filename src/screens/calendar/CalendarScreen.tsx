@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { StyleSheet, View, Text } from 'react-native';
+import { StyleSheet, } from 'react-native';
 import CalendarHome from './CalendarHome';
 import { getMonthYearDetails, getNewMonthYear } from '../../utils/date';
 import { SafeAreaView } from 'react-native-safe-area-context';

@@ -95,26 +95,21 @@ const MainHomeScreen = () => {
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        {/* 🔍 검색창 */}
-        <View style={styles.searchContainer}>
-          <Text style={styles.searchEmoji}>🔍</Text>
-          <Text style={styles.searchText}>검색을 시작해 보세요</Text>
-        </View>
-
         {/* 🔥 인기 지역 슬라이드 */}
         <View style={{alignItems: 'center', marginTop: 24, marginBottom: 10}}>
           <Text style={styles.sectionTitle}>🔥 인기 지역</Text>
           <Animated.View
             style={{
               transform: [{translateX}],
-              width: 320,
-              height: 180,
+              width: width * 0.9,
+              height: 220,
               borderRadius: 16,
               overflow: 'hidden',
+              marginHorizontal: width * 0.05,
             }}>
             <Image
               source={images[currentIndex]}
-              style={{width: 320, height: 180}}
+              style={{width: '100%', height: '100%'}}
               resizeMode="cover"
             />
           </Animated.View>
@@ -185,26 +180,6 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingBottom: 60,
   },
-  searchContainer: {
-    marginTop: 20,
-    marginHorizontal: 20,
-    backgroundColor: '#f1f3f5',
-    borderRadius: 16,
-    paddingVertical: 16,
-    paddingHorizontal: 20,
-    flexDirection: 'row',
-    alignItems: 'center',
-    elevation: 2,
-  },
-  searchEmoji: {
-    fontSize: 20,
-    marginRight: 8,
-  },
-  searchText: {
-    fontSize: 16,
-    color: '#555',
-    fontWeight: '500',
-  },
   dotsContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
@@ -234,8 +209,8 @@ const styles = StyleSheet.create({
   actionGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    justifyContent: 'space-around',
-    paddingHorizontal: 10,
+    justifyContent: 'space-between',
+    paddingHorizontal: width * 0.05,
     marginTop: 30,
   },
   iconCard: {

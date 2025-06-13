@@ -7,8 +7,12 @@ import {
   FlatList,
   StyleSheet,
   TouchableWithoutFeedback,
+  ScrollView,
 } from 'react-native';
 import axios from 'axios';
+import {useNavigation} from '@react-navigation/native';
+import type {StackNavigationProp} from '@react-navigation/stack';
+import type {AppStackParamList} from '../../navigations/AppNavigator';
 
 // ✅ MBTI 목록 아이템 타입
 interface MbtiItem {
@@ -38,24 +42,17 @@ interface TourProgram {
   wishlistCount?: number;
 }
 
-// ✅ 투어 프로그램 API 요청 시 사용할 파라미터 구조
-interface TourProgramListParams {
-  hashtags?: string[];
-  regions?: string[];
-  page: string | number;
-  size: string | number;
-  sortOption: string;
-}
-
 const TraitDropdown = () => {
+  // 네비게이션 훅
+  const navigation = useNavigation<StackNavigationProp<AppStackParamList>>();
+
   // 상태 정의
   const [mbtiList, setMbtiList] = useState<MbtiItem[]>([]);
   const [selectedMbti, setSelectedMbti] = useState<MbtiDetail | null>(null);
   const [selectedHashtags, setSelectedHashtags] = useState<string[]>([]);
   const [selectedRegions, setSelectedRegions] = useState<string[]>([]);
   const [showDropdown, setShowDropdown] = useState(false);
-  const [showSortDropdown, setShowSortDropdown] = useState(false);
-  const [selectedSort, setSelectedSort] = useState('addedDesc'); // 기본 정렬 옵션
+  const [selectedSort, setSelectedSort] = useState('최신순'); // 기본 정렬 옵션
   const [displayedPosts, setDisplayedPosts] = useState(10);
   const [loadingMore, setLoadingMore] = useState(false);
   const [posts, setPosts] = useState<TourProgram[]>([]);
@@ -69,12 +66,9 @@ const TraitDropdown = () => {
         const token = await AsyncStorage.getItem('accessToken');
         console.log('🟢 MBTI 목록 요청용 토큰:', token);
 
-        const res = await axios.get(
-          'http://124.60.137.10:80/api/mbti/all-mbti',
-          {
-            headers: token ? {Authorization: `Bearer ${token}`} : {},
-          },
-        );
+        const res = await axios.get('http://124.60.137.10/api/mbti/all-mbti', {
+          headers: token ? {Authorization: `Bearer ${token}`} : {},
+        });
 
         console.log('🟢 MBTI 목록 응답:', res.data);
         setMbtiList(res.data.data);
@@ -103,47 +97,60 @@ const TraitDropdown = () => {
         const currentPage = isLoadMore ? page + 1 : 0;
 
         // 파라미터 생성
-        const params: TourProgramListParams = {
-          page: currentPage,
-          size: size,
-          sortOption: selectedSort,
-        };
+        // selectedSort를 API 파라미터로 변환
+        let sortOption = 'addedDesc';
+        switch (selectedSort) {
+          case '최신순':
+            sortOption = 'addedDesc';
+            break;
+          case '가격 낮은순':
+            sortOption = 'priceAsc';
+            break;
+          case '가격 높은순':
+            sortOption = 'priceDesc';
+            break;
+          case '리뷰순':
+            sortOption = 'reviewDesc';
+            break;
+          case '찜순':
+            sortOption = 'wishlistDesc';
+            break;
+        }
 
+        // GET 요청으로 복구하되 필수 파라미터 처리
+        const queryParams = [
+          `page=${currentPage}`,
+          `size=${size}`,
+          `sortOption=${sortOption.trim()}`,
+        ];
+
+        // 해시태그 처리 - 없으면 더미 값 추가
         if (selectedHashtags.length > 0) {
-          params.hashtags = selectedHashtags
+          const cleanHashtags = selectedHashtags
             .map(tag => (tag.startsWith('#') ? tag.substring(1) : tag).trim())
             .filter(tag => tag !== '');
+          cleanHashtags.forEach(tag => {
+            queryParams.push(`hashtags=${encodeURIComponent(tag)}`);
+          });
+        } else {
+          queryParams.push(`hashtags=all`); // 더미 값으로 'all' 사용
         }
 
+        // 지역 처리 - 없으면 더미 값 추가
         if (selectedRegions.length > 0) {
-          params.regions = selectedRegions
+          const cleanRegions = selectedRegions
             .map(region => region.trim())
             .filter(region => region !== '');
-        }
-
-        // URLSearchParams 생성
-        const searchParams = new URLSearchParams();
-
-        // 기본 파라미터 추가
-        searchParams.append('page', String(currentPage));
-        searchParams.append('size', String(size));
-        searchParams.append('sortOption', selectedSort.trim());
-
-        // 해시태그 추가
-        if (params.hashtags) {
-          params.hashtags.forEach(tag => {
-            searchParams.append('hashtags', tag.trim());
+          cleanRegions.forEach(region => {
+            queryParams.push(`regions=${encodeURIComponent(region)}`);
           });
+        } else {
+          queryParams.push(`regions=all`); // 더미 값으로 'all' 사용
         }
 
-        // 지역 추가
-        if (params.regions) {
-          params.regions.forEach(region => {
-            searchParams.append('regions', region.trim());
-          });
-        }
-
-        const apiUrl = `http://124.60.137.10:80/api/tour-program?${searchParams.toString()}`;
+        const apiUrl = `http://124.60.137.10/api/tour-program?${queryParams.join(
+          '&',
+        )}`;
         console.log('🟢 최종 요청 URL:', apiUrl);
 
         const headers = {
@@ -152,10 +159,15 @@ const TraitDropdown = () => {
           Accept: 'application/json',
         };
 
+        console.log('🟢 요청 헤더:', headers);
+        console.log('🟢 GET 요청 시작');
+
         const response = await axios.get(apiUrl, {
           headers,
-          timeout: 30000,
+          timeout: 15000,
         });
+
+        console.log('🟢 응답 받음 - 상태:', response.status);
 
         console.log('🟢 응답 상태 코드:', response.status);
         console.log('🟢 응답 데이터:', response.data);
@@ -206,7 +218,7 @@ const TraitDropdown = () => {
       console.log('🟢 MBTI 상세 요청용 토큰:', token);
 
       const res = await axios.get(
-        `http://124.60.137.10:80/api/mbti/detail-mbti?mbtiId=${item.mbtiId}&mbti=${item.mbti}`,
+        `http://124.60.137.10/api/mbti/detail-mbti?mbtiId=${item.mbtiId}&mbti=${item.mbti}`,
         {
           headers: token ? {Authorization: `Bearer ${token}`} : {},
         },
@@ -256,30 +268,9 @@ const TraitDropdown = () => {
 
   // ✅ 정렬 옵션 선택 시 적용 후 게시물 조회
   const handleSortSelect = (option: string) => {
-    let sortOption = 'addedDesc';
+    console.log('🟢 선택된 정렬 옵션:', option);
 
-    switch (option) {
-      case '최신순':
-        sortOption = 'addedDesc';
-        break;
-      case '가격 낮은순':
-        sortOption = 'priceAsc';
-        break;
-      case '가격 높은순':
-        sortOption = 'priceDesc';
-        break;
-      case '리뷰순':
-        sortOption = 'reviewDesc';
-        break;
-      case '찜순':
-        sortOption = 'wishlistDesc';
-        break;
-    }
-
-    console.log('🟢 선택된 정렬 옵션:', sortOption);
-
-    setSelectedSort(sortOption);
-    setShowSortDropdown(false);
+    setSelectedSort(option);
     setPage(0);
     setTimeout(() => fetchTourPrograms(), 100);
   };
@@ -297,7 +288,6 @@ const TraitDropdown = () => {
   // ✅ 외부 클릭 시 드롭다운 닫기
   const handleOutsidePress = () => {
     setShowDropdown(false);
-    setShowSortDropdown(false);
   };
 
   return (
@@ -306,7 +296,15 @@ const TraitDropdown = () => {
         data={posts.slice(0, displayedPosts)}
         keyExtractor={(item, index) => index.toString()}
         renderItem={({item}) => (
-          <View style={styles.postCard}>
+          <TouchableOpacity
+            style={styles.postCard}
+            onPress={() => {
+              console.log('🟢 게시물 클릭 - tourProgramId:', item.id);
+              navigation.navigate('PracticeDetail', {
+                tourProgramId: item.id,
+              });
+            }}
+            activeOpacity={0.8}>
             <Text style={styles.postTitle}>{item.title}</Text>
             <Text style={styles.postDescription}>{item.description}</Text>
             <View style={styles.postMetaContainer}>
@@ -326,7 +324,7 @@ const TraitDropdown = () => {
                 ))}
               </View>
             )}
-          </View>
+          </TouchableOpacity>
         )}
         onEndReached={loadMorePosts}
         onEndReachedThreshold={0.5}
@@ -419,28 +417,35 @@ const TraitDropdown = () => {
             {selectedMbti && (
               <View style={styles.postContainer}>
                 <Text style={styles.postText}>게시글</Text>
-                <TouchableOpacity
-                  style={styles.sortButton}
-                  onPress={() => setShowSortDropdown(!showSortDropdown)}>
-                  <Text style={styles.sortButtonText}>{selectedSort}</Text>
-                </TouchableOpacity>
-                {showSortDropdown && (
-                  <View style={styles.sortDropdown}>
-                    {[
-                      '최신순',
-                      '가격 낮은순',
-                      '가격 높은순',
-                      '리뷰순',
-                      '찜순',
-                    ].map(option => (
-                      <TouchableOpacity
-                        key={option}
-                        onPress={() => handleSortSelect(option)}>
-                        <Text style={styles.sortDropdownItem}>{option}</Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                )}
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  style={styles.sortScrollView}
+                  contentContainerStyle={styles.sortScrollContent}>
+                  {[
+                    '최신순',
+                    '가격 낮은순',
+                    '가격 높은순',
+                    '리뷰순',
+                    '찜순',
+                  ].map(option => (
+                    <TouchableOpacity
+                      key={option}
+                      style={[
+                        styles.sortOptionButton,
+                        selectedSort === option && styles.selectedSortButton,
+                      ]}
+                      onPress={() => handleSortSelect(option)}>
+                      <Text
+                        style={[
+                          styles.sortOptionText,
+                          selectedSort === option && styles.selectedSortText,
+                        ]}>
+                        {option}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
               </View>
             )}
           </View>
@@ -524,25 +529,36 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   postText: {fontSize: 18, fontWeight: 'bold'},
-  sortButton: {
-    padding: 8,
-    backgroundColor: '#fff',
-    borderWidth: 1,
-    borderColor: '#ccc',
-    borderRadius: 5,
+  sortScrollView: {
+    flex: 1,
+    marginLeft: 10,
   },
-  sortButtonText: {fontSize: 14},
-  sortDropdown: {
-    position: 'absolute',
-    top: 40,
-    right: 0,
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#ccc',
-    zIndex: 100,
+  sortScrollContent: {
+    alignItems: 'center',
+    paddingRight: 10,
   },
-  sortDropdownItem: {padding: 10, fontSize: 14},
+  sortOptionButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    marginHorizontal: 4,
+    backgroundColor: '#f0f0f0',
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#ddd',
+  },
+  selectedSortButton: {
+    backgroundColor: '#2196F3',
+    borderColor: '#2196F3',
+  },
+  sortOptionText: {
+    fontSize: 14,
+    color: '#666',
+    fontWeight: '500',
+  },
+  selectedSortText: {
+    color: '#fff',
+    fontWeight: 'bold',
+  },
   postCard: {
     marginTop: 10,
     padding: 15,
