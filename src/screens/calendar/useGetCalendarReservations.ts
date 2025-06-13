@@ -21,7 +21,7 @@ export default function useGetCalendarReservations(start: string, end: string) {
   return useQuery({
     queryKey: ['calendarReservations', start, end],
     queryFn: () => fetchCalendarReservations(start, end),
-    refetchInterval: 5000, // ✅ 5초마다 자동 새로고침
+    refetchInterval: 50000000, // ✅ 5초마다 자동 새로고침
     refetchOnWindowFocus: true, // 앱 복귀 시 refetch
     staleTime: 0, // ✅ 항상 최신 데이터 유지
   });
