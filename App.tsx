@@ -1,3 +1,4 @@
+// ✅ 최상단에 추가 (반드시 import보다 위 또는 아래이지만 App 함수 밖에 위치해야 함)
 import {TextDecoder, TextEncoder} from 'text-encoding';
 
 if (typeof global.TextEncoder === 'undefined') {
