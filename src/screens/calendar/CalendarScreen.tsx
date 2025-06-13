@@ -1,43 +1,75 @@
-import React, { useState } from 'react';
-import { StyleSheet, } from 'react-native';
+import React, {useState, useMemo} from 'react';
+import {StyleSheet, Text} from 'react-native';
 import CalendarHome from './CalendarHome';
-import { getMonthYearDetails, getNewMonthYear } from '../../utils/date';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { colors } from '../../constants';
-// import useGetCalendarPosts from '../../hooks/queries/useGetCalendarPost';
-// import { CalendarPost, ResponseCalendarPost } from '../../api/post';
-// import EventList from './EventList';
+import {getMonthYearDetails, getNewMonthYear} from '../../utils/date';
+import {SafeAreaView} from 'react-native-safe-area-context';
+import {colors} from '../../constants';
+import EventList from './EventList';
+import useGetCalendarReservations from './useGetCalendarReservations';
+import dayjs from 'dayjs';
 
 function CalendarScreen() {
   const currentMonthYear = getMonthYearDetails(new Date());
-  const [monthYear, setMonthYear] = useState(currentMonthYear); 
+  const [monthYear, setMonthYear] = useState(currentMonthYear);
   const today = new Date().getDate();
-  const [selectedDate, setSeltectedDate] = useState(today);
-  // const { data: posts = {} as ResponseCalendarPost, isPending, isError } = useGetCalendarPosts(monthYear.year, monthYear.month);
+  const [selectedDate, setSelectedDate] = useState(today);
 
-  // if (isPending) return <View style={styles.container}><Text>로딩 중...</Text></View>;
-  // if (isError) return <View style={styles.container}><Text>에러 발생</Text></View>;
+  const start = useMemo(
+    () =>
+      dayjs(`${monthYear.year}-${monthYear.month}-01`)
+        .startOf('week')
+        .format('YYYY-MM-DD[T]00:00:00'),
+    [monthYear],
+  );
 
-  // const groupedSchedules: ResponseCalendarPost = posts;
+  const end = useMemo(
+    () =>
+      dayjs(`${monthYear.year}-${monthYear.month}-01`)
+        .endOf('month')
+        .endOf('week')
+        .format('YYYY-MM-DD[T]23:59:59'),
+    [monthYear],
+  );
+
+  const {
+    data: reservations = [],
+    isLoading,
+    isError,
+  } = useGetCalendarReservations(start, end);
 
   const handlePressDate = (date: number) => {
-    setSeltectedDate(date);
+    setSelectedDate(date);
   };
 
   const handleUpdateMonth = (increment: number) => {
     setMonthYear(prev => getNewMonthYear(prev, increment));
   };
 
+  const selectedDateObj = dayjs(
+    `${monthYear.year}-${monthYear.month}-${selectedDate}`,
+  );
+
+  const selectedDateReservations = reservations.filter(item =>
+    selectedDateObj.isBetween(
+      item.guideStartDate,
+      item.guideEndDate,
+      'day',
+      '[]',
+    ),
+  );
+
   return (
     <SafeAreaView style={styles.container}>
-      <CalendarHome 
-        monthYear={monthYear} 
-        onChangeMonth={handleUpdateMonth} 
+      <CalendarHome
+        monthYear={monthYear}
+        onChangeMonth={handleUpdateMonth}
         selectedDate={selectedDate}
-        onPressDate={handlePressDate} 
-        // schedules={groupedSchedules}
+        onPressDate={handlePressDate}
+        reservations={reservations}
       />
-      {/* <EventList posts={groupedSchedules[selectedDate] || []} /> */}
+      {isLoading && <Text>로딩 중...</Text>}
+      {isError && <Text>데이터를 불러오지 못했습니다.</Text>}
+      {!isLoading && !isError && <EventList posts={selectedDateReservations} />}
     </SafeAreaView>
   );
 }

@@ -15,6 +15,7 @@ import PaymentScreen from '../screens/payment/PaymentScreen';
 import PaymentCompleteScreen from '../screens/payment/PaymentCompleteScreen';
 import WishlistScreen from '../screens/wishlist/WishlistScreen';
 import {NativeStackScreenProps} from '@react-navigation/native-stack';
+import IamportPaymentScreen from '../screens/payment/IamportPaymentScreen';
 
 export type AppStackParamList = {
   AuthStack: undefined;
@@ -49,6 +50,19 @@ export type AppStackParamList = {
   };
   Practice: {tourProgramId: number};
   PracticeDetail: {tourProgramId: number; refresh?: boolean};
+  IamportPayment: {
+    userCode: string;
+    data: {
+      pg: string;
+      pay_method: string;
+      name: string;
+      amount: number;
+      merchant_uid: string;
+      buyer_name: string;
+      buyer_tel: string;
+      buyer_email: string;
+    };
+  };
   MyReviewList: undefined;
   PaymentScreen: undefined;
   PaymentComplete: undefined;
@@ -179,6 +193,11 @@ const AppNavigator = () => {
           title: '위시리스트',
           headerTitleStyle: {fontSize: 20},
         }}
+      />
+      <Stack.Screen
+        name="IamportPayment"
+        component={IamportPaymentScreen}
+        options={{headerShown: false}}
       />
     </Stack.Navigator>
   );

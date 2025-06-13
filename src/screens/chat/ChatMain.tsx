@@ -1,4 +1,4 @@
-import React from 'react';
+import React, {useEffect, useState} from 'react';
 import {
   View,
   Text,
@@ -7,11 +7,12 @@ import {
   TouchableOpacity,
   Image,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
-import { StackNavigationProp } from '@react-navigation/stack';
+import {useNavigation} from '@react-navigation/native';
+import {StackNavigationProp} from '@react-navigation/stack';
+import axios from 'axios';
 
 type RootStackParamList = {
-  ChatRoom: { roomId: string };
+  ChatRoom: {roomId: string};
   NewChat: undefined;
 };
 
@@ -26,35 +27,40 @@ interface ChatRoom {
   avatar: string;
 }
 
-const dummyData: ChatRoom[] = [
-  {
-    id: '1',
-    name: '여행 친구 모임',
-    lastMessage: '오늘 저녁에 만나서 여행 계획 세워요!',
-    time: '오후 2:30',
-    unread: 3,
-    avatar: 'https://via.placeholder.com/50',
-  },
-  {
-    id: '2',
-    name: '제주도 여행팸',
-    lastMessage: '숙소 예약 완료했습니다~',
-    time: '오전 11:20',
-    unread: 0,
-    avatar: 'https://via.placeholder.com/50',
-  },
-  // 더미 데이터 추가 가능
-];
-
 const ChatMain = () => {
   const navigation = useNavigation<ChatNavigationProp>();
+  const [chatRooms, setChatRooms] = useState<ChatRoom[]>([]);
 
-  const renderChatRoom = ({ item }: { item: ChatRoom }) => (
+  useEffect(() => {
+    const fetchChatRooms = async () => {
+      try {
+        const response = await axios.get('http://192.168.1.120:8080/rooms'); // 수정 필요
+        const rooms = response.data;
+
+        // 서버에서 받은 데이터 형식을 ChatRoom에 맞게 매핑
+        const transformed: ChatRoom[] = rooms.map((room: any) => ({
+          id: room.id.toString(),
+          name: `채팅방 ${room.id}`,
+          lastMessage: '최근 메시지를 불러오는 기능 추가 예정',
+          time: '오전 10:00',
+          unread: Math.floor(Math.random() * 5), // 예시
+          avatar: 'https://via.placeholder.com/50',
+        }));
+
+        setChatRooms(transformed);
+      } catch (error) {
+        console.error('채팅방 목록 불러오기 실패:', error);
+      }
+    };
+
+    fetchChatRooms();
+  }, []);
+
+  const renderChatRoom = ({item}: {item: ChatRoom}) => (
     <TouchableOpacity
       style={styles.chatRoom}
-      onPress={() => navigation.navigate('ChatRoom', { roomId: item.id })}
-    >
-      <Image source={{ uri: item.avatar }} style={styles.avatar} />
+      onPress={() => navigation.navigate('ChatRoom', {roomId: item.id})}>
+      <Image source={{uri: item.avatar}} style={styles.avatar} />
       <View style={styles.chatInfo}>
         <View style={styles.topRow}>
           <Text style={styles.name}>{item.name}</Text>
@@ -80,15 +86,14 @@ const ChatMain = () => {
         <Text style={styles.headerTitle}>채팅</Text>
       </View>
       <FlatList
-        data={dummyData}
+        data={chatRooms}
         renderItem={renderChatRoom}
-        keyExtractor={(item) => item.id}
+        keyExtractor={item => item.id}
         style={styles.list}
       />
       <TouchableOpacity
         style={styles.newChatButton}
-        onPress={() => navigation.navigate('NewChat')}
-      >
+        onPress={() => navigation.navigate('NewChat')}>
         <Text style={styles.newChatButtonText}>새 채팅</Text>
       </TouchableOpacity>
     </View>
@@ -96,22 +101,14 @@ const ChatMain = () => {
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-  },
+  container: {flex: 1, backgroundColor: '#fff'},
   header: {
     padding: 16,
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
   },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-  },
-  list: {
-    flex: 1,
-  },
+  headerTitle: {fontSize: 24, fontWeight: 'bold'},
+  list: {flex: 1},
   chatRoom: {
     flexDirection: 'row',
     padding: 16,
@@ -124,22 +121,14 @@ const styles = StyleSheet.create({
     borderRadius: 25,
     marginRight: 12,
   },
-  chatInfo: {
-    flex: 1,
-  },
+  chatInfo: {flex: 1},
   topRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginBottom: 4,
   },
-  name: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  time: {
-    fontSize: 12,
-    color: '#666',
-  },
+  name: {fontSize: 16, fontWeight: '600'},
+  time: {fontSize: 12, color: '#666'},
   bottomRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -177,18 +166,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     elevation: 4,
     shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
+    shadowOffset: {width: 0, height: 2},
     shadowOpacity: 0.25,
     shadowRadius: 3.84,
   },
-  newChatButtonText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '600',
-  },
+  newChatButtonText: {color: '#fff', fontSize: 14, fontWeight: '600'},
 });
 
 export default ChatMain;

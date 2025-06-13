@@ -485,57 +485,13 @@ const Practice = () => {
         return;
       }
 
-      const cleanToken = token.replace('Bearer ', '');
-      console.log('🟢 사용자 정보 요청:', {
-        token: cleanToken.substring(0, 10) + '...',
+      // 결제 화면으로 tourData만 전달
+      navigation.navigate('PaymentScreen', {
+        tourData: data,
       });
-
-      const response = await axios.get('http://124.60.137.10:80/api/users/me', {
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${cleanToken}`,
-        },
-        timeout: 10000,
-      });
-
-      console.log('🟢 사용자 정보 응답:', response.data);
-
-      if (response.data.status === 'OK') {
-        navigation.navigate('PaymentScreen', {
-          tourData: data,
-          userData: response.data.data,
-        });
-      } else {
-        throw new Error(
-          response.data.message || '사용자 정보를 불러오는데 실패했습니다.',
-        );
-      }
     } catch (error) {
-      console.error('❌ 사용자 정보 로딩 실패:', error);
-      if (axios.isAxiosError(error)) {
-        console.error('❌ Axios 에러 상세:', {
-          status: error.response?.status,
-          data: error.response?.data,
-          message: error.message,
-        });
-
-        if (error.code === 'ECONNABORTED') {
-          Alert.alert('오류', '서버 응답 시간이 초과되었습니다.');
-        } else if (error.response?.status === 401) {
-          Alert.alert('오류', '로그인이 만료되었습니다.');
-        } else if (error.response?.status === 404) {
-          Alert.alert('오류', '사용자 정보를 찾을 수 없습니다.');
-        } else if (error.response?.status === 500) {
-          Alert.alert(
-            '오류',
-            '서버 오류가 발생했습니다. 잠시 후 다시 시도해주세요.',
-          );
-        } else {
-          Alert.alert('오류', '사용자 정보를 불러오는데 실패했습니다.');
-        }
-      } else {
-        Alert.alert('오류', '네트워크 연결을 확인해주세요.');
-      }
+      Alert.alert('오류', '예약 처리 중 문제가 발생했습니다.');
+      console.error('❌ 예약 처리 실패:', error);
     }
   };
 
