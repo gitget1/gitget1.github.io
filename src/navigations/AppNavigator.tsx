@@ -13,7 +13,7 @@ import Practice1 from '../screens/practice/Practice_detail page';
 import MyReviewList from '../screens/mypage/MyReviewList';
 import PaymentScreen from '../screens/payment/PaymentScreen';
 import PaymentCompleteScreen from '../screens/payment/PaymentCompleteScreen';
-import TestPost from '../screens/practice/test_post';
+import WishlistScreen from '../screens/wishlist/WishlistScreen';
 import {NativeStackScreenProps} from '@react-navigation/native-stack';
 import IamportPaymentScreen from '../screens/payment/IamportPaymentScreen';
 
@@ -48,6 +48,8 @@ export type AppStackParamList = {
   Result: {
     result: any;
   };
+  Practice: {tourProgramId: number};
+  PracticeDetail: {tourProgramId: number; refresh?: boolean};
   IamportPayment: {
     userCode: string;
     data: {
@@ -61,11 +63,10 @@ export type AppStackParamList = {
       buyer_email: string;
     };
   };
-  Practice: undefined;
   MyReviewList: undefined;
   PaymentScreen: undefined;
   PaymentComplete: undefined;
-  TestPost: undefined;
+  WishlistScreen: undefined;
 };
 
 export type AppStackScreenProps<T extends keyof AppStackParamList> =
@@ -185,10 +186,12 @@ const AppNavigator = () => {
         }}
       />
       <Stack.Screen
-        name="TestPost"
-        component={TestPost}
+        name="WishlistScreen"
+        component={WishlistScreen}
         options={{
-          title: '투어 등록 테스트',
+          headerShown: true,
+          title: '위시리스트',
+          headerTitleStyle: {fontSize: 20},
         }}
       />
       <Stack.Screen

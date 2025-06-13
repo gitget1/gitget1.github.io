@@ -1,5 +1,4 @@
-
-import { StackScreenProps } from '@react-navigation/stack';
+import {StackScreenProps} from '@react-navigation/stack';
 import React from 'react';
 import {
   StyleSheet,
@@ -10,19 +9,22 @@ import {
   Pressable,
 } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { authNavigations, colors } from '../../constants';
+import {SafeAreaView} from 'react-native-safe-area-context';
+import {authNavigations, colors} from '../../constants';
 import CustomButton from '../../components/CustomButton';
-import { Text } from 'react-native-gesture-handler';
-import { AuthStackParamList } from '../../navigations/stack/AuthStackNavigator';
+import {Text} from 'react-native-gesture-handler';
+import {AuthStackParamList} from '../../navigations/stack/AuthStackNavigator';
 
-type Props = StackScreenProps<AuthStackParamList, typeof authNavigations.AUTH_HOME>;
+type Props = StackScreenProps<
+  AuthStackParamList,
+  typeof authNavigations.AUTH_HOME
+>;
 
 type AuthHomeScreenProps = Props & {
   navigationOverride?: () => void;
 };
 
-function AuthHomeScreen({ navigation, navigationOverride }: AuthHomeScreenProps) {
+function AuthHomeScreen({navigation, navigationOverride}: AuthHomeScreenProps) {
   return (
     <ImageBackground
       source={require('../../assets/가로수길.jpg')}
@@ -74,7 +76,9 @@ function AuthHomeScreen({ navigation, navigationOverride }: AuthHomeScreenProps)
           />
 
           <Pressable onPress={navigationOverride}>
-            <Text style={styles.emailText}>로그인없이 메인화면으로 이동하기</Text>
+            <Text style={styles.emailText}>
+              로그인없이 메인화면으로 이동하기
+            </Text>
           </Pressable>
         </View>
       </SafeAreaView>

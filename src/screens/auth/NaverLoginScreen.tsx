@@ -36,12 +36,9 @@ const App = () => {
           'Bearer ',
           '',
         );
-        console.log('받은 accessToken:', accessToken);
 
         if (accessToken) {
           await AsyncStorage.setItem('accessToken', accessToken);
-          Alert.alert('로그인 완료', '토큰 저장 완료');
-          Alert.alert('accessToken 값 출력', accessToken);
           navigation.replace('Main');
         }
       } catch (error) {

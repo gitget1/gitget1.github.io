@@ -44,6 +44,8 @@ type TourData = {
   user: {id: number; name: string};
   description: string;
   guidePrice: number;
+  tourProgramId: number;
+  wishlisted: boolean;
 };
 
 const Practice = () => {
@@ -51,8 +53,14 @@ const Practice = () => {
   const [isLiked, setIsLiked] = useState(false);
   const [loading, setLoading] = useState(true);
   const navigation = useNavigation<StackNavigationProp<AppStackParamList>>();
-  const route = useRoute<RouteProp<AppStackParamList, 'Practice'>>();
+  const route = useRoute<RouteProp<AppStackParamList, 'PracticeDetail'>>();
   const tourProgramId = route.params?.tourProgramId ?? 1;
+  const refresh = route.params?.refresh;
+
+  console.log('🟢 PracticeDetail 화면 - tourProgramId:', tourProgramId);
+
+  // 더 이상 필요하지 않음 - 서버의 wishlisted 필드 사용
+  // const checkWishlistStatus = useCallback(...);
 
   useEffect(() => {
     const fetchTourData = async () => {
@@ -71,7 +79,7 @@ const Practice = () => {
         });
 
         const response = await axios.get(
-          `http://124.60.137.10:80/api/tour-program/${tourProgramId}`,
+          `http://124.60.137.10/api/tour-program/${tourProgramId}`,
           {
             headers: {
               'Content-Type': 'application/json',
@@ -84,7 +92,17 @@ const Practice = () => {
         console.log('🟢 서버 응답:', response.data);
 
         if (response.data.status === 'OK') {
-          setData(response.data.data);
+          const tourData = response.data.data;
+          setData(tourData);
+
+          // 서버에서 받은 wishlisted 값으로 찜하기 상태 설정
+          setIsLiked(tourData.wishlisted || false);
+
+          console.log('🟢 투어 데이터 로드 완료:', {
+            tourProgramId: tourData.tourProgramId || tourData.id,
+            wishlisted: tourData.wishlisted,
+            wishlistCount: tourData.wishlistCount,
+          });
         } else {
           console.error('❌ 서버 응답 에러:', response.data);
           throw new Error(
@@ -128,7 +146,25 @@ const Practice = () => {
     };
 
     fetchTourData();
-  }, [tourProgramId, navigation]);
+  }, [tourProgramId, navigation, refresh]);
+
+  // JWT 토큰 디코딩 함수
+  const decodeJWT = (token: string) => {
+    try {
+      const base64Url = token.split('.')[1];
+      const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+      const jsonPayload = decodeURIComponent(
+        atob(base64)
+          .split('')
+          .map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+          .join(''),
+      );
+      return JSON.parse(jsonPayload);
+    } catch (error) {
+      console.error('JWT 디코딩 실패:', error);
+      return null;
+    }
+  };
 
   const toggleLike = async () => {
     try {
@@ -141,10 +177,36 @@ const Practice = () => {
       // 토큰에서 'Bearer ' 접두사 제거
       const cleanToken = token.replace('Bearer ', '');
 
+      // JWT 토큰 정보 확인
+      const jwtPayload = decodeJWT(cleanToken);
+      console.log('🔍 JWT 토큰 정보:', {
+        userId: jwtPayload?.sub,
+        role: jwtPayload?.role,
+        exp: jwtPayload?.exp,
+        현재시간: Math.floor(Date.now() / 1000),
+        만료여부: jwtPayload?.exp < Math.floor(Date.now() / 1000),
+      });
+
+      console.log('🟢 찜하기 토글 시작:', {
+        currentState: isLiked ? '찜함' : '찜 안함',
+        tourProgramId,
+        tourProgramIdType: typeof tourProgramId,
+        action: isLiked ? '찜하기 취소' : '찜하기 추가',
+        userData: data?.user,
+        tokenPreview: cleanToken.substring(0, 20) + '...',
+      });
+
       if (!isLiked) {
         // 찜하기 추가
+        console.log('🟢 찜하기 추가 요청 시작...', {
+          url: `http://124.60.137.10:80/api/wishlist/${tourProgramId}`,
+          tourProgramId: tourProgramId,
+          tourProgramIdType: typeof tourProgramId,
+          token: cleanToken.substring(0, 10) + '...',
+        });
+
         const response = await axios.post(
-          `http://124.60.137.10:80/api/wishlist/${data?.id}`,
+          `http://124.60.137.10:80/api/wishlist/${tourProgramId}`,
           {}, // 빈 객체로 변경 (tourProgramId는 URL에 포함)
           {
             headers: {
@@ -155,42 +217,104 @@ const Practice = () => {
           },
         );
 
+        console.log('🟢 찜하기 추가 응답:', response.data);
+
         if (response.data.status === 'OK') {
+          // 상태 즉시 업데이트
           setIsLiked(true);
           if (data) {
+            const newWishlistCount = data.wishlistCount + 1;
             setData({
               ...data,
-              wishlistCount: data.wishlistCount + 1,
+              wishlistCount: newWishlistCount,
+              wishlisted: true,
+            });
+            console.log('✅ 찜하기 추가 성공:', {
+              이전상태: '찜 안함 🤍',
+              새상태: '찜함 💖',
+              이전개수: data.wishlistCount,
+              새개수: newWishlistCount,
+              wishlisted: true,
             });
           }
-          Alert.alert('성공', '위시리스트에 추가되었습니다.');
+          Alert.alert(
+            '성공',
+            '위시리스트에 추가되었습니다.\n위시리스트를 확인하시겠습니까?',
+            [
+              {
+                text: '취소',
+                style: 'cancel',
+              },
+              {
+                text: '확인',
+                onPress: () => {
+                  navigation.navigate('WishlistScreen');
+                },
+              },
+            ],
+          );
+        } else {
+          console.error('❌ 찜하기 추가 실패:', response.data);
+          Alert.alert('오류', '찜하기 추가에 실패했습니다.');
         }
       } else {
         // 찜하기 삭제
-        const response = await axios.delete(
-          `http://124.60.137.10:80/api/wishlist/${data?.id}`,
+        console.log('🟢 찜하기 취소 요청 시작...', {
+          url: `http://124.60.137.10:80/api/wishlist/${tourProgramId}`,
+          tourProgramId: tourProgramId,
+          tourProgramIdType: typeof tourProgramId,
+          token: cleanToken.substring(0, 10) + '...',
+          method: 'POST (찜하기 토글)',
+        });
+
+        // 찜하기는 토글 방식으로 작동 - 같은 엔드포인트에 POST 요청
+        const response = await axios.post(
+          `http://124.60.137.10:80/api/wishlist/${tourProgramId}`,
+          {}, // 빈 객체
           {
             headers: {
+              'Content-Type': 'application/json',
               Authorization: `Bearer ${cleanToken}`,
             },
             timeout: 10000,
           },
         );
 
+        console.log('🟢 찜하기 취소 응답:', response.data);
+
         if (response.data.status === 'OK') {
+          // 상태 즉시 업데이트
           setIsLiked(false);
           if (data) {
+            const newWishlistCount = Math.max(0, data.wishlistCount - 1);
             setData({
               ...data,
-              wishlistCount: data.wishlistCount - 1,
+              wishlistCount: newWishlistCount,
+              wishlisted: false,
+            });
+            console.log('✅ 찜하기 취소 성공:', {
+              이전상태: '찜함 💖',
+              새상태: '찜 안함 🤍',
+              이전개수: data.wishlistCount,
+              새개수: newWishlistCount,
+              wishlisted: false,
             });
           }
           Alert.alert('성공', '위시리스트에서 제거되었습니다.');
+        } else {
+          console.error('❌ 찜하기 취소 실패:', response.data);
+          Alert.alert('오류', '찜하기 취소에 실패했습니다.');
         }
       }
     } catch (error) {
-      console.error('찜하기 처리 중 오류:', error);
+      console.error('❌ 찜하기 처리 중 오류:', error);
       if (axios.isAxiosError(error)) {
+        console.error('❌ Axios 에러 상세:', {
+          status: error.response?.status,
+          data: error.response?.data,
+          message: error.message,
+        });
+
         if (error.code === 'ECONNABORTED') {
           Alert.alert(
             '오류',
@@ -200,6 +324,21 @@ const Practice = () => {
           Alert.alert('오류', '로그인이 만료되었습니다. 다시 로그인해주세요.');
         } else if (error.response?.status === 404) {
           Alert.alert('오류', '해당 투어를 찾을 수 없습니다.');
+        } else if (error.response?.status === 500) {
+          console.error('❌ 서버 내부 오류:', error.response?.data);
+          Alert.alert(
+            '서버 오류',
+            `서버에서 오류가 발생했습니다.\n${
+              error.response?.data?.message || '잠시 후 다시 시도해주세요.'
+            }`,
+          );
+        } else if (error.response?.status === 409) {
+          // 이미 찜한 상태에서 다시 찜하려고 할 때
+          console.log('🔄 찜하기 상태 동기화 필요 - 페이지 새로고침 권장');
+          Alert.alert(
+            '알림',
+            '찜하기 상태를 확인하기 위해 페이지를 새로고침해주세요.',
+          );
         } else {
           Alert.alert('오류', '찜하기 처리에 실패했습니다. 다시 시도해주세요.');
         }
@@ -242,44 +381,100 @@ const Practice = () => {
     }
   };
 
-  // 투어 수정
-  const handleEdit = async () => {
+  // 투어 수정 - Make_program 화면으로 이동
+  const handleEdit = () => {
     if (!data) return;
-    try {
-      const body = {
-        title: data.title,
-        description: data.description,
-        guidePrice: data.guidePrice,
-        region: data.region,
-        thumbnailUrl: data.thumbnailUrl,
-        hashtags: data.hashtags,
-        schedules: data.schedules.map((s, idx) => ({
-          day: s.day,
-          scheduleSequence: idx,
-          placeName: s.placeName,
-          lat: s.lat,
-          lon: s.lon,
-          placeDescription: s.placeDescription,
-          travelTime: s.travelTime,
-        })),
-      };
-      await axios.put(`/api/tour-program/${data.id}`, body);
-      Alert.alert('수정 완료', '투어 정보가 수정되었습니다.');
-    } catch (e) {
-      Alert.alert('수정 실패', '투어 정보 수정에 실패했습니다.');
-    }
+
+    console.log('🟢 수정 모드로 이동:', {
+      tourProgramId,
+      editData: data,
+    });
+
+    // Make_program 화면으로 이동하면서 편집할 데이터 전달
+    navigation.navigate('Make_program', {
+      editData: data,
+      tourProgramId: tourProgramId,
+    });
   };
 
   // 투어 삭제
   const handleDelete = async () => {
     if (!data) return;
-    try {
-      await axios.delete(`/api/tour-program/${data.id}`);
-      Alert.alert('삭제 완료', '투어가 삭제되었습니다.');
-      // 필요시 목록 등으로 이동
-    } catch (e) {
-      Alert.alert('삭제 실패', '투어 삭제에 실패했습니다.');
-    }
+
+    Alert.alert(
+      '투어 삭제',
+      '정말로 이 투어를 삭제하시겠습니까?\n삭제된 투어는 복구할 수 없습니다.',
+      [
+        {
+          text: '취소',
+          style: 'cancel',
+        },
+        {
+          text: '삭제',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const token = await AsyncStorage.getItem('accessToken');
+              if (!token) {
+                Alert.alert('알림', '로그인이 필요한 서비스입니다.');
+                return;
+              }
+
+              const cleanToken = token.replace('Bearer ', '');
+
+              console.log('🟢 투어 삭제 요청:', {
+                tourProgramId,
+              });
+
+              const response = await axios.delete(
+                `http://124.60.137.10/api/tour-program/${tourProgramId}`,
+                {
+                  headers: {
+                    Authorization: `Bearer ${cleanToken}`,
+                  },
+                  timeout: 10000,
+                },
+              );
+
+              if (response.data.status === 'OK') {
+                Alert.alert('삭제 완료', '투어가 삭제되었습니다.', [
+                  {
+                    text: '확인',
+                    onPress: () => {
+                      // TraitSelection 화면으로 이동
+                      navigation.navigate('TraitSelection');
+                    },
+                  },
+                ]);
+              } else {
+                throw new Error(
+                  response.data.message || '투어 삭제에 실패했습니다.',
+                );
+              }
+            } catch (error) {
+              console.error('❌ 투어 삭제 실패:', error);
+              if (axios.isAxiosError(error)) {
+                if (error.response?.status === 401) {
+                  Alert.alert('오류', '로그인이 만료되었습니다.');
+                } else if (error.response?.status === 403) {
+                  Alert.alert('오류', '삭제 권한이 없습니다.');
+                } else if (error.response?.status === 404) {
+                  Alert.alert('오류', '해당 투어를 찾을 수 없습니다.');
+                } else {
+                  Alert.alert(
+                    '삭제 실패',
+                    error.response?.data?.message ||
+                      '투어 삭제에 실패했습니다.',
+                  );
+                }
+              } else {
+                Alert.alert('삭제 실패', '네트워크 연결을 확인해주세요.');
+              }
+            }
+          },
+        },
+      ],
+    );
   };
 
   const handleReservation = async () => {
@@ -302,10 +497,7 @@ const Practice = () => {
 
   if (loading)
     return <ActivityIndicator style={{marginTop: 40}} size="large" />;
-  if (!data)
-    return (
-      <Text style={{marginTop: 40, textAlign: 'center'}}>데이터 없음</Text>
-    );
+  if (!data) return null;
 
   const groupedSchedules = data.schedules.reduce((acc, cur) => {
     const key = `Day ${cur.day}`;
@@ -317,7 +509,9 @@ const Practice = () => {
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView>
-        <Image source={{uri: data.thumbnailUrl}} style={styles.map} />
+        {data.thumbnailUrl && (
+          <Image source={{uri: data.thumbnailUrl}} style={styles.map} />
+        )}
         <View style={styles.whiteBox}>
           <Text style={styles.title}>{data.title}</Text>
 
@@ -333,7 +527,12 @@ const Practice = () => {
           <View style={styles.rightAlignRow}>
             <Text style={styles.region}>📍 {data.region}</Text>
             <View style={styles.rowRight}>
-              <TouchableOpacity onPress={() => navigation.navigate('Practice')}>
+              <TouchableOpacity
+                onPress={() =>
+                  navigation.navigate('Practice', {
+                    tourProgramId: tourProgramId,
+                  })
+                }>
                 <Text style={styles.review}>💬 리뷰 {data.reviewCount}</Text>
               </TouchableOpacity>
               <TouchableOpacity onPress={toggleLike}>
