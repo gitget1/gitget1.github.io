@@ -17,9 +17,9 @@ import type {AppStackParamList} from '../../navigations/AppNavigator';
 
 interface WishlistItem {
   id: number;
-  tourProgramId?: number; // 실제 투어 프로그램 ID
+  tourProgramId?: number;
   title: string;
-  thumbnailUrl: string;
+  thumbnailUrl: string | null;
   region: string;
   guidePrice: number;
   description: string;
@@ -58,75 +58,34 @@ const WishlistScreen = () => {
         timeout: 10000,
       });
 
-      console.log(
-        '🟢 위시리스트 전체 응답:',
-        JSON.stringify(response.data, null, 2),
-      );
-      console.log('🟢 응답 상태:', response.status);
-      console.log('🟢 응답 데이터 타입:', typeof response.data);
-      console.log('🟢 응답 데이터 구조:', Object.keys(response.data || {}));
-
-      // 다양한 응답 구조에 대응
       let items: any[] = [];
 
       if (response.data) {
         if (Array.isArray(response.data)) {
           items = response.data;
-          console.log('🟢 직접 배열 형태:', items.length, '개');
         } else if (response.data.status === 'OK' && response.data.data) {
           if (Array.isArray(response.data.data)) {
             items = response.data.data;
-            console.log('🟢 data 필드 배열:', items.length, '개');
           }
         } else if (
           response.data.content &&
           Array.isArray(response.data.content)
         ) {
           items = response.data.content;
-          console.log('🟢 content 필드 배열:', items.length, '개');
         } else if (response.data.data && Array.isArray(response.data.data)) {
           items = response.data.data;
-          console.log('🟢 data 필드 배열 (일반):', items.length, '개');
-        } else {
-          console.log('🔴 알 수 없는 응답 구조');
-          console.log('🔴 응답 전체:', response.data);
         }
-      }
-
-      console.log('🟢 최종 아이템 개수:', items.length);
-      if (items.length > 0) {
-        console.log(
-          '🟢 첫 번째 아이템 전체:',
-          JSON.stringify(items[0], null, 2),
-        );
-        console.log(
-          '🟢 첫 번째 아이템의 모든 키:',
-          Object.keys(items[0] || {}),
-        );
-
-        // ID 관련 필드들만 따로 확인
-        const firstItem = items[0];
-        console.log('🔍 첫 번째 아이템의 ID 관련 필드들:', {
-          id: firstItem?.id,
-          tourProgramId: firstItem?.tourProgramId,
-          tour_program_id: firstItem?.tour_program_id,
-          programId: firstItem?.programId,
-          program_id: firstItem?.program_id,
-        });
       }
 
       if (items.length > 0) {
         setWishlistItems(items);
         setError(null);
-        console.log('✅ 위시리스트 설정 완료:', items.length, '개');
       } else {
         setWishlistItems([]);
         setError(null);
-        console.log('📝 위시리스트가 비어있음');
       }
     } catch (err) {
-      console.error('위시리스트 에러:', err);
-      setWishlistItems([]); // 에러 발생 시 빈 배열로 설정
+      setWishlistItems([]);
       if (axios.isAxiosError(err)) {
         if (err.response?.status === 401) {
           setError('로그인이 필요한 서비스입니다.');
@@ -155,25 +114,6 @@ const WishlistScreen = () => {
   }, []);
 
   const handleItemPress = (item: WishlistItem) => {
-    // 아이템의 모든 필드를 로그로 출력하여 올바른 ID 필드 확인
-    console.log(
-      '🟢 위시리스트 아이템 전체 데이터:',
-      JSON.stringify(item, null, 2),
-    );
-
-    // 가능한 ID 필드들을 확인
-    const possibleIds = {
-      id: item.id,
-      tourProgramId: item.tourProgramId,
-      // 다른 가능한 필드명들도 확인
-      tour_program_id: (item as any).tour_program_id,
-      programId: (item as any).programId,
-      program_id: (item as any).program_id,
-    };
-
-    console.log('🔍 가능한 ID 필드들:', possibleIds);
-
-    // 실제 사용할 ID 결정 (tourProgramId가 있으면 우선 사용, 없으면 id 사용)
     const actualTourProgramId =
       item.tourProgramId ||
       (item as any).tour_program_id ||
@@ -181,16 +121,12 @@ const WishlistScreen = () => {
       (item as any).program_id ||
       item.id;
 
-    console.log('🎯 사용할 투어 프로그램 ID:', actualTourProgramId);
-
     try {
       navigation.navigate('PracticeDetail', {
         tourProgramId: actualTourProgramId,
         refresh: false,
       });
-      console.log('✅ 상세 페이지로 이동 성공 - ID:', actualTourProgramId);
     } catch (error) {
-      console.error('❌ 네비게이션 에러:', error);
       Alert.alert('오류', '페이지 이동에 실패했습니다.');
     }
   };
@@ -225,15 +161,6 @@ const WishlistScreen = () => {
         </TouchableOpacity>
       </View>
 
-      <Text style={styles.debugText}>
-        현재 상태:{' '}
-        {loading
-          ? '로딩중'
-          : error
-          ? '에러'
-          : `${wishlistItems?.length || 0}개 아이템`}
-      </Text>
-
       {!wishlistItems || wishlistItems.length === 0 ? (
         <View style={styles.emptyContainer}>
           <Text style={styles.emptyText}>
@@ -258,11 +185,26 @@ const WishlistScreen = () => {
             style={styles.itemContainer}
             onPress={() => handleItemPress(item)}
             activeOpacity={0.7}>
-            <Image
-              source={{uri: item.thumbnailUrl || ''}}
-              style={styles.thumbnail}
-              resizeMode="cover"
-            />
+            {item.thumbnailUrl ? (
+              <Image
+                source={{uri: item.thumbnailUrl}}
+                style={styles.thumbnail}
+                resizeMode="cover"
+                onError={() => {
+                  const updatedItems = wishlistItems.map(wishItem => {
+                    if (wishItem.id === item.id) {
+                      return {...wishItem, thumbnailUrl: null};
+                    }
+                    return wishItem;
+                  });
+                  setWishlistItems(updatedItems);
+                }}
+              />
+            ) : (
+              <View style={[styles.thumbnail, {backgroundColor: '#e0e0e0'}]}>
+                <Text style={styles.noImageText}>이미지 없음</Text>
+              </View>
+            )}
             <View style={styles.itemContent}>
               <Text style={styles.itemTitle}>{item.title || '제목 없음'}</Text>
               <Text style={styles.itemRegion}>
@@ -402,13 +344,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: 'bold',
   },
-  debugText: {
-    fontSize: 14,
-    color: '#999',
-    textAlign: 'center',
-    marginBottom: 10,
-    paddingHorizontal: 20,
-  },
   retryButton: {
     backgroundColor: '#FF385C',
     paddingHorizontal: 20,
@@ -429,6 +364,12 @@ const styles = StyleSheet.create({
     fontSize: 24,
     color: '#ccc',
     fontWeight: 'bold',
+  },
+  noImageText: {
+    color: '#666',
+    fontSize: 12,
+    textAlign: 'center',
+    marginTop: 40,
   },
 });
 

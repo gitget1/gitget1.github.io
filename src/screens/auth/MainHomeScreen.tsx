@@ -60,8 +60,8 @@ const MainHomeScreen = () => {
 
   const handleTest = () => navigation.navigate('QuestionScreen');
   const handleTraitSelection = () => navigation.navigate('TraitSelection');
-  const handleTourByRegion = () => navigation.navigate('TestPost');
-  const handleTodayRecommend = () => navigation.navigate('PracticeDetail');
+  const handleCalendar = () => navigation.navigate('CalendarHome');
+  const handleChat = () => navigation.navigate('ChatMain');
 
   const renderDots = () => (
     <View style={styles.dotsContainer}>
@@ -133,14 +133,14 @@ const MainHomeScreen = () => {
             },
             {
               icon: '🗺️',
-              label: '지역 설정 관광',
-              action: handleTourByRegion,
+              label: '캘린더',
+              action: handleCalendar,
               bg: '#FFE0B2',
             },
             {
               icon: '🌟',
-              label: '오늘의 추천',
-              action: handleTodayRecommend,
+              label: '채팅',
+              action: handleChat,
               bg: '#FFCDD2',
             },
           ].map((item, index) => (

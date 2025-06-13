@@ -16,6 +16,8 @@ import PaymentCompleteScreen from '../screens/payment/PaymentCompleteScreen';
 import WishlistScreen from '../screens/wishlist/WishlistScreen';
 import {NativeStackScreenProps} from '@react-navigation/native-stack';
 import IamportPaymentScreen from '../screens/payment/IamportPaymentScreen';
+import CalendarHome from '../screens/calendar/CalendarHome';
+import ChatMain from '../screens/chat/ChatMain';
 
 export type AppStackParamList = {
   AuthStack: undefined;
@@ -63,6 +65,8 @@ export type AppStackParamList = {
       buyer_email: string;
     };
   };
+  CalendarHome: undefined;
+  ChatMain: undefined;
   MyReviewList: undefined;
   PaymentScreen: undefined;
   PaymentComplete: undefined;
@@ -198,6 +202,24 @@ const AppNavigator = () => {
         name="IamportPayment"
         component={IamportPaymentScreen}
         options={{headerShown: false}}
+      />
+      <Stack.Screen
+        name="CalendarHome"
+        component={CalendarHome}
+        options={{
+          headerShown: true,
+          title: '캘린더',
+          headerTitleStyle: {fontSize: 20},
+        }}
+      />
+      <Stack.Screen
+        name="ChatMain"
+        component={ChatMain}
+        options={{
+          headerShown: true,
+          title: '채팅',
+          headerTitleStyle: {fontSize: 20},
+        }}
       />
     </Stack.Navigator>
   );

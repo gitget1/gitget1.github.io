@@ -5,10 +5,9 @@ import Ionicons from 'react-native-vector-icons/Ionicons';
 
 // 화면 컴포넌트들 import
 import MainHomeScreen from '../screens/auth/MainHomeScreen';
-import CalendarScreen from '../screens/calendar/CalendarScreen';
 import Mypage from '../screens/mypage/MyPage';
 import ChatStackNavigator from './stack/ChatStackNavigator';
-import WishlistScreen from '../screens/wishlist/WishlistScreen';
+
 
 const Tab = createBottomTabNavigator();
 
@@ -35,21 +34,13 @@ const BottomTabNavigator = () => {
         component={MainHomeScreen}
         options={{ tabBarLabel: () => <Text>홈</Text>, headerShown: false }}
       />
-      <Tab.Screen
-        name="캘린더"
-        component={CalendarScreen}
-        options={{ tabBarLabel: () => <Text>캘린더</Text> }}
-      />
+      
       <Tab.Screen
         name="채팅"
         component={ChatStackNavigator}
         options={{ tabBarLabel: () => <Text>채팅</Text>, headerShown: false }}
       />
-      <Tab.Screen
-        name="위시리스트"
-        component={WishlistScreen}
-        options={{ tabBarLabel: () => <Text>위시리스트</Text> }}
-      />
+     
       <Tab.Screen
         name="마이페이지"
         component={Mypage}

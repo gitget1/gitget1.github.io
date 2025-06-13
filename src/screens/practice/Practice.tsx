@@ -36,14 +36,6 @@ const decodeJWT = (token: string) => {
   }
 };
 
-const ratingData = [
-  {score: 5, count: 39},
-  {score: 4, count: 2},
-  {score: 3, count: 1},
-  {score: 2, count: 0},
-  {score: 1, count: 1},
-];
-
 // 별점 텍스트 매핑
 const ratingTexts = [
   '선택하세요',
@@ -68,7 +60,31 @@ export default function ReviewScreen() {
   console.log('🟢 Practice 화면 - 받은 tourProgramId:', tourProgramId);
   console.log('🟢 Practice 화면 - tourProgramId 타입:', typeof tourProgramId);
 
-  const maxCount = Math.max(...ratingData.map(r => r.count));
+  // 평균 별점과 별점 분포 계산 함수
+  const calculateRatingStats = (reviews: any[]) => {
+    if (reviews.length === 0) return {average: 0, distribution: []};
+
+    const distribution = Array(5)
+      .fill(0)
+      .map((_, i) => ({
+        score: 5 - i,
+        count: 0,
+      }));
+
+    let totalRating = 0;
+    reviews.forEach(review => {
+      const rating = Math.floor(review.rating);
+      if (rating >= 1 && rating <= 5) {
+        distribution[5 - rating].count++;
+        totalRating += review.rating;
+      }
+    });
+
+    return {
+      average: totalRating / reviews.length,
+      distribution,
+    };
+  };
 
   const [sortOrder, setSortOrder] = useState<'latest' | 'rating' | 'lowRating'>(
     'latest',
@@ -586,26 +602,40 @@ export default function ReviewScreen() {
 
       {/* ⭐ 평균 평점 영역 */}
       <View style={styles.ratingSummary}>
-        <View style={{alignItems: 'center', marginRight: 24}}>
-          <Text style={styles.bigScore}>4.8</Text>
-          <Text style={styles.stars}>⭐⭐⭐⭐⭐</Text>
-        </View>
-        <View style={{flex: 1}}>
-          {ratingData.map(r => (
-            <View key={r.score} style={styles.scoreRow}>
-              <Text style={styles.scoreLabel}>{r.score}점</Text>
-              <View style={styles.barBackground}>
-                <View
-                  style={[
-                    styles.barFill,
-                    {width: `${(r.count / maxCount) * 100}%`},
-                  ]}
-                />
+        {(() => {
+          const {average, distribution} = calculateRatingStats(reviews);
+          const maxCount = Math.max(...distribution.map(r => r.count));
+
+          return (
+            <>
+              <View style={{alignItems: 'center', marginRight: 24}}>
+                <Text style={styles.bigScore}>{average.toFixed(1)}</Text>
+                <Text style={styles.stars}>{renderStars(average)}</Text>
               </View>
-              <Text style={styles.countText}>{r.count}</Text>
-            </View>
-          ))}
-        </View>
+              <View style={{flex: 1}}>
+                {distribution.map(r => (
+                  <View key={r.score} style={styles.scoreRow}>
+                    <Text style={styles.scoreLabel}>{r.score}점</Text>
+                    <View style={styles.barBackground}>
+                      <View
+                        style={[
+                          styles.barFill,
+                          {
+                            width:
+                              maxCount > 0
+                                ? `${(r.count / maxCount) * 100}%`
+                                : '0%',
+                          },
+                        ]}
+                      />
+                    </View>
+                    <Text style={styles.countText}>{r.count}</Text>
+                  </View>
+                ))}
+              </View>
+            </>
+          );
+        })()}
       </View>
 
       {/* ⬇️ 총 리뷰 수 + 정렬 드롭다운 */}
