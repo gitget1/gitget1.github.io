@@ -1,5 +1,3 @@
-// ✅ Practice.tsx - 개선된 전체 코드 (보안, 안정성, 시각화 향상)
-
 import React, {useState, useEffect} from 'react';
 import {
   View,
@@ -20,6 +18,7 @@ import axios from 'axios';
 import MapView, {Marker, Polyline, PROVIDER_GOOGLE} from 'react-native-maps';
 import haversine from 'haversine-distance';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import Ionicons from 'react-native-vector-icons/Ionicons';
 
 const dayColors = ['#0288d1', '#43a047', '#fbc02d', '#e64a19', '#8e24aa'];
 
@@ -495,6 +494,38 @@ const Practice = () => {
     }
   };
 
+  // 바텀 탭 렌더링 함수
+  const renderBottomTab = () => (
+    <View style={styles.bottomTabContainer}>
+      <TouchableOpacity
+        style={styles.tabItem}
+        onPress={() => {
+          navigation.navigate('Main', {screen: '홈'});
+        }}>
+        <Ionicons name="home" size={24} color="gray" />
+        <Text style={styles.tabLabel}>홈</Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        style={styles.tabItem}
+        onPress={() => {
+          navigation.navigate('WishlistScreen');
+        }}>
+        <Ionicons name="heart" size={24} color="gray" />
+        <Text style={styles.tabLabel}>위시리스트</Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        style={styles.tabItem}
+        onPress={() => {
+          navigation.navigate('Main', {screen: '마이페이지'});
+        }}>
+        <Ionicons name="person" size={24} color="gray" />
+        <Text style={styles.tabLabel}>마이페이지</Text>
+      </TouchableOpacity>
+    </View>
+  );
+
   if (loading)
     return <ActivityIndicator style={{marginTop: 40}} size="large" />;
   if (!data) return null;
@@ -507,138 +538,141 @@ const Practice = () => {
   }, {} as Record<string, Schedule[]>);
 
   return (
-    <SafeAreaView style={styles.container}>
-      <ScrollView>
-        {data.thumbnailUrl && (
-          <Image source={{uri: data.thumbnailUrl}} style={styles.map} />
-        )}
-        <View style={styles.whiteBox}>
-          <Text style={styles.title}>{data.title}</Text>
+    <View style={{flex: 1}}>
+      <SafeAreaView style={styles.container}>
+        <ScrollView>
+          {data.thumbnailUrl && (
+            <Image source={{uri: data.thumbnailUrl}} style={styles.map} />
+          )}
+          <View style={styles.whiteBox}>
+            <Text style={styles.title}>{data.title}</Text>
 
-          <View style={styles.editDeleteRow}>
-            <TouchableOpacity onPress={handleEdit} style={styles.editBtn}>
-              <Text style={styles.editText}>수정</Text>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={handleDelete} style={styles.deleteBtn}>
-              <Text style={styles.deleteText}>삭제</Text>
-            </TouchableOpacity>
-          </View>
-
-          <View style={styles.rightAlignRow}>
-            <Text style={styles.region}>📍 {data.region}</Text>
-            <View style={styles.rowRight}>
-              <TouchableOpacity
-                onPress={() =>
-                  navigation.navigate('Practice', {
-                    tourProgramId: tourProgramId,
-                  })
-                }>
-                <Text style={styles.review}>💬 리뷰 {data.reviewCount}</Text>
+            <View style={styles.editDeleteRow}>
+              <TouchableOpacity onPress={handleEdit} style={styles.editBtn}>
+                <Text style={styles.editText}>수정</Text>
               </TouchableOpacity>
-              <TouchableOpacity onPress={toggleLike}>
-                <Text style={styles.like}>
-                  {isLiked ? '💖 찜함' : '🤍 찜'} {data.wishlistCount}
-                </Text>
+              <TouchableOpacity onPress={handleDelete} style={styles.deleteBtn}>
+                <Text style={styles.deleteText}>삭제</Text>
               </TouchableOpacity>
             </View>
-          </View>
 
-          <View style={styles.tags}>
-            {data.hashtags.map((tag, i) => (
-              <Text key={i} style={styles.tag}>
-                #{tag}
-              </Text>
+            <View style={styles.rightAlignRow}>
+              <Text style={styles.region}>📍 {data.region}</Text>
+              <View style={styles.rowRight}>
+                <TouchableOpacity
+                  onPress={() =>
+                    navigation.navigate('Practice', {
+                      tourProgramId: tourProgramId,
+                    })
+                  }>
+                  <Text style={styles.review}>💬 리뷰 {data.reviewCount}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={toggleLike}>
+                  <Text style={styles.like}>
+                    {isLiked ? '💖 찜함' : '🤍 찜'} {data.wishlistCount}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            <View style={styles.tags}>
+              {data.hashtags.map((tag, i) => (
+                <Text key={i} style={styles.tag}>
+                  #{tag}
+                </Text>
+              ))}
+            </View>
+
+            <Text style={styles.sectionTitle}>🗓️ 일정</Text>
+            {Object.entries(groupedSchedules).map(([day, items], i) => (
+              <View key={i} style={styles.scheduleCard}>
+                <Text style={styles.dayTitle}>{day}</Text>
+                {items.map((item, idx) => (
+                  <Text key={idx} style={styles.scheduleItem}>
+                    ⏱ {item.placeName} ({item.travelTime}분) -{' '}
+                    {item.placeDescription}
+                  </Text>
+                ))}
+              </View>
             ))}
-          </View>
 
-          <Text style={styles.sectionTitle}>🗓️ 일정</Text>
-          {Object.entries(groupedSchedules).map(([day, items], i) => (
-            <View key={i} style={styles.scheduleCard}>
-              <Text style={styles.dayTitle}>{day}</Text>
-              {items.map((item, idx) => (
-                <Text key={idx} style={styles.scheduleItem}>
-                  ⏱ {item.placeName} ({item.travelTime}분) -{' '}
-                  {item.placeDescription}
-                </Text>
-              ))}
-            </View>
-          ))}
-
-          <Text style={styles.sectionTitle}>🗺 지도</Text>
-          <View
-            style={{
-              height: 300,
-              marginBottom: 20,
-              borderRadius: 12,
-              overflow: 'hidden',
-            }}>
-            <MapView
-              style={{flex: 1}}
-              provider={PROVIDER_GOOGLE}
-              initialRegion={
-                data.schedules.length > 0
-                  ? {
-                      latitude: data.schedules[0].lat,
-                      longitude: data.schedules[0].lon,
-                      latitudeDelta: 0.05,
-                      longitudeDelta: 0.05,
-                    }
-                  : {
-                      latitude: 37.5665,
-                      longitude: 126.978,
-                      latitudeDelta: 0.05,
-                      longitudeDelta: 0.05,
-                    }
-              }>
-              {data.schedules.map((s, idx) => (
-                <Marker
-                  key={idx}
-                  coordinate={{latitude: s.lat, longitude: s.lon}}
-                  title={`Day ${s.day} - ${s.placeName}`}
-                  description={s.placeDescription}
-                  pinColor={dayColors[(s.day - 1) % dayColors.length]}
+            <Text style={styles.sectionTitle}>🗺 지도</Text>
+            <View
+              style={{
+                height: 300,
+                marginBottom: 20,
+                borderRadius: 12,
+                overflow: 'hidden',
+              }}>
+              <MapView
+                style={{flex: 1}}
+                provider={PROVIDER_GOOGLE}
+                initialRegion={
+                  data.schedules.length > 0
+                    ? {
+                        latitude: data.schedules[0].lat,
+                        longitude: data.schedules[0].lon,
+                        latitudeDelta: 0.05,
+                        longitudeDelta: 0.05,
+                      }
+                    : {
+                        latitude: 37.5665,
+                        longitude: 126.978,
+                        latitudeDelta: 0.05,
+                        longitudeDelta: 0.05,
+                      }
+                }>
+                {data.schedules.map((s, idx) => (
+                  <Marker
+                    key={idx}
+                    coordinate={{latitude: s.lat, longitude: s.lon}}
+                    title={`Day ${s.day} - ${s.placeName}`}
+                    description={s.placeDescription}
+                    pinColor={dayColors[(s.day - 1) % dayColors.length]}
+                  />
+                ))}
+                <Polyline
+                  coordinates={data.schedules.map(s => ({
+                    latitude: s.lat,
+                    longitude: s.lon,
+                  }))}
+                  strokeColor="#0288d1"
+                  strokeWidth={3}
                 />
-              ))}
-              <Polyline
-                coordinates={data.schedules.map(s => ({
-                  latitude: s.lat,
-                  longitude: s.lon,
-                }))}
-                strokeColor="#0288d1"
-                strokeWidth={3}
-              />
-            </MapView>
-            <Text style={{textAlign: 'right', marginTop: 6}}>
-              총 거리: {getTotalDistance(data.schedules)}km
-            </Text>
+              </MapView>
+              <Text style={{textAlign: 'right', marginTop: 6}}>
+                총 거리: {getTotalDistance(data.schedules)}km
+              </Text>
+            </View>
+
+            <Text style={styles.sectionTitle}>🧑‍💼 호스트 정보</Text>
+            <Text style={styles.description}>호스트: {data.user.name}</Text>
+
+            <Text style={styles.sectionTitle}>📖 투어 설명</Text>
+            <Text style={styles.description}>{data.description}</Text>
+
+            <View style={{height: 100}} />
           </View>
+        </ScrollView>
 
-          <Text style={styles.sectionTitle}>🧑‍💼 호스트 정보</Text>
-          <Text style={styles.description}>호스트: {data.user.name}</Text>
-
-          <Text style={styles.sectionTitle}>📖 투어 설명</Text>
-          <Text style={styles.description}>{data.description}</Text>
-
-          <View style={{height: 100}} />
+        <View style={styles.bottomBar}>
+          <Text style={styles.price}>
+            ₩{data.guidePrice.toLocaleString()} /인
+          </Text>
+          <View style={styles.buttonGroup}>
+            <TouchableOpacity style={styles.chatBtn} onPress={handleChat}>
+              <Text style={styles.chatText}>상담하기</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.reserveBtn}
+              onPress={handleReservation}>
+              <Text style={styles.reserveText}>예약하기</Text>
+            </TouchableOpacity>
+          </View>
         </View>
-      </ScrollView>
-
-      <View style={styles.bottomBar}>
-        <Text style={styles.price}>
-          ₩{data.guidePrice.toLocaleString()} /인
-        </Text>
-        <View style={styles.buttonGroup}>
-          <TouchableOpacity style={styles.chatBtn} onPress={handleChat}>
-            <Text style={styles.chatText}>상담하기</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.reserveBtn}
-            onPress={handleReservation}>
-            <Text style={styles.reserveText}>예약하기</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    </SafeAreaView>
+        {renderBottomTab()}
+      </SafeAreaView>
+    </View>
   );
 };
 
@@ -771,6 +805,24 @@ const styles = StyleSheet.create({
     gap: 16,
     marginTop: 18,
     marginBottom: 12,
+  },
+  bottomTabContainer: {
+    flexDirection: 'row',
+    backgroundColor: '#fff',
+    borderTopWidth: 1,
+    borderTopColor: '#ddd',
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    justifyContent: 'space-around',
+  },
+  tabItem: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  tabLabel: {
+    fontSize: 12,
+    color: 'gray',
+    marginTop: 4,
   },
 });
 

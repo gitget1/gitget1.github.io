@@ -5,7 +5,7 @@ import ChatRoom from '../../screens/chat/ChatRoom';
 
 export type ChatStackParamList = {
   ChatMain: undefined;
-  ChatRoom: {roomId: string};
+  ChatRoom: {roomId: string; userId?: number};
   ChatRoomScreen: {roomId: string; userId?: number};
   NewChat: undefined;
 };

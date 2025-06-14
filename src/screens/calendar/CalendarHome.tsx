@@ -4,11 +4,7 @@ import {Pressable, StyleSheet, Text, View} from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import DayOfWeeks from './DayOfWeeks';
-import {
-  isSameAsCurrentDate,
-  MonthYear,
-  getMonthYearDetails,
-} from '../../utils/date';
+import {isSameAsCurrentDate, MonthYear} from '../../utils/date';
 import {FlatList} from 'react-native-gesture-handler';
 import DateBox from './DateBox';
 import MiniCalendar from './MiniCalendar';
@@ -28,12 +24,14 @@ interface CalendarHomeProps {
   selectedDate: number;
   onPressDate: (date: number) => void;
   onChangeMonth: (increment: number) => void;
+  onSetMonthYear: (date: Date) => void;
   reservations: Reservation[];
 }
 
 function CalendarHome({
   monthYear,
   onChangeMonth,
+  onSetMonthYear,
   selectedDate,
   onPressDate,
   reservations,
@@ -41,9 +39,13 @@ function CalendarHome({
   const {month, year, lastDate, firstDOW} = monthYear;
   const [showMiniCalendar, setShowMiniCalendar] = useState(false);
 
+  console.log('🏠 CalendarHome Debug:');
+  console.log('- monthYear:', monthYear);
+  console.log('- reservations received:', reservations);
+  console.log('- reservations length:', reservations.length);
+
   const handleSelectDate = (date: Date) => {
-    const newMonthYear = getMonthYearDetails(date);
-    onChangeMonth(newMonthYear.month - month);
+    onSetMonthYear(date);
     onPressDate(date.getDate());
   };
 
@@ -82,14 +84,26 @@ function CalendarHome({
             const date = new Date(year, month - 1, day);
             const schedules =
               day > 0
-                ? reservations.filter(res =>
-                    dayjs(date).isBetween(
+                ? reservations.filter(res => {
+                    const isInRange = dayjs(date).isBetween(
                       dayjs(res.guideStartDate),
                       dayjs(res.guideEndDate),
                       'day',
                       '[]',
-                    ),
-                  )
+                    );
+
+                    if (day === 15 && reservations.length > 0) {
+                      console.log(
+                        `📅 Day ${day} (${date.toISOString().split('T')[0]}):`,
+                      );
+                      console.log('- Checking reservation:', res);
+                      console.log('- guideStartDate:', res.guideStartDate);
+                      console.log('- guideEndDate:', res.guideEndDate);
+                      console.log('- isInRange:', isInRange);
+                    }
+
+                    return isInRange;
+                  })
                 : [];
 
             return {

@@ -37,12 +37,25 @@ function CalendarScreen() {
     isError,
   } = useGetCalendarReservations(start, end);
 
+  // 디버깅 로그 추가
+  console.log('📅 CalendarScreen Debug:');
+  console.log('- start:', start);
+  console.log('- end:', end);
+  console.log('- reservations:', reservations);
+  console.log('- isLoading:', isLoading);
+  console.log('- isError:', isError);
+
   const handlePressDate = (date: number) => {
     setSelectedDate(date);
   };
 
   const handleUpdateMonth = (increment: number) => {
     setMonthYear(prev => getNewMonthYear(prev, increment));
+  };
+
+  const handleSetMonthYear = (date: Date) => {
+    const newMonthYear = getMonthYearDetails(date);
+    setMonthYear(newMonthYear);
   };
 
   const selectedDateObj = dayjs(
@@ -58,18 +71,31 @@ function CalendarScreen() {
     ),
   );
 
+  console.log('- selectedDate:', selectedDate);
+  console.log('- selectedDateObj:', selectedDateObj.format('YYYY-MM-DD'));
+  console.log('- selectedDateReservations:', selectedDateReservations);
+
   return (
     <SafeAreaView style={styles.container}>
       <CalendarHome
         monthYear={monthYear}
         onChangeMonth={handleUpdateMonth}
+        onSetMonthYear={handleSetMonthYear}
         selectedDate={selectedDate}
         onPressDate={handlePressDate}
         reservations={reservations}
       />
       {isLoading && <Text>로딩 중...</Text>}
       {isError && <Text>데이터를 불러오지 못했습니다.</Text>}
-      {!isLoading && !isError && <EventList posts={selectedDateReservations} />}
+      {!isLoading && !isError && (
+        <>
+          <Text style={{padding: 10, fontSize: 12, color: 'gray'}}>
+            총 예약: {reservations.length}개, 선택된 날짜 예약:{' '}
+            {selectedDateReservations.length}개
+          </Text>
+          <EventList posts={selectedDateReservations} />
+        </>
+      )}
     </SafeAreaView>
   );
 }

@@ -11,6 +11,7 @@ import {
   Alert,
   SafeAreaView,
   Modal,
+  Platform,
 } from 'react-native';
 import {launchImageLibrary} from 'react-native-image-picker';
 import MapView, {Marker, Polyline, PROVIDER_GOOGLE} from 'react-native-maps';
@@ -82,17 +83,25 @@ function Make_program() {
   const [guidePrice, setGuidePrice] = useState('');
   const [hashtags, setHashtags] = useState('');
   const [region, setRegion] = useState({
-    latitude: 37.5665,
-    longitude: 126.978,
+    latitude: 36.7994, // 순천향대학교 위도
+    longitude: 126.9306, // 순천향대학교 경도
     latitudeDelta: 0.0922,
     longitudeDelta: 0.0421,
   });
   const mapRef = useRef<MapView>(null);
   const [placeModalVisible, setPlaceModalVisible] = useState(false);
+  const [locationLoading, setLocationLoading] = useState(false);
   const navigation = useNavigation();
   const [routes, setRoutes] = useState<{
     [key: string]: {latitude: number; longitude: number}[];
   }>({});
+  const [routeDistances, setRouteDistances] = useState<{
+    [key: string]: number;
+  }>({});
+  const [currentLocation, setCurrentLocation] = useState<{
+    latitude: number;
+    longitude: number;
+  } | null>(null);
 
   useEffect(() => {
     if (editData) {
@@ -103,10 +112,14 @@ function Make_program() {
       setGuidePrice(editData.guidePrice.toString());
       setHashtags(editData.hashtags.join(', '));
 
-      // 일정 데이터 변환
-      const convertedDays = [
-        {
-          plans: editData.schedules.map(schedule => ({
+      // 일정 데이터 변환 - day별로 그룹화
+      const schedulesByDay: DayPlan[][] = editData.schedules.reduce(
+        (acc: DayPlan[][], schedule) => {
+          const dayIndex = schedule.day - 1; // day는 1부터 시작하므로 -1
+          if (!acc[dayIndex]) {
+            acc[dayIndex] = [];
+          }
+          acc[dayIndex].push({
             place: schedule.placeName,
             memo: schedule.placeDescription,
             travelTime: schedule.travelTime,
@@ -114,9 +127,22 @@ function Make_program() {
               latitude: schedule.lat,
               longitude: schedule.lon,
             },
-          })),
+          });
+          return acc;
         },
-      ];
+        [],
+      );
+
+      // day별로 정렬된 일정을 days 배열에 설정
+      const convertedDays: DaySchedule[] = [];
+      const maxDay = Math.max(...editData.schedules.map(s => s.day));
+
+      for (let i = 0; i < maxDay; i++) {
+        convertedDays.push({
+          plans: schedulesByDay[i] || [],
+        });
+      }
+
       setDays(convertedDays);
 
       // 지도 위치 설정
@@ -128,25 +154,96 @@ function Make_program() {
           longitudeDelta: 0.0421,
         });
       }
+    } else {
+      // 편집 모드가 아닐 때만 현재 위치 가져오기
+      getCurrentLocation();
     }
   }, [editData]);
 
-  useEffect(() => {
-    // 현재 위치 가져오기
+  // 현재 위치 가져오기 함수
+  const getCurrentLocation = () => {
+    setLocationLoading(true);
+
+    // 개발 모드에서 에뮬레이터 감지 (실제 기기에서는 이 조건이 false)
+    const isEmulator = __DEV__ && Platform.OS === 'android';
+
+    if (isEmulator) {
+      // 에뮬레이터에서는 순천향대학교 위치로 설정
+      const soonchunhyangLocation = {
+        latitude: 36.7994,
+        longitude: 126.9306,
+        latitudeDelta: 0.0922,
+        longitudeDelta: 0.0421,
+      };
+      setRegion(soonchunhyangLocation);
+      setCurrentLocation({
+        latitude: 36.7994,
+        longitude: 126.9306,
+      });
+
+      if (mapRef.current) {
+        mapRef.current.animateToRegion(soonchunhyangLocation, 1000);
+      }
+
+      setLocationLoading(false);
+      return;
+    }
+
     Geolocation.getCurrentPosition(
       (position: GeolocationPosition) => {
-        setRegion({
+        const newRegion = {
           latitude: position.coords.latitude,
           longitude: position.coords.longitude,
           latitudeDelta: 0.0922,
           longitudeDelta: 0.0421,
+        };
+        setRegion(newRegion);
+        setCurrentLocation({
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
         });
+
+        // 지도를 현재 위치로 이동
+        if (mapRef.current) {
+          mapRef.current.animateToRegion(newRegion, 1000);
+        }
+
+        setLocationLoading(false);
+        Alert.alert('위치 확인', '현재 위치로 이동했습니다.');
       },
-      (_error: GeolocationError) =>
-        Alert.alert('위치 오류', '현재 위치를 가져오는데 실패했습니다.'),
-      {enableHighAccuracy: true, timeout: 20000, maximumAge: 1000},
+      (error: GeolocationError) => {
+        setLocationLoading(false);
+        console.error('위치 오류:', error);
+
+        // 에러 발생 시 기본 위치로 설정
+        const defaultLocation = {
+          latitude: 36.7994,
+          longitude: 126.9306,
+          latitudeDelta: 0.0922,
+          longitudeDelta: 0.0421,
+        };
+        setRegion(defaultLocation);
+        setCurrentLocation({
+          latitude: 36.7994,
+          longitude: 126.9306,
+        });
+
+        if (mapRef.current) {
+          mapRef.current.animateToRegion(defaultLocation, 1000);
+        }
+
+        Alert.alert(
+          '위치 오류',
+          `현재 위치를 가져올 수 없어 기본 위치(순천향대학교)로 설정합니다.\n\n실제 기기에서 테스트해주세요.`,
+        );
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 15000,
+        maximumAge: 10000,
+      },
     );
-  }, []);
+  };
 
   // 썸네일(사진) 추가
   const handlePickThumbnail = async () => {
@@ -267,6 +364,7 @@ function Make_program() {
       const response = await fetch(url);
       const data = await response.json();
       if (data.routes.length) {
+        // 경로 좌표 저장
         const points = polyline
           .decode(data.routes[0].overview_polyline.points)
           .map(([latitude, longitude]: [number, number]) => ({
@@ -274,6 +372,10 @@ function Make_program() {
             longitude,
           }));
         setRoutes(prev => ({...prev, [key]: points}));
+
+        // 실제 도로 거리 저장 (미터 단위를 킬로미터로 변환)
+        const distanceInKm = data.routes[0].legs[0].distance.value / 1000;
+        setRouteDistances(prev => ({...prev, [key]: distanceInKm}));
       }
     } catch (e) {
       console.error('경로 가져오기 실패:', e);
@@ -439,15 +541,27 @@ function Make_program() {
 
       if (response?.data.status === 'OK') {
         if (tourProgramId) {
-          // 수정 모드: 상세 페이지로 돌아가기
+          // 수정 모드: 스택을 재구성하여 TraitSelection과 PracticeDetail 모두 새로고침
           Alert.alert('성공', '투어 프로그램이 수정되었습니다!', [
             {
               text: '확인',
               onPress: () => {
-                // 상세 페이지로 돌아가면서 데이터 새로고침
-                navigation.navigate('PracticeDetail', {
-                  tourProgramId: tourProgramId,
-                  refresh: true, // 새로고침 플래그
+                // 스택을 완전히 재구성: TraitSelection → PracticeDetail
+                navigation.reset({
+                  index: 1, // PracticeDetail이 현재 화면 (index 1)
+                  routes: [
+                    {
+                      name: 'TraitSelection',
+                      params: {forceRefresh: true}, // TraitSelection 새로고침
+                    },
+                    {
+                      name: 'PracticeDetail',
+                      params: {
+                        tourProgramId: tourProgramId,
+                        refresh: true, // PracticeDetail 새로고침
+                      },
+                    },
+                  ],
                 });
               },
             },
@@ -586,7 +700,22 @@ function Make_program() {
               provider={PROVIDER_GOOGLE}
               style={styles.map}
               region={region}
-              onRegionChangeComplete={setRegion}>
+              onRegionChangeComplete={setRegion}
+              showsUserLocation={true}
+              showsMyLocationButton={false}>
+              {/* 현재 위치 마커 */}
+              {currentLocation && (
+                <Marker
+                  coordinate={currentLocation}
+                  title="현재 위치"
+                  description="내가 있는 곳"
+                  pinColor="#FF0000">
+                  <View style={styles.currentLocationMarker}>
+                    <Text style={styles.currentLocationText}>📍</Text>
+                  </View>
+                </Marker>
+              )}
+
               {days.map((day, dayIdx) => (
                 <React.Fragment key={dayIdx}>
                   {/* 마커 */}
@@ -621,6 +750,25 @@ function Make_program() {
                   {/* 거리 표시 */}
                   {day.plans.length > 1 &&
                     day.plans.slice(1).map((p, idx) => {
+                      const key = `${dayIdx}-${idx}-${idx + 1}`;
+                      const roadDistance = routeDistances[key];
+
+                      // 실제 도로 거리가 있으면 사용, 없으면 직선 거리 사용
+                      let displayDistance;
+                      if (roadDistance) {
+                        displayDistance = roadDistance;
+                      } else {
+                        const prev = day.plans[idx].coordinate as {
+                          latitude: number;
+                          longitude: number;
+                        };
+                        const curr = p.coordinate as {
+                          latitude: number;
+                          longitude: number;
+                        };
+                        displayDistance = haversine(prev, curr) / 1000;
+                      }
+
                       const prev = day.plans[idx].coordinate as {
                         latitude: number;
                         longitude: number;
@@ -629,7 +777,6 @@ function Make_program() {
                         latitude: number;
                         longitude: number;
                       };
-                      const dist = haversine(prev, curr) / 1000;
                       const mid = {
                         latitude: (prev.latitude + curr.latitude) / 2,
                         longitude: (prev.longitude + curr.longitude) / 2,
@@ -652,7 +799,10 @@ function Make_program() {
                                 styles.distanceText,
                                 {color: dayColors[dayIdx % dayColors.length]},
                               ]}>
-                              {dist.toFixed(1)}km
+                              {displayDistance.toFixed(1)}km
+                              {roadDistance && (
+                                <Text style={{fontSize: 10}}> 🛣️</Text>
+                              )}
                             </Text>
                           </View>
                         </Marker>
@@ -661,6 +811,17 @@ function Make_program() {
                 </React.Fragment>
               ))}
             </MapView>
+
+            {/* 현재 위치 버튼 */}
+            <TouchableOpacity
+              style={styles.locationButton}
+              onPress={getCurrentLocation}
+              disabled={locationLoading}>
+              <Text style={styles.locationButtonText}>
+                {locationLoading ? '📍' : '🎯'}
+              </Text>
+            </TouchableOpacity>
+
             {/* 총 거리 표시 */}
             {days[selectedDay].plans.length > 1 && (
               <View style={styles.totalDistanceBox}>
@@ -724,7 +885,7 @@ function Make_program() {
                         }}>
                         <View
                           style={{
-                            width: 2,
+                            width: 3,
                             height: 30,
                             backgroundColor: dayColors[idx % dayColors.length],
                           }}
@@ -732,27 +893,45 @@ function Make_program() {
                         <Text
                           style={{
                             color: dayColors[idx % dayColors.length],
-                            fontWeight: 'bold',
+                            fontWeight: '900',
                             marginVertical: 2,
-                            fontSize: 13,
+                            fontSize: 15,
+                            textShadowColor: '#ffffff',
+                            textShadowOffset: {width: 1, height: 1},
+                            textShadowRadius: 2,
+                            letterSpacing: 0.3,
+                            backgroundColor: 'rgba(255, 255, 255, 0.9)',
+                            paddingHorizontal: 6,
+                            paddingVertical: 2,
+                            borderRadius: 8,
+                            borderWidth: 1,
+                            borderColor: dayColors[idx % dayColors.length],
                           }}>
-                          {(
-                            haversine(
-                              p.coordinate as {
-                                latitude: number;
-                                longitude: number;
-                              },
-                              day.plans[pIdx + 1].coordinate as {
-                                latitude: number;
-                                longitude: number;
-                              },
-                            ) / 1000
-                          ).toFixed(1)}
-                          km
+                          {(() => {
+                            const key = `${idx}-${pIdx}-${pIdx + 1}`;
+                            const roadDistance = routeDistances[key];
+
+                            if (roadDistance) {
+                              return `${roadDistance.toFixed(1)}km 🛣️`;
+                            } else {
+                              const directDistance =
+                                haversine(
+                                  p.coordinate as {
+                                    latitude: number;
+                                    longitude: number;
+                                  },
+                                  day.plans[pIdx + 1].coordinate as {
+                                    latitude: number;
+                                    longitude: number;
+                                  },
+                                ) / 1000;
+                              return `${directDistance.toFixed(1)}km`;
+                            }
+                          })()}
                         </Text>
                         <View
                           style={{
-                            width: 2,
+                            width: 3,
                             height: 10,
                             backgroundColor: dayColors[idx % dayColors.length],
                           }}
@@ -883,25 +1062,28 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   distanceBox: {
-    backgroundColor: '#fffbe6',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 8,
-    borderWidth: 2,
+    backgroundColor: '#ffffff',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+    borderWidth: 3,
     borderColor: '#ff9800',
     shadowColor: '#000',
-    shadowOffset: {width: 0, height: 2},
-    shadowOpacity: 0.2,
-    shadowRadius: 2,
-    elevation: 3,
+    shadowOffset: {width: 0, height: 3},
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 6,
+    minWidth: 60,
+    alignItems: 'center',
   },
   distanceText: {
-    color: '#ff9800',
-    fontWeight: 'bold',
-    fontSize: 15,
-    textShadowColor: '#fff',
+    color: '#ff6f00',
+    fontWeight: '900',
+    fontSize: 16,
+    textShadowColor: '#ffffff',
     textShadowOffset: {width: 1, height: 1},
-    textShadowRadius: 2,
+    textShadowRadius: 3,
+    letterSpacing: 0.5,
   },
   totalDistanceBox: {
     position: 'absolute',
@@ -962,6 +1144,40 @@ const styles = StyleSheet.create({
     padding: 15,
     fontSize: 16,
     lineHeight: 24,
+  },
+  locationButton: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    backgroundColor: '#0288d1',
+    borderRadius: 20,
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 2},
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  locationButtonText: {
+    color: '#fff',
+    fontSize: 20,
+    fontWeight: 'bold',
+  },
+  currentLocationMarker: {
+    backgroundColor: 'rgba(255, 0, 0, 0.8)',
+    borderRadius: 15,
+    width: 30,
+    height: 30,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#fff',
+  },
+  currentLocationText: {
+    fontSize: 18,
   },
 });
 

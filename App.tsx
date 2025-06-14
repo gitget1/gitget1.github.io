@@ -1,20 +1,25 @@
-// ✅ 최상단에 추가 (반드시 import보다 위 또는 아래이지만 App 함수 밖에 위치해야 함)
-import {TextDecoder, TextEncoder} from 'text-encoding';
-
 if (typeof global.TextEncoder === 'undefined') {
+  const {TextEncoder} = require('text-encoding');
   global.TextEncoder = TextEncoder;
 }
 if (typeof global.TextDecoder === 'undefined') {
+  const {TextDecoder} = require('text-encoding');
   global.TextDecoder = TextDecoder;
 }
 
-// 그다음 기존 import들
 import React from 'react';
 import {GestureHandlerRootView} from 'react-native-gesture-handler';
 import {SafeAreaProvider} from 'react-native-safe-area-context';
 import AppNavigator from './src/navigations/AppNavigator';
 import {NavigationContainer} from '@react-navigation/native';
 import {QueryClient, QueryClientProvider} from '@tanstack/react-query';
+
+// React Native에서 TextEncoder/TextDecoder 폴리필
+if (typeof global.TextEncoder === 'undefined') {
+  const {TextEncoder, TextDecoder} = require('text-encoding');
+  global.TextEncoder = TextEncoder;
+  global.TextDecoder = TextDecoder;
+}
 
 const queryClient = new QueryClient();
 

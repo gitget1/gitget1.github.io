@@ -9,9 +9,15 @@ import {
   TouchableWithoutFeedback,
   ScrollView,
 } from 'react-native';
+import Ionicons from 'react-native-vector-icons/Ionicons';
 import axios from 'axios';
-import {useNavigation} from '@react-navigation/native';
+import {
+  useNavigation,
+  useFocusEffect,
+  useRoute,
+} from '@react-navigation/native';
 import type {StackNavigationProp} from '@react-navigation/stack';
+import type {RouteProp} from '@react-navigation/native';
 import type {AppStackParamList} from '../../navigations/AppNavigator';
 
 // ✅ MBTI 목록 아이템 타입
@@ -45,6 +51,7 @@ interface TourProgram {
 const TraitDropdown = () => {
   // 네비게이션 훅
   const navigation = useNavigation<StackNavigationProp<AppStackParamList>>();
+  const route = useRoute<RouteProp<AppStackParamList, 'TraitSelection'>>();
 
   // 상태 정의
   const [mbtiList, setMbtiList] = useState<MbtiItem[]>([]);
@@ -211,6 +218,20 @@ const TraitDropdown = () => {
     }
   }, [selectedMbti, fetchTourPrograms]);
 
+  // ✅ 화면 포커스 시 새로고침 (Make_program에서 수정 완료 후 돌아올 때)
+  useFocusEffect(
+    useCallback(() => {
+      const forceRefresh = route.params?.forceRefresh;
+      if (selectedMbti || forceRefresh) {
+        console.log('🟢 TraitSelection 화면 포커스 - 투어 목록 새로고침', {
+          selectedMbti: !!selectedMbti,
+          forceRefresh,
+        });
+        fetchTourPrograms(false); // 첫 페이지부터 다시 로드
+      }
+    }, [selectedMbti, fetchTourPrograms, route.params?.forceRefresh]),
+  );
+
   // ✅ MBTI 선택 시 상세정보 조회
   const handleSelectMbti = async (item: MbtiItem) => {
     try {
@@ -290,168 +311,203 @@ const TraitDropdown = () => {
     setShowDropdown(false);
   };
 
+  // 바텀 탭 렌더링 함수
+  const renderBottomTab = () => (
+    <View style={styles.bottomTabContainer}>
+      <TouchableOpacity
+        style={styles.tabItem}
+        onPress={() => {
+          navigation.navigate('Main', {screen: '홈'});
+        }}>
+        <Ionicons name="home" size={24} color="gray" />
+        <Text style={styles.tabLabel}>홈</Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        style={styles.tabItem}
+        onPress={() => {
+          navigation.navigate('WishlistScreen');
+        }}>
+        <Ionicons name="heart" size={24} color="gray" />
+        <Text style={styles.tabLabel}>위시리스트</Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        style={styles.tabItem}
+        onPress={() => {
+          navigation.navigate('Main', {screen: '마이페이지'});
+        }}>
+        <Ionicons name="person" size={24} color="gray" />
+        <Text style={styles.tabLabel}>마이페이지</Text>
+      </TouchableOpacity>
+    </View>
+  );
+
   return (
-    <TouchableWithoutFeedback onPress={handleOutsidePress}>
-      <FlatList
-        data={posts.slice(0, displayedPosts)}
-        keyExtractor={(item, index) => index.toString()}
-        renderItem={({item}) => (
-          <TouchableOpacity
-            style={styles.postCard}
-            onPress={() => {
-              console.log('🟢 게시물 클릭 - tourProgramId:', item.id);
-              navigation.navigate('PracticeDetail', {
-                tourProgramId: item.id,
-              });
-            }}
-            activeOpacity={0.8}>
-            <Text style={styles.postTitle}>{item.title}</Text>
-            <Text style={styles.postDescription}>{item.description}</Text>
-            <View style={styles.postMetaContainer}>
-              <Text style={styles.postMeta}>
-                ❤️ {item.likes} 💬 {item.comments}
-              </Text>
-              <Text style={styles.postPrice}>
-                가이드 가격: {item.guidePrice?.toLocaleString()}원
-              </Text>
-            </View>
-            {item.hashtags && (
-              <View style={styles.hashtagContainer}>
-                {item.hashtags.map((tag, index) => (
-                  <Text key={index} style={styles.postHashtag}>
-                    {tag}
-                  </Text>
-                ))}
-              </View>
-            )}
-          </TouchableOpacity>
-        )}
-        onEndReached={loadMorePosts}
-        onEndReachedThreshold={0.5}
-        ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <Text style={styles.emptyText}>
-              {selectedHashtags.length > 0 || selectedRegions.length > 0
-                ? '선택한 조건에 맞는 게시물이 없습니다.'
-                : '게시물이 없습니다.'}
-            </Text>
-          </View>
-        }
-        ListFooterComponent={
-          loadingMore ? <Text>로딩 중…</Text> : <View style={{height: 30}} />
-        }
-        ListHeaderComponent={
-          <View style={styles.container}>
-            <View style={styles.centeredRow}>
-              <TouchableOpacity
-                style={styles.dropdownButton}
-                onPress={() => setShowDropdown(!showDropdown)}>
-                <Text style={styles.dropdownButtonText}>
-                  {selectedMbti ? selectedMbti.mbti : '클릭하여 성향 선택'}
+    <View style={{flex: 1}}>
+      <TouchableWithoutFeedback onPress={handleOutsidePress}>
+        <FlatList
+          data={posts.slice(0, displayedPosts)}
+          keyExtractor={(item, index) => index.toString()}
+          renderItem={({item}) => (
+            <TouchableOpacity
+              style={styles.postCard}
+              onPress={() => {
+                console.log('🟢 게시물 클릭 - tourProgramId:', item.id);
+                navigation.navigate('PracticeDetail', {
+                  tourProgramId: item.id,
+                });
+              }}
+              activeOpacity={0.8}>
+              <Text style={styles.postTitle}>{item.title}</Text>
+              <Text style={styles.postDescription}>{item.description}</Text>
+              <View style={styles.postMetaContainer}>
+                <Text style={styles.postMeta}>
+                  ❤️ {item.likes} 💬 {item.comments}
                 </Text>
-              </TouchableOpacity>
+                <Text style={styles.postPrice}>
+                  가이드 가격: {item.guidePrice?.toLocaleString()}원
+                </Text>
+              </View>
+              {item.hashtags && (
+                <View style={styles.hashtagContainer}>
+                  {item.hashtags.map((tag, index) => (
+                    <Text key={index} style={styles.postHashtag}>
+                      {tag}
+                    </Text>
+                  ))}
+                </View>
+              )}
+            </TouchableOpacity>
+          )}
+          onEndReached={loadMorePosts}
+          onEndReachedThreshold={0.5}
+          ListEmptyComponent={
+            <View style={styles.emptyContainer}>
+              <Text style={styles.emptyText}>
+                {selectedHashtags.length > 0 || selectedRegions.length > 0
+                  ? '선택한 조건에 맞는 게시물이 없습니다.'
+                  : '게시물이 없습니다.'}
+              </Text>
             </View>
-            {showDropdown && (
-              <View style={styles.dropdownList}>
-                <FlatList
-                  data={mbtiList}
-                  keyExtractor={(item, index) => `${item.mbti}-${index}`}
-                  renderItem={({item}) => (
-                    <TouchableOpacity
-                      style={styles.dropdownItem}
-                      onPress={() => handleSelectMbti(item)}>
-                      <Text style={styles.dropdownItemText}>{item.mbti}</Text>
-                    </TouchableOpacity>
-                  )}
-                />
-              </View>
-            )}
-            {selectedMbti && (
-              <>
-                <Text style={styles.sectionTitle}>해시태그</Text>
-                <View style={styles.hashtagWrapper}>
-                  {selectedMbti.hashtags.map((tag, i) => (
-                    <TouchableOpacity
-                      key={i}
-                      style={[
-                        styles.hashtagBox,
-                        selectedHashtags.includes(tag) &&
-                          styles.selectedHashtagBox,
-                      ]}
-                      onPress={() => toggleHashtag(tag)}>
-                      <Text
-                        style={[
-                          styles.hashtagText,
-                          selectedHashtags.includes(tag) &&
-                            styles.selectedHashtagText,
-                        ]}>
-                        {tag}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-
-                <Text style={styles.sectionTitle}>추천 지역</Text>
-                <View style={styles.regionGridCentered}>
-                  {selectedMbti.regions.map((region, i) => (
-                    <TouchableOpacity
-                      key={i}
-                      style={[
-                        styles.regionItemFixed,
-                        selectedRegions.includes(region) &&
-                          styles.selectedRegionItem,
-                      ]}
-                      onPress={() => handleRegionSelect(region)}>
-                      <Text style={styles.regionText}>{region}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-
+          }
+          ListFooterComponent={
+            loadingMore ? <Text>로딩 중…</Text> : <View style={{height: 30}} />
+          }
+          ListHeaderComponent={
+            <View style={styles.container}>
+              <View style={styles.centeredRow}>
                 <TouchableOpacity
-                  style={styles.searchButton}
-                  onPress={handleSearch}>
-                  <Text style={styles.searchButtonText}>조회하기</Text>
+                  style={styles.dropdownButton}
+                  onPress={() => setShowDropdown(!showDropdown)}>
+                  <Text style={styles.dropdownButtonText}>
+                    {selectedMbti ? selectedMbti.mbti : '클릭하여 성향 선택'}
+                  </Text>
                 </TouchableOpacity>
-              </>
-            )}
-            {selectedMbti && (
-              <View style={styles.postContainer}>
-                <Text style={styles.postText}>게시글</Text>
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  style={styles.sortScrollView}
-                  contentContainerStyle={styles.sortScrollContent}>
-                  {[
-                    '최신순',
-                    '가격 낮은순',
-                    '가격 높은순',
-                    '리뷰순',
-                    '찜순',
-                  ].map(option => (
-                    <TouchableOpacity
-                      key={option}
-                      style={[
-                        styles.sortOptionButton,
-                        selectedSort === option && styles.selectedSortButton,
-                      ]}
-                      onPress={() => handleSortSelect(option)}>
-                      <Text
-                        style={[
-                          styles.sortOptionText,
-                          selectedSort === option && styles.selectedSortText,
-                        ]}>
-                        {option}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
               </View>
-            )}
-          </View>
-        }
-      />
-    </TouchableWithoutFeedback>
+              {showDropdown && (
+                <View style={styles.dropdownList}>
+                  <FlatList
+                    data={mbtiList}
+                    keyExtractor={(item, index) => `${item.mbti}-${index}`}
+                    renderItem={({item}) => (
+                      <TouchableOpacity
+                        style={styles.dropdownItem}
+                        onPress={() => handleSelectMbti(item)}>
+                        <Text style={styles.dropdownItemText}>{item.mbti}</Text>
+                      </TouchableOpacity>
+                    )}
+                  />
+                </View>
+              )}
+              {selectedMbti && (
+                <>
+                  <Text style={styles.sectionTitle}>해시태그</Text>
+                  <View style={styles.hashtagWrapper}>
+                    {selectedMbti.hashtags.map((tag, i) => (
+                      <TouchableOpacity
+                        key={i}
+                        style={[
+                          styles.hashtagBox,
+                          selectedHashtags.includes(tag) &&
+                            styles.selectedHashtagBox,
+                        ]}
+                        onPress={() => toggleHashtag(tag)}>
+                        <Text
+                          style={[
+                            styles.hashtagText,
+                            selectedHashtags.includes(tag) &&
+                              styles.selectedHashtagText,
+                          ]}>
+                          {tag}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+
+                  <Text style={styles.sectionTitle}>추천 지역</Text>
+                  <View style={styles.regionGridCentered}>
+                    {selectedMbti.regions.map((region, i) => (
+                      <TouchableOpacity
+                        key={i}
+                        style={[
+                          styles.regionItemFixed,
+                          selectedRegions.includes(region) &&
+                            styles.selectedRegionItem,
+                        ]}
+                        onPress={() => handleRegionSelect(region)}>
+                        <Text style={styles.regionText}>{region}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+
+                  <TouchableOpacity
+                    style={styles.searchButton}
+                    onPress={handleSearch}>
+                    <Text style={styles.searchButtonText}>조회하기</Text>
+                  </TouchableOpacity>
+                </>
+              )}
+              {selectedMbti && (
+                <View style={styles.postContainer}>
+                  <Text style={styles.postText}>게시글</Text>
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    style={styles.sortScrollView}
+                    contentContainerStyle={styles.sortScrollContent}>
+                    {[
+                      '최신순',
+                      '가격 낮은순',
+                      '가격 높은순',
+                      '리뷰순',
+                      '찜순',
+                    ].map(option => (
+                      <TouchableOpacity
+                        key={option}
+                        style={[
+                          styles.sortOptionButton,
+                          selectedSort === option && styles.selectedSortButton,
+                        ]}
+                        onPress={() => handleSortSelect(option)}>
+                        <Text
+                          style={[
+                            styles.sortOptionText,
+                            selectedSort === option && styles.selectedSortText,
+                          ]}>
+                          {option}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+                </View>
+              )}
+            </View>
+          }
+        />
+      </TouchableWithoutFeedback>
+      {renderBottomTab()}
+    </View>
   );
 };
 
@@ -625,6 +681,24 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#666',
     textAlign: 'center',
+  },
+  bottomTabContainer: {
+    flexDirection: 'row',
+    backgroundColor: '#fff',
+    borderTopWidth: 1,
+    borderTopColor: '#ddd',
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    justifyContent: 'space-around',
+  },
+  tabItem: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  tabLabel: {
+    fontSize: 12,
+    color: 'gray',
+    marginTop: 4,
   },
 });
 

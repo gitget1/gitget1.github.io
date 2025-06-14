@@ -1,4 +1,3 @@
-// ✅ AppNavigator.tsx
 import React from 'react';
 import {createNativeStackNavigator} from '@react-navigation/native-stack';
 import BottomTabNavigator from './BottomTabNavigator';
@@ -16,8 +15,9 @@ import PaymentCompleteScreen from '../screens/payment/PaymentCompleteScreen';
 import WishlistScreen from '../screens/wishlist/WishlistScreen';
 import {NativeStackScreenProps} from '@react-navigation/native-stack';
 import IamportPaymentScreen from '../screens/payment/IamportPaymentScreen';
-import CalendarHome from '../screens/calendar/CalendarHome';
+import CalendarScreen from '../screens/calendar/CalendarScreen';
 import ChatMain from '../screens/chat/ChatMain';
+import ChatRoom from '../screens/chat/ChatRoom';
 
 export type AppStackParamList = {
   AuthStack: undefined;
@@ -67,6 +67,7 @@ export type AppStackParamList = {
   };
   CalendarHome: undefined;
   ChatMain: undefined;
+  ChatRoom: {roomId: string; userId?: number};
   MyReviewList: undefined;
   PaymentScreen: undefined;
   PaymentComplete: undefined;
@@ -205,7 +206,7 @@ const AppNavigator = () => {
       />
       <Stack.Screen
         name="CalendarHome"
-        component={CalendarHome}
+        component={CalendarScreen}
         options={{
           headerShown: true,
           title: '캘린더',
@@ -218,6 +219,15 @@ const AppNavigator = () => {
         options={{
           headerShown: true,
           title: '채팅',
+          headerTitleStyle: {fontSize: 20},
+        }}
+      />
+      <Stack.Screen
+        name="ChatRoom"
+        component={ChatRoom}
+        options={{
+          headerShown: true,
+          title: '채팅방',
           headerTitleStyle: {fontSize: 20},
         }}
       />

@@ -94,7 +94,7 @@ export default function ResultScreen({
   };
 
   const handleMain = () => {
-    Alert.alert('메인화면', '메인 화면으로 이동 될 예정입니다.');
+    navigation.navigate('Main');
   };
 
   return (
