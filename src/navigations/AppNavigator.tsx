@@ -160,7 +160,7 @@ const AppNavigator = () => {
         component={Make_program}
         options={{
           headerShown: true,
-          title: t('makeProgram'),
+          title: '프로그램 작성하기',
           headerTitleStyle: {
             fontSize: 20,
           },
