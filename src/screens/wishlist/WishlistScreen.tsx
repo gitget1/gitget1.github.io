@@ -1,4 +1,4 @@
-import React, {useEffect, useState} from 'react';
+import React, {useEffect, useState, useCallback} from 'react';
 import {
   View,
   Text,
@@ -14,6 +14,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import {useNavigation} from '@react-navigation/native';
 import type {StackNavigationProp} from '@react-navigation/stack';
 import type {AppStackParamList} from '../../navigations/AppNavigator';
+import {useTranslation} from 'react-i18next';
 
 interface WishlistItem {
   id: number;
@@ -29,17 +30,18 @@ interface WishlistItem {
 const WISHLIST_API_URL = 'http://124.60.137.10:80/api/wishlist';
 
 const WishlistScreen = () => {
+  const {t} = useTranslation();
   const [loading, setLoading] = useState(true);
   const [wishlistItems, setWishlistItems] = useState<WishlistItem[]>([]);
   const [error, setError] = useState<string | null>(null);
   const navigation = useNavigation<StackNavigationProp<AppStackParamList>>();
 
-  const fetchWishlist = async () => {
+  const fetchWishlist = useCallback(async () => {
     try {
       setLoading(true);
       const token = await AsyncStorage.getItem('accessToken');
       if (!token) {
-        setError('로그인이 필요한 서비스입니다.');
+        setError(t('loginRequiredService'));
         return;
       }
 
@@ -88,30 +90,27 @@ const WishlistScreen = () => {
       setWishlistItems([]);
       if (axios.isAxiosError(err)) {
         if (err.response?.status === 401) {
-          setError('로그인이 필요한 서비스입니다.');
-          Alert.alert('알림', '로그인이 필요한 서비스입니다.');
+          setError(t('loginRequiredService'));
+          Alert.alert(t('notification'), t('loginRequiredService'));
         } else if (err.code === 'ECONNABORTED') {
-          setError('서버 응답 시간이 초과되었습니다.');
-          Alert.alert(
-            '오류',
-            '서버 응답 시간이 초과되었습니다. 다시 시도해주세요.',
-          );
+          setError(t('serverTimeout'));
+          Alert.alert(t('error'), t('serverTimeoutDesc'));
         } else {
-          setError('위시리스트를 불러오는데 실패했습니다.');
-          Alert.alert('오류', '위시리스트를 불러오는데 실패했습니다.');
+          setError(t('wishlistLoadFailed'));
+          Alert.alert(t('error'), t('wishlistLoadFailed'));
         }
       } else {
-        setError('네트워크 연결을 확인해주세요.');
-        Alert.alert('오류', '네트워크 연결을 확인해주세요.');
+        setError(t('networkError'));
+        Alert.alert(t('error'), t('networkError'));
       }
     } finally {
       setLoading(false);
     }
-  };
+  }, [t]);
 
   useEffect(() => {
     fetchWishlist();
-  }, []);
+  }, [fetchWishlist]);
 
   const handleItemPress = (item: WishlistItem) => {
     const actualTourProgramId =
@@ -127,7 +126,7 @@ const WishlistScreen = () => {
         refresh: false,
       });
     } catch (error) {
-      Alert.alert('오류', '페이지 이동에 실패했습니다.');
+      Alert.alert(t('error'), t('pageNavigationFailed'));
     }
   };
 
@@ -150,13 +149,13 @@ const WishlistScreen = () => {
   return (
     <ScrollView style={styles.container}>
       <View style={styles.headerContainer}>
-        <Text style={styles.header}>나의 위시리스트</Text>
+        <Text style={styles.header}>{t('myWishlist')}</Text>
         <TouchableOpacity
           style={styles.refreshButton}
           onPress={fetchWishlist}
           disabled={loading}>
           <Text style={styles.refreshButtonText}>
-            {loading ? '로딩중...' : '새로고침'}
+            {loading ? t('loading') : t('refresh')}
           </Text>
         </TouchableOpacity>
       </View>
@@ -164,17 +163,14 @@ const WishlistScreen = () => {
       {!wishlistItems || wishlistItems.length === 0 ? (
         <View style={styles.emptyContainer}>
           <Text style={styles.emptyText}>
-            {error ? error : '위시리스트가 비어있습니다.'}
+            {error ? error : t('wishlistEmpty')}
           </Text>
           {!error && (
-            <Text style={styles.emptySubText}>
-              투어 상세 페이지에서 🤍 버튼을 눌러{'\n'}
-              관심있는 투어를 찜해보세요!
-            </Text>
+            <Text style={styles.emptySubText}>{t('wishlistEmptyDesc')}</Text>
           )}
           <TouchableOpacity style={styles.retryButton} onPress={fetchWishlist}>
             <Text style={styles.retryButtonText}>
-              {error ? '다시 시도' : '새로고침'}
+              {error ? t('retry') : t('refresh')}
             </Text>
           </TouchableOpacity>
         </View>
@@ -202,13 +198,13 @@ const WishlistScreen = () => {
               />
             ) : (
               <View style={[styles.thumbnail, {backgroundColor: '#e0e0e0'}]}>
-                <Text style={styles.noImageText}>이미지 없음</Text>
+                <Text style={styles.noImageText}>{t('noImage')}</Text>
               </View>
             )}
             <View style={styles.itemContent}>
-              <Text style={styles.itemTitle}>{item.title || '제목 없음'}</Text>
+              <Text style={styles.itemTitle}>{item.title || t('noTitle')}</Text>
               <Text style={styles.itemRegion}>
-                📍 {item.region || '지역 정보 없음'}
+                📍 {item.region || t('noRegionInfo')}
               </Text>
               <View style={styles.tagsContainer}>
                 {(item.hashtags || []).map((tag, index) => (
@@ -220,7 +216,7 @@ const WishlistScreen = () => {
                 ))}
               </View>
               <Text style={styles.itemPrice}>
-                ₩{(item.guidePrice || 0).toLocaleString()} /인
+                ₩{(item.guidePrice || 0).toLocaleString()} {t('perPerson')}
               </Text>
             </View>
             <View style={styles.arrowContainer}>

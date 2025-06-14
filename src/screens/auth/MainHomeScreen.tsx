@@ -8,11 +8,14 @@ import {
   Animated,
   Image,
   ScrollView,
+  Modal,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {useNavigation} from '@react-navigation/native';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {AppStackParamList} from '../../navigations/AppNavigator';
+import {useTranslation} from 'react-i18next';
+import Ionicons from 'react-native-vector-icons/Ionicons';
 
 const {width} = Dimensions.get('window');
 type NavigationProp = NativeStackNavigationProp<AppStackParamList>;
@@ -25,43 +28,77 @@ const images = [
 
 const MainHomeScreen = () => {
   const navigation = useNavigation<NavigationProp>();
+  const {t, i18n} = useTranslation();
   const [currentIndex, setCurrentIndex] = useState(0);
   const translateX = useRef(new Animated.Value(width)).current;
   const dotPosition = useRef(new Animated.Value(0)).current;
+  const animationTimer = useRef<NodeJS.Timeout | null>(null);
+  const [showLanguageModal, setShowLanguageModal] = useState(false);
 
+  // 도트 애니메이션만 currentIndex 변경 시 실행
   useEffect(() => {
-    const animate = () => {
+    Animated.spring(dotPosition, {
+      toValue: currentIndex,
+      tension: 50,
+      friction: 8,
+      useNativeDriver: true,
+    }).start();
+  }, [currentIndex, dotPosition]);
+
+  // 슬라이드 애니메이션은 컴포넌트 마운트 시에만 시작
+  useEffect(() => {
+    const startSlideAnimation = () => {
+      // 기존 타이머가 있다면 클리어
+      if (animationTimer.current) {
+        clearTimeout(animationTimer.current);
+      }
+
       translateX.setValue(width);
       Animated.timing(translateX, {
         toValue: 0,
         duration: 700,
         useNativeDriver: true,
       }).start(() => {
-        setTimeout(() => {
+        animationTimer.current = setTimeout(() => {
           Animated.timing(translateX, {
             toValue: -width,
             duration: 700,
             useNativeDriver: true,
           }).start(() => {
             setCurrentIndex(prev => (prev + 1) % images.length);
+            // 다음 애니메이션 예약
+            startSlideAnimation();
           });
         }, 5000);
       });
-
-      Animated.spring(dotPosition, {
-        toValue: currentIndex,
-        tension: 50,
-        friction: 8,
-        useNativeDriver: true,
-      }).start();
     };
-    animate();
-  }, [currentIndex, dotPosition, translateX]);
+
+    startSlideAnimation();
+
+    // 컴포넌트 언마운트 시 타이머 클리어
+    return () => {
+      if (animationTimer.current) {
+        clearTimeout(animationTimer.current);
+      }
+    };
+  }, [translateX]); // translateX만 의존성으로 설정
 
   const handleTest = () => navigation.navigate('QuestionScreen');
   const handleTraitSelection = () => navigation.navigate('TraitSelection');
   const handleCalendar = () => navigation.navigate('CalendarHome');
   const handleChat = () => navigation.navigate('ChatMain');
+
+  const changeLanguage = (languageCode: string) => {
+    i18n.changeLanguage(languageCode);
+    setShowLanguageModal(false);
+  };
+
+  const languages = [
+    {code: 'ko', name: t('korean'), flag: '🇰🇷'},
+    {code: 'en', name: t('english'), flag: '🇺🇸'},
+    {code: 'ja', name: t('japanese'), flag: '🇯🇵'},
+    {code: 'zh', name: t('chinese'), flag: '🇨🇳'},
+  ];
 
   const renderDots = () => (
     <View style={styles.dotsContainer}>
@@ -94,10 +131,20 @@ const MainHomeScreen = () => {
 
   return (
     <SafeAreaView style={styles.container}>
+      {/* 언어 선택 버튼 */}
+      <View style={styles.languageButtonContainer}>
+        <TouchableOpacity
+          style={styles.languageButton}
+          onPress={() => setShowLanguageModal(true)}>
+          <Ionicons name="language" size={20} color="#0288d1" />
+          <Text style={styles.languageButtonText}>{t('language')}</Text>
+        </TouchableOpacity>
+      </View>
+
       <ScrollView contentContainerStyle={styles.scrollContent}>
         {/* 🔥 인기 지역 슬라이드 */}
         <View style={{alignItems: 'center', marginTop: 24, marginBottom: 10}}>
-          <Text style={styles.sectionTitle}>🔥 인기 지역</Text>
+          <Text style={styles.sectionTitle}>{t('popularRegions')}</Text>
           <Animated.View
             style={{
               transform: [{translateX}],
@@ -121,25 +168,25 @@ const MainHomeScreen = () => {
           {[
             {
               icon: '🧠',
-              label: '성향 테스트',
+              label: t('personalityTest'),
               action: handleTest,
               bg: '#E3F2FD',
             },
             {
               icon: '📍',
-              label: '나의 성향 관광',
+              label: t('myTourism'),
               action: handleTraitSelection,
               bg: '#C8E6C9',
             },
             {
-              icon: '🗺️',
-              label: '캘린더',
+              icon: '📅',
+              label: t('calendar'),
               action: handleCalendar,
               bg: '#FFE0B2',
             },
             {
-              icon: '🌟',
-              label: '채팅',
+              icon: '💬',
+              label: t('chat'),
               action: handleChat,
               bg: '#FFCDD2',
             },
@@ -156,18 +203,49 @@ const MainHomeScreen = () => {
 
         {/* 📍 위치 기반 추천 박스 */}
         <View style={styles.tipBox}>
-          <Text style={styles.tipTitle}>📍 현재 위치: 서울</Text>
-          <Text style={styles.tipSub}>☀️ 맑음, 22℃ | 한강 산책 어때요?</Text>
+          <Text style={styles.tipTitle}>{t('currentLocation')}</Text>
+          <Text style={styles.tipSub}>{t('weatherInfo')}</Text>
         </View>
 
         {/* 📢 이벤트 정보 박스 */}
         <View style={styles.eventBox}>
-          <Text style={styles.eventTitle}>📢 이벤트</Text>
-          <Text style={styles.eventDescription}>
-            🎉 5월 한정! 성향 분석하면 굿즈 추첨 이벤트에 참여해보세요.
-          </Text>
+          <Text style={styles.eventTitle}>{t('event')}</Text>
+          <Text style={styles.eventDescription}>{t('eventDescription')}</Text>
         </View>
       </ScrollView>
+
+      {/* 언어 선택 모달 */}
+      <Modal
+        visible={showLanguageModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowLanguageModal(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>{t('language')}</Text>
+            {languages.map(language => (
+              <TouchableOpacity
+                key={language.code}
+                style={[
+                  styles.languageOption,
+                  i18n.language === language.code && styles.selectedLanguage,
+                ]}
+                onPress={() => changeLanguage(language.code)}>
+                <Text style={styles.languageFlag}>{language.flag}</Text>
+                <Text style={styles.languageName}>{language.name}</Text>
+                {i18n.language === language.code && (
+                  <Ionicons name="checkmark" size={20} color="#0288d1" />
+                )}
+              </TouchableOpacity>
+            ))}
+            <TouchableOpacity
+              style={styles.closeButton}
+              onPress={() => setShowLanguageModal(false)}>
+              <Text style={styles.closeButtonText}>닫기</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 };
@@ -276,6 +354,81 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#4E342E',
     lineHeight: 20,
+  },
+  // 언어 선택 관련 스타일
+  languageButtonContainer: {
+    position: 'absolute',
+    top: 10,
+    right: 20,
+    zIndex: 1,
+  },
+  languageButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f5f5f5',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+  },
+  languageButtonText: {
+    marginLeft: 6,
+    fontSize: 14,
+    color: '#0288d1',
+    fontWeight: '500',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    backgroundColor: 'white',
+    borderRadius: 16,
+    padding: 20,
+    width: width * 0.8,
+    maxHeight: '70%',
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    marginBottom: 20,
+    color: '#333',
+  },
+  languageOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    marginBottom: 8,
+  },
+  selectedLanguage: {
+    backgroundColor: '#e3f2fd',
+  },
+  languageFlag: {
+    fontSize: 24,
+    marginRight: 12,
+  },
+  languageName: {
+    flex: 1,
+    fontSize: 16,
+    color: '#333',
+  },
+  closeButton: {
+    marginTop: 20,
+    backgroundColor: '#0288d1',
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  closeButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '500',
   },
 });
 

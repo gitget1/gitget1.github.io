@@ -41,7 +41,7 @@ const MyReviewList = () => {
       // 토큰에서 'Bearer ' 접두사 제거
       const cleanToken = token.replace('Bearer ', '');
 
-      const res = await axios.get('http://124.60.137.10:80/api/review', {
+      const res = await axios.get('http://124.60.137.10/api/review', {
         params: {
           page: 0,
           size: 10,
@@ -113,14 +113,52 @@ const MyReviewList = () => {
         text: '삭제',
         onPress: async () => {
           try {
-            await axios.delete(`http://124.60.137.10:80/api/review/${id}`, {
-              headers: {
-                Authorization: `Bearer ${process.env.API_TOKEN}`,
-              },
+            const token = await AsyncStorage.getItem('accessToken');
+            if (!token) {
+              Alert.alert('알림', '로그인이 필요한 서비스입니다.');
+              return;
+            }
+
+            const cleanToken = token.replace('Bearer ', '');
+
+            console.log('🗑️ 리뷰 삭제 요청:', {
+              reviewId: id,
+              url: `http://124.60.137.10/api/review/${id}`,
             });
+
+            const response = await axios.delete(
+              `http://124.60.137.10/api/review/${id}`,
+              {
+                headers: {
+                  'Content-Type': 'application/json',
+                  Authorization: `Bearer ${cleanToken}`,
+                },
+                timeout: 10000,
+              },
+            );
+
+            console.log('✅ 리뷰 삭제 성공:', response.data);
+
             setReviews(prev => prev.filter(r => r.tourProgramId !== id));
+            Alert.alert('완료', '리뷰가 삭제되었습니다.');
           } catch (error) {
-            Alert.alert('오류', '리뷰 삭제 중 오류 발생');
+            console.error('❌ 리뷰 삭제 실패:', error);
+            if (axios.isAxiosError(error)) {
+              if (error.response?.status === 401) {
+                Alert.alert('오류', '로그인이 만료되었습니다.');
+              } else if (error.response?.status === 403) {
+                Alert.alert('오류', '삭제 권한이 없습니다.');
+              } else if (error.response?.status === 404) {
+                Alert.alert('오류', '해당 리뷰를 찾을 수 없습니다.');
+              } else {
+                Alert.alert(
+                  '오류',
+                  error.response?.data?.message || '리뷰 삭제에 실패했습니다.',
+                );
+              }
+            } else {
+              Alert.alert('오류', '네트워크 연결을 확인해주세요.');
+            }
           }
         },
         style: 'destructive',
@@ -134,16 +172,69 @@ const MyReviewList = () => {
     setModalVisible(true);
   };
 
-  const saveEdited = () => {
-    setReviews(prev =>
-      prev.map(r =>
-        r.tourProgramId === editingReview?.tourProgramId
-          ? {...r, content: editedContent}
-          : r,
-      ),
-    );
-    setModalVisible(false);
-    setEditingReview(null);
+  const saveEdited = async () => {
+    if (!editingReview) return;
+
+    try {
+      const token = await AsyncStorage.getItem('accessToken');
+      if (!token) {
+        Alert.alert('알림', '로그인이 필요한 서비스입니다.');
+        return;
+      }
+
+      const cleanToken = token.replace('Bearer ', '');
+
+      console.log('✏️ 리뷰 수정 요청:', {
+        reviewId: editingReview.tourProgramId,
+        content: editedContent,
+      });
+
+      const response = await axios.put(
+        `http://124.60.137.10/api/review/${editingReview.tourProgramId}`,
+        {
+          content: editedContent,
+        },
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${cleanToken}`,
+          },
+          timeout: 10000,
+        },
+      );
+
+      console.log('✅ 리뷰 수정 성공:', response.data);
+
+      setReviews(prev =>
+        prev.map(r =>
+          r.tourProgramId === editingReview?.tourProgramId
+            ? {...r, content: editedContent}
+            : r,
+        ),
+      );
+
+      setModalVisible(false);
+      setEditingReview(null);
+      Alert.alert('완료', '리뷰가 수정되었습니다.');
+    } catch (error) {
+      console.error('❌ 리뷰 수정 실패:', error);
+      if (axios.isAxiosError(error)) {
+        if (error.response?.status === 401) {
+          Alert.alert('오류', '로그인이 만료되었습니다.');
+        } else if (error.response?.status === 403) {
+          Alert.alert('오류', '수정 권한이 없습니다.');
+        } else if (error.response?.status === 404) {
+          Alert.alert('오류', '해당 리뷰를 찾을 수 없습니다.');
+        } else {
+          Alert.alert(
+            '오류',
+            error.response?.data?.message || '리뷰 수정에 실패했습니다.',
+          );
+        }
+      } else {
+        Alert.alert('오류', '네트워크 연결을 확인해주세요.');
+      }
+    }
   };
 
   return (

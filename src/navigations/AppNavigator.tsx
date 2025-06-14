@@ -18,6 +18,7 @@ import IamportPaymentScreen from '../screens/payment/IamportPaymentScreen';
 import CalendarScreen from '../screens/calendar/CalendarScreen';
 import ChatMain from '../screens/chat/ChatMain';
 import ChatRoom from '../screens/chat/ChatRoom';
+import {useTranslation} from 'react-i18next';
 
 export type AppStackParamList = {
   AuthStack: undefined;
@@ -80,6 +81,8 @@ export type AppStackScreenProps<T extends keyof AppStackParamList> =
 const Stack = createNativeStackNavigator<AppStackParamList>();
 
 const AppNavigator = () => {
+  const {t} = useTranslation();
+
   return (
     <Stack.Navigator
       initialRouteName="AuthStack"
@@ -104,7 +107,7 @@ const AppNavigator = () => {
         component={QuestionScreen}
         options={{
           headerShown: true,
-          title: 'MBTI 테스트',
+          title: t('mbtiTest'),
           headerTitleStyle: {
             fontSize: 20,
           },
@@ -115,7 +118,7 @@ const AppNavigator = () => {
         component={Practice1}
         options={{
           headerShown: true,
-          title: '투어 상세',
+          title: t('practiceDetail'),
           headerTitleStyle: {fontSize: 20},
         }}
       />
@@ -124,7 +127,7 @@ const AppNavigator = () => {
         component={TraitSelection}
         options={{
           headerShown: true,
-          title: '성향 선택',
+          title: t('traitSelection'),
           headerTitleStyle: {
             fontSize: 20,
           },
@@ -135,7 +138,7 @@ const AppNavigator = () => {
         component={ResultScreen}
         options={{
           headerShown: true,
-          title: '테스트 결과',
+          title: t('mbtiResult'),
           headerTitleStyle: {
             fontSize: 20,
           },
@@ -146,7 +149,7 @@ const AppNavigator = () => {
         component={Practice}
         options={{
           headerShown: true,
-          title: '리뷰',
+          title: t('myReview'),
           headerTitleStyle: {
             fontSize: 20,
           },
@@ -157,7 +160,7 @@ const AppNavigator = () => {
         component={Make_program}
         options={{
           headerShown: true,
-          title: '프로그램 작성하기',
+          title: t('makeProgram'),
           headerTitleStyle: {
             fontSize: 20,
           },
@@ -168,7 +171,7 @@ const AppNavigator = () => {
         component={MyReviewList}
         options={{
           headerShown: true,
-          title: '내가 쓴 리뷰',
+          title: t('myReviewList'),
           headerTitleStyle: {fontSize: 20},
         }}
       />
@@ -177,7 +180,7 @@ const AppNavigator = () => {
         component={PaymentScreen}
         options={{
           headerShown: true,
-          title: '결제',
+          title: t('payment'),
           headerTitleStyle: {fontSize: 20},
         }}
       />
@@ -186,7 +189,7 @@ const AppNavigator = () => {
         component={PaymentCompleteScreen}
         options={{
           headerShown: true,
-          title: '결제 완료',
+          title: t('paymentComplete'),
           headerTitleStyle: {fontSize: 20},
         }}
       />
@@ -195,7 +198,7 @@ const AppNavigator = () => {
         component={WishlistScreen}
         options={{
           headerShown: true,
-          title: '위시리스트',
+          title: t('wishlistScreen'),
           headerTitleStyle: {fontSize: 20},
         }}
       />
@@ -209,7 +212,7 @@ const AppNavigator = () => {
         component={CalendarScreen}
         options={{
           headerShown: true,
-          title: '캘린더',
+          title: t('calendarScreen'),
           headerTitleStyle: {fontSize: 20},
         }}
       />
@@ -218,7 +221,7 @@ const AppNavigator = () => {
         component={ChatMain}
         options={{
           headerShown: true,
-          title: '채팅',
+          title: t('chatMain'),
           headerTitleStyle: {fontSize: 20},
         }}
       />
@@ -227,7 +230,7 @@ const AppNavigator = () => {
         component={ChatRoom}
         options={{
           headerShown: true,
-          title: '채팅방',
+          title: t('chatRoom'),
           headerTitleStyle: {fontSize: 20},
         }}
       />

@@ -51,7 +51,7 @@ const IamportPaymentScreen = () => {
         navigation.replace('PaymentScreen', {result: 'fail'});
       }
     } else {
-      console.warn('⚠️ 결제 실패 or 취소됨:', response);
+    
       navigation.replace('PaymentScreen', {result: 'fail'});
     }
   };

@@ -13,6 +13,7 @@ import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {NativeStackScreenProps} from '@react-navigation/native-stack';
 import {RootStackParamList} from '../../navigations/root/RootNavigator';
+import {useTranslation} from 'react-i18next';
 
 type Question = {
   question: string;
@@ -22,6 +23,7 @@ type Question = {
 
 type Props = NativeStackScreenProps<RootStackParamList, 'QuestionScreen'>;
 export default function QuestionScreen({navigation}: Props) {
+  const {t} = useTranslation();
   const [questions, setQuestions] = useState<Question[]>([]);
   const [currentIndex, setCurrentIndex] = useState<number>(0);
   const [answers, setAnswers] = useState<string[]>([]);
@@ -33,31 +35,34 @@ export default function QuestionScreen({navigation}: Props) {
       try {
         const accessToken = await AsyncStorage.getItem('accessToken');
         if (!accessToken) {
-          Alert.alert('알림', '로그인이 필요한 서비스입니다.');
+          Alert.alert(t('notification'), t('loginRequired'));
           return;
         }
 
-        const res = await axios.get(`http://10.147.17.48:8000/generate_question`, {
-          withCredentials: true,
-          headers: {
-            'Content-Type': 'application/json',
-            Accept: 'application/json',
-            Authorization: `Bearer ${accessToken}`,
+        const res = await axios.get(
+          `http://10.147.17.48:8000/generate_question`,
+          {
+            withCredentials: true,
+            headers: {
+              'Content-Type': 'application/json',
+              Accept: 'application/json',
+              Authorization: `Bearer ${accessToken}`,
+            },
           },
-        });
+        );
 
         setQuestions(res.data.questions);
       } catch (error) {
         console.error(error);
         if (axios.isAxiosError(error) && error.response?.status === 401) {
-          Alert.alert('알림', '로그인이 필요한 서비스입니다.');
+          Alert.alert(t('notification'), t('loginRequired'));
         } else {
-          Alert.alert('오류', '질문을 불러오는 데 실패했어요.');
+          Alert.alert(t('error'), t('questionLoadError'));
         }
       }
     };
     fetchQuestions();
-  }, []);
+  }, [t]);
 
   const handleSelectAnswer = async (option: string) => {
     setSelected(option);
@@ -74,7 +79,7 @@ export default function QuestionScreen({navigation}: Props) {
         try {
           const accessToken = await AsyncStorage.getItem('accessToken');
           if (!accessToken) {
-            Alert.alert('알림', '로그인이 필요한 서비스입니다.');
+            Alert.alert(t('notification'), t('loginRequired'));
             return;
           }
 
@@ -96,9 +101,9 @@ export default function QuestionScreen({navigation}: Props) {
         } catch (error) {
           console.error(error);
           if (axios.isAxiosError(error) && error.response?.status === 401) {
-            Alert.alert('알림', '로그인이 필요한 서비스입니다.');
+            Alert.alert(t('notification'), t('loginRequired'));
           } else {
-            Alert.alert('오류', '분석 중 문제가 발생했어요.');
+            Alert.alert(t('error'), t('analysisError'));
           }
         } finally {
           setLoading(false);
@@ -118,7 +123,7 @@ export default function QuestionScreen({navigation}: Props) {
     return (
       <ScrollView contentContainerStyle={styles.container}>
         <ActivityIndicator size="large" color="#0288d1" />
-        <Text style={styles.loadingText}>분석 중입니다...</Text>
+        <Text style={styles.loadingText}>{t('analyzing')}</Text>
       </ScrollView>
     );
   }
@@ -127,7 +132,7 @@ export default function QuestionScreen({navigation}: Props) {
     return (
       <ScrollView contentContainerStyle={styles.container}>
         <ActivityIndicator size="large" color="#0288d1" />
-        <Text style={styles.loadingText}>질문을 불러오는 중...</Text>
+        <Text style={styles.loadingText}>{t('loadingQuestions')}</Text>
       </ScrollView>
     );
   }
@@ -136,11 +141,14 @@ export default function QuestionScreen({navigation}: Props) {
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.pageTitle}>🌴 여행 성향 질문</Text>
+      <Text style={styles.pageTitle}>{t('travelPersonalityQuestion')}</Text>
 
       <View style={styles.card}>
         <Text style={styles.subtitle}>
-          질문 {currentIndex + 1} / {questions.length}
+          {t('questionProgress', {
+            current: currentIndex + 1,
+            total: questions.length,
+          })}
         </Text>
         <Text style={styles.question}>{currentQuestion.question}</Text>
 
@@ -167,7 +175,7 @@ export default function QuestionScreen({navigation}: Props) {
 
         {currentIndex > 0 && (
           <TouchableOpacity style={styles.prevButton} onPress={handlePrevious}>
-            <Text style={styles.prevButtonText}>⬅️ 이전 질문</Text>
+            <Text style={styles.prevButtonText}>{t('previousQuestion')}</Text>
           </TouchableOpacity>
         )}
       </View>

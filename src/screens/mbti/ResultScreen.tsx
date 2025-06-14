@@ -11,11 +11,13 @@ import {
 } from 'react-native';
 import axios from 'axios';
 import {AppStackScreenProps} from '../../navigations/AppNavigator';
+import {useTranslation} from 'react-i18next';
 
 export default function ResultScreen({
   route,
   navigation,
 }: AppStackScreenProps<'Result'>) {
+  const {t} = useTranslation();
   const {result} = route.params;
   const [selectedFeedback, setSelectedFeedback] = useState<string | null>(null);
 
@@ -43,34 +45,31 @@ export default function ResultScreen({
       );
 
       if (response.status === 200) {
-        Alert.alert(
-          '✅ 저장 성공',
-          'MBTI 분석 결과가 성공적으로 저장되었습니다.',
-        );
+        Alert.alert(t('saveSuccess'), t('saveSuccessMessage'));
       } else {
-        Alert.alert('⚠️ 저장 실패', '서버 응답이 올바르지 않습니다.');
+        Alert.alert(t('saveFailed'), t('serverResponseError'));
       }
     } catch (error: any) {
       console.error('MBTI 저장 실패:', error);
       Alert.alert(
-        '❌ 저장 실패',
-        error?.response?.data?.detail || '서버 오류가 발생했습니다.',
+        t('saveError'),
+        error?.response?.data?.detail || t('serverError'),
       );
     }
   };
 
   const handleSubmitFeedback = async () => {
     if (!selectedFeedback) {
-      Alert.alert('알림', '만족도를 선택해주세요.');
+      Alert.alert(t('notification'), t('selectSatisfaction'));
       return;
     }
 
     const feedbackMap: Record<string, {isAgree: boolean; comment: string}> = {
-      very_good: {isAgree: true, comment: '매우 정확했어요!'},
-      good: {isAgree: true, comment: '꽤 맞는 것 같아요'},
-      neutral: {isAgree: true, comment: '보통이에요'},
-      bad: {isAgree: false, comment: '조금 다른 것 같아요'},
-      very_bad: {isAgree: false, comment: '전혀 맞지 않았어요'},
+      very_good: {isAgree: true, comment: t('veryAccurate')},
+      good: {isAgree: true, comment: t('quiteAccurate')},
+      neutral: {isAgree: true, comment: t('neutral')},
+      bad: {isAgree: false, comment: t('slightlyDifferent')},
+      very_bad: {isAgree: false, comment: t('notAccurate')},
     };
 
     const selected = feedbackMap[selectedFeedback];
@@ -83,13 +82,13 @@ export default function ResultScreen({
       });
 
       if (response.data.message) {
-        Alert.alert('제출 완료', '만족도가 성공적으로 저장되었습니다!');
+        Alert.alert(t('submitComplete'), t('satisfactionSaved'));
       } else {
-        Alert.alert('에러', response.data.error || '알 수 없는 오류');
+        Alert.alert(t('error'), response.data.error || t('unknownError'));
       }
     } catch (error) {
       console.error(error);
-      Alert.alert('오류 발생', '피드백 전송 중 문제가 발생했습니다.');
+      Alert.alert(t('error'), t('feedbackError'));
     }
   };
 
@@ -100,69 +99,69 @@ export default function ResultScreen({
   return (
     <ScrollView contentContainerStyle={styles.container}>
       <View style={styles.headerWrapper}>
-        <Text style={styles.title}>여행 성향 분석 결과</Text>
+        <Text style={styles.title}>{t('travelPersonalityResult')}</Text>
       </View>
 
       <View style={styles.card}>
-        <Text style={styles.sectionTitle}>🧠 예측된 MBTI</Text>
+        <Text style={styles.sectionTitle}>{t('predictedMbti')}</Text>
         <Text style={styles.mbti}>{result.mbti}</Text>
         <Text style={styles.description}>
-          {result.trait?.description || '설명 없음'}
+          {result.trait?.description || t('noDescription')}
         </Text>
       </View>
 
       <View style={styles.card}>
-        <Text style={styles.sectionTitle}>💬 여행 성향 분석</Text>
+        <Text style={styles.sectionTitle}>
+          {t('travelPersonalityAnalysis')}
+        </Text>
         <Text style={styles.text}>{result.recommendation}</Text>
       </View>
 
       <View style={styles.card}>
-        <Text style={styles.sectionTitle}>🏷️ 추천 해시태그</Text>
+        <Text style={styles.sectionTitle}>{t('recommendedHashtags')}</Text>
         <View style={styles.tagsWrapperLeft}>
           {result.tags?.map((tag: string, idx: number) => (
             <Text key={idx} style={styles.tag}>
               {tag}
             </Text>
-          )) || <Text>없음</Text>}
+          )) || <Text>{t('none')}</Text>}
         </View>
       </View>
 
       <View style={styles.card}>
-        <Text style={styles.sectionTitle}>📍 추천 여행지</Text>
+        <Text style={styles.sectionTitle}>{t('recommendedDestinations')}</Text>
         {result.recommended_regions?.map((region: string, index: number) => (
           <Text key={index} style={styles.region}>
             - {region}
           </Text>
-        )) || <Text>없음</Text>}
+        )) || <Text>{t('none')}</Text>}
       </View>
 
       <View style={styles.buttonRow}>
         <TouchableOpacity style={styles.inlineButton} onPress={handleSave}>
-          <Text style={styles.inlineText}>💾 결과 저장</Text>
+          <Text style={styles.inlineText}>{t('saveResult')}</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
           style={styles.inlineButton}
           onPress={() => navigation.navigate('QuestionScreen')}>
-          <Text style={styles.inlineText}>🔄 다시 검사하기</Text>
+          <Text style={styles.inlineText}>{t('retakeTest')}</Text>
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.inlineButton} onPress={handleMain}>
-          <Text style={styles.inlineText}>🏠 메인 화면</Text>
+          <Text style={styles.inlineText}>{t('goToMain')}</Text>
         </TouchableOpacity>
       </View>
 
       <View style={styles.feedbackContainer}>
-        <Text style={styles.sectionTitle}>
-          😊 이 MBTI 결과는 얼마나 잘 맞았나요?
-        </Text>
+        <Text style={styles.sectionTitle}>{t('howAccurate')}</Text>
         <View style={styles.feedbackOptions}>
           {[
-            {key: 'very_good', label: '매우 정확해요'},
-            {key: 'good', label: '꽤 맞아요'},
-            {key: 'neutral', label: '보통이에요'},
-            {key: 'bad', label: '조금 달라요'},
-            {key: 'very_bad', label: '전혀 아니에요'},
+            {key: 'very_good', label: t('veryAccurate')},
+            {key: 'good', label: t('quiteAccurate')},
+            {key: 'neutral', label: t('neutral')},
+            {key: 'bad', label: t('slightlyDifferent')},
+            {key: 'very_bad', label: t('notAccurate')},
           ].map(({key, label}) => (
             <TouchableOpacity
               key={key}
@@ -178,7 +177,7 @@ export default function ResultScreen({
         <TouchableOpacity
           style={styles.submitButton}
           onPress={handleSubmitFeedback}>
-          <Text style={styles.submitText}>📝 만족도 제출</Text>
+          <Text style={styles.submitText}>{t('submitSatisfaction')}</Text>
         </TouchableOpacity>
       </View>
     </ScrollView>

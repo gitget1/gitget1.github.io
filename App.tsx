@@ -13,6 +13,7 @@ import {SafeAreaProvider} from 'react-native-safe-area-context';
 import AppNavigator from './src/navigations/AppNavigator';
 import {NavigationContainer} from '@react-navigation/native';
 import {QueryClient, QueryClientProvider} from '@tanstack/react-query';
+import './src/i18n'; // i18n 초기화
 
 // React Native에서 TextEncoder/TextDecoder 폴리필
 if (typeof global.TextEncoder === 'undefined') {

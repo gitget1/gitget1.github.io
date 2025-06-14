@@ -316,10 +316,8 @@ const TraitDropdown = () => {
     <View style={styles.bottomTabContainer}>
       <TouchableOpacity
         style={styles.tabItem}
-        onPress={() => {
-          navigation.navigate('Main', {screen: '홈'});
-        }}>
-        <Ionicons name="home" size={24} color="gray" />
+        onPress={() => navigation.navigate('Main', {screen: 'Home'})}>
+        <Ionicons name="home" size={24} color="#999" />
         <Text style={styles.tabLabel}>홈</Text>
       </TouchableOpacity>
 
@@ -334,10 +332,8 @@ const TraitDropdown = () => {
 
       <TouchableOpacity
         style={styles.tabItem}
-        onPress={() => {
-          navigation.navigate('Main', {screen: '마이페이지'});
-        }}>
-        <Ionicons name="person" size={24} color="gray" />
+        onPress={() => navigation.navigate('Main', {screen: 'MyPage'})}>
+        <Ionicons name="person" size={24} color="#999" />
         <Text style={styles.tabLabel}>마이페이지</Text>
       </TouchableOpacity>
     </View>
