@@ -12,6 +12,7 @@ import {useNavigation} from '@react-navigation/native';
 import {StackNavigationProp} from '@react-navigation/stack';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
+import {useTranslation} from 'react-i18next';
 
 type RootStackParamList = {
   ChatRoom: {roomId: string; userId?: number};
@@ -32,6 +33,7 @@ interface ChatRoom {
 }
 
 const ChatMain = () => {
+  const {t} = useTranslation();
   const navigation = useNavigation<ChatNavigationProp>();
   const [chatRooms, setChatRooms] = useState<ChatRoom[]>([]);
   const [loading, setLoading] = useState(true);
@@ -65,25 +67,25 @@ const ChatMain = () => {
           id: room.id,
           user1Id: room.user1Id,
           user2Id: room.user2Id,
-          name: room.name || `채팅방 ${room.id}`,
-          lastMessage: room.lastMessage || '최근 메시지 미지원',
+          name: room.name || `${t('chatRoomTitle')} ${room.id}`,
+          lastMessage: room.lastMessage || t('recentMessageNotSupported'),
           time: room.updatedAt
             ? new Date(room.updatedAt).toLocaleTimeString()
-            : '오전 10:00',
+            : t('morningTime'),
           unread: Math.floor(Math.random() * 5),
           avatar: 'https://via.placeholder.com/50',
         }));
 
         setChatRooms(transformed);
       } catch (error) {
-        console.error('채팅방 목록 불러오기 실패:', error);
+        console.error(t('chatRoomLoadError'), error);
       } finally {
         setLoading(false);
       }
     };
 
     fetchChatRooms();
-  }, []);
+  }, [t]);
 
   const renderChatRoom = ({item}: {item: ChatRoom}) => (
     <TouchableOpacity
@@ -119,7 +121,7 @@ const ChatMain = () => {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>채팅 목록</Text>
+        <Text style={styles.headerTitle}>{t('chatList')}</Text>
       </View>
 
       {loading ? (
@@ -140,7 +142,7 @@ const ChatMain = () => {
       <TouchableOpacity
         style={styles.newChatButton}
         onPress={() => navigation.navigate('NewChat')}>
-        <Text style={styles.newChatButtonText}>새 채팅</Text>
+        <Text style={styles.newChatButtonText}>{t('newChat')}</Text>
       </TouchableOpacity>
     </View>
   );

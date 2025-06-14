@@ -7,8 +7,10 @@ import {colors} from '../../constants';
 import EventList from './EventList';
 import useGetCalendarReservations from './useGetCalendarReservations';
 import dayjs from 'dayjs';
+import {useTranslation} from 'react-i18next';
 
 function CalendarScreen() {
+  const {t} = useTranslation();
   const currentMonthYear = getMonthYearDetails(new Date());
   const [monthYear, setMonthYear] = useState(currentMonthYear);
   const today = new Date().getDate();
@@ -85,13 +87,15 @@ function CalendarScreen() {
         onPressDate={handlePressDate}
         reservations={reservations}
       />
-      {isLoading && <Text>로딩 중...</Text>}
-      {isError && <Text>데이터를 불러오지 못했습니다.</Text>}
+      {isLoading && <Text>{t('calendarLoading')}</Text>}
+      {isError && <Text>{t('dataLoadError')}</Text>}
       {!isLoading && !isError && (
         <>
           <Text style={{padding: 10, fontSize: 12, color: 'gray'}}>
-            총 예약: {reservations.length}개, 선택된 날짜 예약:{' '}
-            {selectedDateReservations.length}개
+            {t('totalReservations')}: {reservations.length}
+            {t('reservationCount')}, {t('selectedDateReservations')}:{' '}
+            {selectedDateReservations.length}
+            {t('reservationCount')}
           </Text>
           <EventList posts={selectedDateReservations} />
         </>

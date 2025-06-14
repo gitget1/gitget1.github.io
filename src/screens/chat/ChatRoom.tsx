@@ -20,6 +20,7 @@ import {
   sendMessage,
   isWebSocketConnected,
 } from './chatsocket';
+import {useTranslation} from 'react-i18next';
 
 interface Message {
   id: number;
@@ -36,6 +37,7 @@ type ChatRoomRouteProp = RouteProp<RootStackParamList, 'ChatRoom'>;
 type ChatRoomNavigationProp = StackNavigationProp<RootStackParamList>;
 
 const ChatRoom = () => {
+  const {t} = useTranslation();
   const {params} = useRoute<ChatRoomRouteProp>();
   const navigation = useNavigation<ChatRoomNavigationProp>();
   const [input, setInput] = useState('');
@@ -159,7 +161,7 @@ const ChatRoom = () => {
           onPress={() => navigation.goBack()}>
           <Ionicons name="chevron-back" size={24} color="#000" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>채팅방</Text>
+        <Text style={styles.headerTitle}>{t('chatRoomTitle')}</Text>
         <View style={{width: 24}} />
       </View>
 
@@ -178,7 +180,7 @@ const ChatRoom = () => {
             style={styles.input}
             value={input}
             onChangeText={setInput}
-            placeholder="메시지를 입력하세요"
+            placeholder={t('enterMessage')}
             multiline
           />
           <TouchableOpacity

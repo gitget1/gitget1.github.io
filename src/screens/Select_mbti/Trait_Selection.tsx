@@ -19,6 +19,7 @@ import {
 import type {StackNavigationProp} from '@react-navigation/stack';
 import type {RouteProp} from '@react-navigation/native';
 import type {AppStackParamList} from '../../navigations/AppNavigator';
+import {useTranslation} from 'react-i18next';
 
 // ✅ MBTI 목록 아이템 타입
 interface MbtiItem {
@@ -49,6 +50,9 @@ interface TourProgram {
 }
 
 const TraitDropdown = () => {
+  // 다국어 지원
+  const {t} = useTranslation();
+
   // 네비게이션 훅
   const navigation = useNavigation<StackNavigationProp<AppStackParamList>>();
   const route = useRoute<RouteProp<AppStackParamList, 'TraitSelection'>>();
@@ -59,7 +63,7 @@ const TraitDropdown = () => {
   const [selectedHashtags, setSelectedHashtags] = useState<string[]>([]);
   const [selectedRegions, setSelectedRegions] = useState<string[]>([]);
   const [showDropdown, setShowDropdown] = useState(false);
-  const [selectedSort, setSelectedSort] = useState('최신순'); // 기본 정렬 옵션
+  const [selectedSort, setSelectedSort] = useState('latest'); // 기본 정렬 옵션
   const [displayedPosts, setDisplayedPosts] = useState(10);
   const [loadingMore, setLoadingMore] = useState(false);
   const [posts, setPosts] = useState<TourProgram[]>([]);
@@ -107,19 +111,19 @@ const TraitDropdown = () => {
         // selectedSort를 API 파라미터로 변환
         let sortOption = 'addedDesc';
         switch (selectedSort) {
-          case '최신순':
+          case 'latest':
             sortOption = 'addedDesc';
             break;
-          case '가격 낮은순':
+          case 'priceLowToHigh':
             sortOption = 'priceAsc';
             break;
-          case '가격 높은순':
+          case 'priceHighToLow':
             sortOption = 'priceDesc';
             break;
-          case '리뷰순':
+          case 'reviewOrder':
             sortOption = 'reviewDesc';
             break;
-          case '찜순':
+          case 'wishlistOrder':
             sortOption = 'wishlistDesc';
             break;
         }
@@ -318,7 +322,7 @@ const TraitDropdown = () => {
         style={styles.tabItem}
         onPress={() => navigation.navigate('Main', {screen: 'Home'})}>
         <Ionicons name="home" size={24} color="#999" />
-        <Text style={styles.tabLabel}>홈</Text>
+        <Text style={styles.tabLabel}>{t('homeTab')}</Text>
       </TouchableOpacity>
 
       <TouchableOpacity
@@ -327,14 +331,14 @@ const TraitDropdown = () => {
           navigation.navigate('WishlistScreen');
         }}>
         <Ionicons name="heart" size={24} color="gray" />
-        <Text style={styles.tabLabel}>위시리스트</Text>
+        <Text style={styles.tabLabel}>{t('wishlist')}</Text>
       </TouchableOpacity>
 
       <TouchableOpacity
         style={styles.tabItem}
         onPress={() => navigation.navigate('Main', {screen: 'MyPage'})}>
         <Ionicons name="person" size={24} color="#999" />
-        <Text style={styles.tabLabel}>마이페이지</Text>
+        <Text style={styles.tabLabel}>{t('myPageTab')}</Text>
       </TouchableOpacity>
     </View>
   );
@@ -362,7 +366,8 @@ const TraitDropdown = () => {
                   ❤️ {item.likes} 💬 {item.comments}
                 </Text>
                 <Text style={styles.postPrice}>
-                  가이드 가격: {item.guidePrice?.toLocaleString()}원
+                  {t('guidePrice')}: {item.guidePrice?.toLocaleString()}
+                  {t('won')}
                 </Text>
               </View>
               {item.hashtags && (
@@ -382,13 +387,17 @@ const TraitDropdown = () => {
             <View style={styles.emptyContainer}>
               <Text style={styles.emptyText}>
                 {selectedHashtags.length > 0 || selectedRegions.length > 0
-                  ? '선택한 조건에 맞는 게시물이 없습니다.'
-                  : '게시물이 없습니다.'}
+                  ? t('noPostsFound')
+                  : t('noPosts')}
               </Text>
             </View>
           }
           ListFooterComponent={
-            loadingMore ? <Text>로딩 중…</Text> : <View style={{height: 30}} />
+            loadingMore ? (
+              <Text>{t('loadingMore')}</Text>
+            ) : (
+              <View style={{height: 30}} />
+            )
           }
           ListHeaderComponent={
             <View style={styles.container}>
@@ -397,7 +406,7 @@ const TraitDropdown = () => {
                   style={styles.dropdownButton}
                   onPress={() => setShowDropdown(!showDropdown)}>
                   <Text style={styles.dropdownButtonText}>
-                    {selectedMbti ? selectedMbti.mbti : '클릭하여 성향 선택'}
+                    {selectedMbti ? selectedMbti.mbti : t('selectPersonality')}
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -418,7 +427,7 @@ const TraitDropdown = () => {
               )}
               {selectedMbti && (
                 <>
-                  <Text style={styles.sectionTitle}>해시태그</Text>
+                  <Text style={styles.sectionTitle}>{t('hashtags')}</Text>
                   <View style={styles.hashtagWrapper}>
                     {selectedMbti.hashtags.map((tag, i) => (
                       <TouchableOpacity
@@ -441,7 +450,9 @@ const TraitDropdown = () => {
                     ))}
                   </View>
 
-                  <Text style={styles.sectionTitle}>추천 지역</Text>
+                  <Text style={styles.sectionTitle}>
+                    {t('recommendedRegions')}
+                  </Text>
                   <View style={styles.regionGridCentered}>
                     {selectedMbti.regions.map((region, i) => (
                       <TouchableOpacity
@@ -460,24 +471,24 @@ const TraitDropdown = () => {
                   <TouchableOpacity
                     style={styles.searchButton}
                     onPress={handleSearch}>
-                    <Text style={styles.searchButtonText}>조회하기</Text>
+                    <Text style={styles.searchButtonText}>{t('search')}</Text>
                   </TouchableOpacity>
                 </>
               )}
               {selectedMbti && (
                 <View style={styles.postContainer}>
-                  <Text style={styles.postText}>게시글</Text>
+                  <Text style={styles.postText}>{t('posts')}</Text>
                   <ScrollView
                     horizontal
                     showsHorizontalScrollIndicator={false}
                     style={styles.sortScrollView}
                     contentContainerStyle={styles.sortScrollContent}>
                     {[
-                      '최신순',
-                      '가격 낮은순',
-                      '가격 높은순',
-                      '리뷰순',
-                      '찜순',
+                      'latest',
+                      'priceLowToHigh',
+                      'priceHighToLow',
+                      'reviewOrder',
+                      'wishlistOrder',
                     ].map(option => (
                       <TouchableOpacity
                         key={option}
@@ -491,7 +502,7 @@ const TraitDropdown = () => {
                             styles.sortOptionText,
                             selectedSort === option && styles.selectedSortText,
                           ]}>
-                          {option}
+                          {t(option)}
                         </Text>
                       </TouchableOpacity>
                     ))}
