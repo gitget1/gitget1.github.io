@@ -1,5 +1,7 @@
 import React from 'react';
+import {TouchableOpacity} from 'react-native';
 import {createNativeStackNavigator} from '@react-navigation/native-stack';
+import Ionicons from 'react-native-vector-icons/Ionicons';
 import BottomTabNavigator from './BottomTabNavigator';
 import AuthStackNavigator from './stack/AuthStackNavigator';
 import FunctionStackNavigator from './stack/FunctionStackNavigator';
@@ -10,6 +12,7 @@ import ResultScreen from '../screens/mbti/ResultScreen';
 import Practice from '../screens/practice/Practice';
 import Practice1 from '../screens/practice/Practice_detail page';
 import MyReviewList from '../screens/mypage/MyReviewList';
+import MyPage from '../screens/mypage/MyPage';
 import PaymentScreen from '../screens/payment/PaymentScreen';
 import PaymentCompleteScreen from '../screens/payment/PaymentCompleteScreen';
 import WishlistScreen from '../screens/wishlist/WishlistScreen';
@@ -27,6 +30,7 @@ export type AppStackParamList = {
     screen: 'Test' | 'TourByPreference' | 'TourByRegion' | 'TodayRecommend';
   };
   QuestionScreen: undefined;
+  MyPage: undefined;
   Make_program: {
     editData?: {
       title: string;
@@ -228,9 +232,25 @@ const AppNavigator = () => {
       <Stack.Screen
         name="ChatRoom"
         component={ChatRoom}
-        options={{
+        options={({navigation}) => ({
           headerShown: true,
           title: t('chatRoom'),
+          headerTitleStyle: {fontSize: 20},
+          headerLeft: () => (
+            <TouchableOpacity
+              onPress={() => navigation.navigate('ChatMain')}
+              style={{marginLeft: 10}}>
+              <Ionicons name="chevron-back" size={24} color="#000" />
+            </TouchableOpacity>
+          ),
+        })}
+      />
+      <Stack.Screen
+        name="MyPage"
+        component={MyPage}
+        options={{
+          headerShown: true,
+          title: t('mypage'),
           headerTitleStyle: {fontSize: 20},
         }}
       />

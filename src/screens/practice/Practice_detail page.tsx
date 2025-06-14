@@ -361,22 +361,71 @@ const Practice = () => {
   // 상담하기 버튼 클릭 시 채팅방 생성 및 입장
   const handleChat = async () => {
     try {
-      const userId = 1; // 내 아이디(로그인 유저)
-      const hostId = data?.user?.id || 2; // 상대방 아이디(호스트)
-      const res = await axios.post('/api/chat/rooms', {
-        user1Id: userId,
-        user2Id: hostId,
+      const accessToken = await AsyncStorage.getItem('accessToken');
+      if (!accessToken) {
+        Alert.alert(t('alert'), t('loginRequiredTour'));
+        return;
+      }
+
+      const cleanToken = accessToken.replace('Bearer ', '');
+
+      // JWT 토큰에서 현재 사용자 ID 추출
+      const jwtPayload = decodeJWT(cleanToken);
+      const currentUserId = parseInt(jwtPayload?.sub) || 1; // 현재 로그인한 사용자 ID (관광객)
+      const hostId = data?.user?.id || 2; // 프로그램 작성자 ID
+
+      console.log('🟢 채팅방 생성 요청:', {
+        currentUserId: currentUserId + ' (관광객)',
+        hostId: hostId + ' (프로그램 작성자)',
+        accessToken: accessToken.substring(0, 10) + '...',
       });
-      const roomId = res.data.id;
-      navigation.navigate('Main', {
-        screen: '채팅',
-        params: {
-          screen: 'ChatRoomScreen',
-          params: {roomId, userId},
+
+      // 채팅방 생성 또는 기존 채팅방 입장
+      // userId는 관광객 ID (현재 로그인한 사용자)
+      const response = await axios.post(
+        `http://10.147.17.114:8080/api/chat/rooms?userId=${currentUserId}`,
+        {},
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${cleanToken}`,
+          },
+          timeout: 10000,
         },
-      });
+      );
+
+      console.log('🟢 채팅방 생성/입장 응답:', response.data);
+
+      if (response.data && response.data.id) {
+        const roomData = response.data;
+
+        // ChatRoom으로 이동
+        navigation.navigate('ChatRoom', {
+          roomId: roomData.id.toString(),
+          userId: currentUserId,
+        });
+      } else {
+        throw new Error('채팅방 정보를 받을 수 없습니다.');
+      }
     } catch (e) {
-      console.error(e);
+      console.error('채팅방 생성/입장 실패:', e);
+      if (axios.isAxiosError(e)) {
+        console.error('❌ Axios 에러 상세:', {
+          status: e.response?.status,
+          data: e.response?.data,
+          message: e.message,
+        });
+
+        if (e.response?.status === 401) {
+          Alert.alert('오류', '로그인이 만료되었습니다. 다시 로그인해주세요.');
+        } else if (e.response?.status === 404) {
+          Alert.alert('오류', '사용자를 찾을 수 없습니다.');
+        } else {
+          Alert.alert('오류', '채팅방 생성에 실패했습니다. 다시 시도해주세요.');
+        }
+      } else {
+        Alert.alert('오류', '네트워크 연결을 확인해주세요.');
+      }
     }
   };
 
