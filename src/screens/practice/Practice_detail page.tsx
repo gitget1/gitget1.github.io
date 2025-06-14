@@ -18,7 +18,7 @@ import axios from 'axios';
 import MapView, {Marker, Polyline, PROVIDER_GOOGLE} from 'react-native-maps';
 import haversine from 'haversine-distance';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import Ionicons from 'react-native-vector-icons/Ionicons';
+
 
 const dayColors = ['#0288d1', '#43a047', '#fbc02d', '#e64a19', '#8e24aa'];
 
@@ -494,38 +494,6 @@ const Practice = () => {
     }
   };
 
-  // 바텀 탭 렌더링 함수
-  const renderBottomTab = () => (
-    <View style={styles.bottomTabContainer}>
-      <TouchableOpacity
-        style={styles.tabItem}
-        onPress={() => {
-          navigation.navigate('Main', {screen: '홈'});
-        }}>
-        <Ionicons name="home" size={24} color="gray" />
-        <Text style={styles.tabLabel}>홈</Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity
-        style={styles.tabItem}
-        onPress={() => {
-          navigation.navigate('WishlistScreen');
-        }}>
-        <Ionicons name="heart" size={24} color="gray" />
-        <Text style={styles.tabLabel}>위시리스트</Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity
-        style={styles.tabItem}
-        onPress={() => {
-          navigation.navigate('Main', {screen: '마이페이지'});
-        }}>
-        <Ionicons name="person" size={24} color="gray" />
-        <Text style={styles.tabLabel}>마이페이지</Text>
-      </TouchableOpacity>
-    </View>
-  );
-
   if (loading)
     return <ActivityIndicator style={{marginTop: 40}} size="large" />;
   if (!data) return null;
@@ -670,7 +638,6 @@ const Practice = () => {
             </TouchableOpacity>
           </View>
         </View>
-        {renderBottomTab()}
       </SafeAreaView>
     </View>
   );
@@ -805,24 +772,6 @@ const styles = StyleSheet.create({
     gap: 16,
     marginTop: 18,
     marginBottom: 12,
-  },
-  bottomTabContainer: {
-    flexDirection: 'row',
-    backgroundColor: '#fff',
-    borderTopWidth: 1,
-    borderTopColor: '#ddd',
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    justifyContent: 'space-around',
-  },
-  tabItem: {
-    alignItems: 'center',
-    flex: 1,
-  },
-  tabLabel: {
-    fontSize: 12,
-    color: 'gray',
-    marginTop: 4,
   },
 });
 
