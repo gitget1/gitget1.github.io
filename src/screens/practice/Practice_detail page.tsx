@@ -18,7 +18,7 @@ import axios from 'axios';
 import MapView, {Marker, Polyline, PROVIDER_GOOGLE} from 'react-native-maps';
 import haversine from 'haversine-distance';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-
+import {useTranslation} from 'react-i18next';
 
 const dayColors = ['#0288d1', '#43a047', '#fbc02d', '#e64a19', '#8e24aa'];
 
@@ -48,6 +48,7 @@ type TourData = {
 };
 
 const Practice = () => {
+  const {t} = useTranslation();
   const [data, setData] = useState<TourData | null>(null);
   const [isLiked, setIsLiked] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -66,7 +67,7 @@ const Practice = () => {
       try {
         const token = await AsyncStorage.getItem('accessToken');
         if (!token) {
-          Alert.alert('알림', '로그인이 필요한 서비스입니다.');
+          Alert.alert(t('alert'), t('loginRequiredTour'));
           navigation.goBack();
           return;
         }
@@ -118,25 +119,25 @@ const Practice = () => {
           });
 
           if (error.code === 'ECONNABORTED') {
-            Alert.alert('오류', '서버 응답 시간이 초과되었습니다.');
+            Alert.alert(t('errorTour'), '서버 응답 시간이 초과되었습니다.');
           } else if (error.response?.status === 401) {
-            Alert.alert('오류', '로그인이 만료되었습니다.');
+            Alert.alert(t('errorTour'), '로그인이 만료되었습니다.');
             navigation.goBack();
           } else if (error.response?.status === 404) {
-            Alert.alert('오류', '해당 투어를 찾을 수 없습니다.');
+            Alert.alert(t('errorTour'), '해당 투어를 찾을 수 없습니다.');
             navigation.goBack();
           } else if (error.response?.status === 500) {
             Alert.alert(
-              '오류',
+              t('errorTour'),
               '서버 오류가 발생했습니다. 잠시 후 다시 시도해주세요.',
             );
             navigation.goBack();
           } else {
-            Alert.alert('오류', '투어 정보를 불러오는데 실패했습니다.');
+            Alert.alert(t('errorTour'), '투어 정보를 불러오는데 실패했습니다.');
             navigation.goBack();
           }
         } else {
-          Alert.alert('오류', '네트워크 연결을 확인해주세요.');
+          Alert.alert(t('errorTour'), t('networkErrorTour'));
           navigation.goBack();
         }
       } finally {
@@ -145,7 +146,7 @@ const Practice = () => {
     };
 
     fetchTourData();
-  }, [tourProgramId, navigation, refresh]);
+  }, [tourProgramId, navigation, refresh, t]);
 
   // JWT 토큰 디코딩 함수
   const decodeJWT = (token: string) => {
@@ -169,7 +170,7 @@ const Practice = () => {
     try {
       const token = await AsyncStorage.getItem('accessToken');
       if (!token) {
-        Alert.alert('알림', '로그인이 필요한 서비스입니다.');
+        Alert.alert(t('alert'), t('loginRequiredTour'));
         return;
       }
 
@@ -236,22 +237,18 @@ const Practice = () => {
               wishlisted: true,
             });
           }
-          Alert.alert(
-            '성공',
-            '위시리스트에 추가되었습니다.\n위시리스트를 확인하시겠습니까?',
-            [
-              {
-                text: '취소',
-                style: 'cancel',
+          Alert.alert(t('successTour'), t('wishlistAdded'), [
+            {
+              text: t('cancelTour'),
+              style: 'cancel',
+            },
+            {
+              text: t('confirmTour'),
+              onPress: () => {
+                navigation.navigate('WishlistScreen');
               },
-              {
-                text: '확인',
-                onPress: () => {
-                  navigation.navigate('WishlistScreen');
-                },
-              },
-            ],
-          );
+            },
+          ]);
         } else {
           console.error('❌ 찜하기 추가 실패:', response.data);
           Alert.alert('오류', '찜하기 추가에 실패했습니다.');
@@ -299,7 +296,7 @@ const Practice = () => {
               wishlisted: false,
             });
           }
-          Alert.alert('성공', '위시리스트에서 제거되었습니다.');
+          Alert.alert(t('successTour'), t('wishlistRemoved'));
         } else {
           console.error('❌ 찜하기 취소 실패:', response.data);
           Alert.alert('오류', '찜하기 취소에 실패했습니다.');
@@ -316,17 +313,20 @@ const Practice = () => {
 
         if (error.code === 'ECONNABORTED') {
           Alert.alert(
-            '오류',
+            t('errorTour'),
             '서버 응답 시간이 초과되었습니다. 다시 시도해주세요.',
           );
         } else if (error.response?.status === 401) {
-          Alert.alert('오류', '로그인이 만료되었습니다. 다시 로그인해주세요.');
+          Alert.alert(
+            t('errorTour'),
+            '로그인이 만료되었습니다. 다시 로그인해주세요.',
+          );
         } else if (error.response?.status === 404) {
-          Alert.alert('오류', '해당 투어를 찾을 수 없습니다.');
+          Alert.alert(t('errorTour'), '해당 투어를 찾을 수 없습니다.');
         } else if (error.response?.status === 500) {
           console.error('❌ 서버 내부 오류:', error.response?.data);
           Alert.alert(
-            '서버 오류',
+            t('errorTour'),
             `서버에서 오류가 발생했습니다.\n${
               error.response?.data?.message || '잠시 후 다시 시도해주세요.'
             }`,
@@ -361,22 +361,71 @@ const Practice = () => {
   // 상담하기 버튼 클릭 시 채팅방 생성 및 입장
   const handleChat = async () => {
     try {
-      const userId = 1; // 내 아이디(로그인 유저)
-      const hostId = data?.user?.id || 2; // 상대방 아이디(호스트)
-      const res = await axios.post('/api/chat/rooms', {
-        user1Id: userId,
-        user2Id: hostId,
+      const accessToken = await AsyncStorage.getItem('accessToken');
+      if (!accessToken) {
+        Alert.alert(t('alert'), t('loginRequiredTour'));
+        return;
+      }
+
+      const cleanToken = accessToken.replace('Bearer ', '');
+
+      // JWT 토큰에서 현재 사용자 ID 추출
+      const jwtPayload = decodeJWT(cleanToken);
+      const currentUserId = parseInt(jwtPayload?.sub) || 1; // 현재 로그인한 사용자 ID (관광객)
+      const hostId = data?.user?.id || 2; // 프로그램 작성자 ID
+
+      console.log('🟢 채팅방 생성 요청:', {
+        currentUserId: currentUserId + ' (관광객)',
+        hostId: hostId + ' (프로그램 작성자)',
+        accessToken: accessToken.substring(0, 10) + '...',
       });
-      const roomId = res.data.id;
-      navigation.navigate('Main', {
-        screen: '채팅',
-        params: {
-          screen: 'ChatRoomScreen',
-          params: {roomId, userId},
+
+      // 채팅방 생성 또는 기존 채팅방 입장
+      // userId는 관광객 ID (현재 로그인한 사용자)
+      const response = await axios.post(
+        `http://10.147.17.114:8080/api/chat/rooms?userId=${currentUserId}`,
+        {},
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${cleanToken}`,
+          },
+          timeout: 10000,
         },
-      });
+      );
+
+      console.log('🟢 채팅방 생성/입장 응답:', response.data);
+
+      if (response.data && response.data.id) {
+        const roomData = response.data;
+
+        // ChatRoom으로 이동
+        navigation.navigate('ChatRoom', {
+          roomId: roomData.id.toString(),
+          userId: currentUserId,
+        });
+      } else {
+        throw new Error('채팅방 정보를 받을 수 없습니다.');
+      }
     } catch (e) {
-      console.error(e);
+      console.error('채팅방 생성/입장 실패:', e);
+      if (axios.isAxiosError(e)) {
+        console.error('❌ Axios 에러 상세:', {
+          status: e.response?.status,
+          data: e.response?.data,
+          message: e.message,
+        });
+
+        if (e.response?.status === 401) {
+          Alert.alert('오류', '로그인이 만료되었습니다. 다시 로그인해주세요.');
+        } else if (e.response?.status === 404) {
+          Alert.alert('오류', '사용자를 찾을 수 없습니다.');
+        } else {
+          Alert.alert('오류', '채팅방 생성에 실패했습니다. 다시 시도해주세요.');
+        }
+      } else {
+        Alert.alert('오류', '네트워크 연결을 확인해주세요.');
+      }
     }
   };
 
@@ -400,87 +449,82 @@ const Practice = () => {
   const handleDelete = async () => {
     if (!data) return;
 
-    Alert.alert(
-      '투어 삭제',
-      '정말로 이 투어를 삭제하시겠습니까?\n삭제된 투어는 복구할 수 없습니다.',
-      [
-        {
-          text: '취소',
-          style: 'cancel',
-        },
-        {
-          text: '삭제',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              const token = await AsyncStorage.getItem('accessToken');
-              if (!token) {
-                Alert.alert('알림', '로그인이 필요한 서비스입니다.');
-                return;
-              }
+    Alert.alert(t('tourDelete'), t('deleteConfirmTour'), [
+      {
+        text: t('cancelTour'),
+        style: 'cancel',
+      },
+      {
+        text: t('deleteTour'),
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            const token = await AsyncStorage.getItem('accessToken');
+            if (!token) {
+              Alert.alert(t('alert'), t('loginRequiredTour'));
+              return;
+            }
 
-              const cleanToken = token.replace('Bearer ', '');
+            const cleanToken = token.replace('Bearer ', '');
 
-              console.log('🟢 투어 삭제 요청:', {
-                tourProgramId,
-              });
+            console.log('🟢 투어 삭제 요청:', {
+              tourProgramId,
+            });
 
-              const response = await axios.delete(
-                `http://124.60.137.10/api/tour-program/${tourProgramId}`,
-                {
-                  headers: {
-                    Authorization: `Bearer ${cleanToken}`,
-                  },
-                  timeout: 10000,
+            const response = await axios.delete(
+              `http://124.60.137.10/api/tour-program/${tourProgramId}`,
+              {
+                headers: {
+                  Authorization: `Bearer ${cleanToken}`,
                 },
-              );
+                timeout: 10000,
+              },
+            );
 
-              if (response.data.status === 'OK') {
-                Alert.alert('삭제 완료', '투어가 삭제되었습니다.', [
-                  {
-                    text: '확인',
-                    onPress: () => {
-                      // TraitSelection 화면으로 이동
-                      navigation.navigate('TraitSelection');
-                    },
+            if (response.data.status === 'OK') {
+              Alert.alert(t('deleteComplete'), t('tourDeleted'), [
+                {
+                  text: t('confirmTour'),
+                  onPress: () => {
+                    // TraitSelection 화면으로 이동
+                    navigation.navigate('TraitSelection');
                   },
-                ]);
+                },
+              ]);
+            } else {
+              throw new Error(
+                response.data.message || '투어 삭제에 실패했습니다.',
+              );
+            }
+          } catch (error) {
+            console.error('❌ 투어 삭제 실패:', error);
+            if (axios.isAxiosError(error)) {
+              if (error.response?.status === 401) {
+                Alert.alert(t('errorTour'), '로그인이 만료되었습니다.');
+              } else if (error.response?.status === 403) {
+                Alert.alert('오류', '삭제 권한이 없습니다.');
+              } else if (error.response?.status === 404) {
+                Alert.alert(t('errorTour'), '해당 투어를 찾을 수 없습니다.');
               } else {
-                throw new Error(
-                  response.data.message || '투어 삭제에 실패했습니다.',
+                Alert.alert(
+                  t('errorTour'),
+                  error.response?.data?.message || '투어 삭제에 실패했습니다.',
                 );
               }
-            } catch (error) {
-              console.error('❌ 투어 삭제 실패:', error);
-              if (axios.isAxiosError(error)) {
-                if (error.response?.status === 401) {
-                  Alert.alert('오류', '로그인이 만료되었습니다.');
-                } else if (error.response?.status === 403) {
-                  Alert.alert('오류', '삭제 권한이 없습니다.');
-                } else if (error.response?.status === 404) {
-                  Alert.alert('오류', '해당 투어를 찾을 수 없습니다.');
-                } else {
-                  Alert.alert(
-                    '삭제 실패',
-                    error.response?.data?.message ||
-                      '투어 삭제에 실패했습니다.',
-                  );
-                }
-              } else {
-                Alert.alert('삭제 실패', '네트워크 연결을 확인해주세요.');
-              }
+            } else {
+              Alert.alert('삭제 실패', '네트워크 연결을 확인해주세요.');
             }
-          },
+          }
         },
-      ],
-    );
+      },
+    ]);
   };
 
   const handleReservation = async () => {
     try {
       const token = await AsyncStorage.getItem('accessToken');
       if (!token) {
-        Alert.alert('알림', '로그인이 필요한 서비스입니다.');
+        Alert.alert(t('alert'), t('loginRequiredTour'));
         return;
       }
 
@@ -517,10 +561,10 @@ const Practice = () => {
 
             <View style={styles.editDeleteRow}>
               <TouchableOpacity onPress={handleEdit} style={styles.editBtn}>
-                <Text style={styles.editText}>수정</Text>
+                <Text style={styles.editText}>{t('editTour')}</Text>
               </TouchableOpacity>
               <TouchableOpacity onPress={handleDelete} style={styles.deleteBtn}>
-                <Text style={styles.deleteText}>삭제</Text>
+                <Text style={styles.deleteText}>{t('deleteTour')}</Text>
               </TouchableOpacity>
             </View>
 
@@ -533,11 +577,14 @@ const Practice = () => {
                       tourProgramId: tourProgramId,
                     })
                   }>
-                  <Text style={styles.review}>💬 리뷰 {data.reviewCount}</Text>
+                  <Text style={styles.review}>
+                    {t('reviewTour')} {data.reviewCount}
+                  </Text>
                 </TouchableOpacity>
                 <TouchableOpacity onPress={toggleLike}>
                   <Text style={styles.like}>
-                    {isLiked ? '💖 찜함' : '🤍 찜'} {data.wishlistCount}
+                    {isLiked ? `💖 ${t('likedTour')}` : `🤍 ${t('likeTour')}`}{' '}
+                    {data.wishlistCount}
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -551,7 +598,7 @@ const Practice = () => {
               ))}
             </View>
 
-            <Text style={styles.sectionTitle}>🗓️ 일정</Text>
+            <Text style={styles.sectionTitle}>🗓️ {t('scheduleTour')}</Text>
             {Object.entries(groupedSchedules).map(([day, items], i) => (
               <View key={i} style={styles.scheduleCard}>
                 <Text style={styles.dayTitle}>{day}</Text>
@@ -564,7 +611,7 @@ const Practice = () => {
               </View>
             ))}
 
-            <Text style={styles.sectionTitle}>🗺 지도</Text>
+            <Text style={styles.sectionTitle}>🗺 {t('mapTour')}</Text>
             <View
               style={{
                 height: 300,
@@ -609,14 +656,16 @@ const Practice = () => {
                 />
               </MapView>
               <Text style={{textAlign: 'right', marginTop: 6}}>
-                총 거리: {getTotalDistance(data.schedules)}km
+                {t('totalDistance')}: {getTotalDistance(data.schedules)}km
               </Text>
             </View>
 
-            <Text style={styles.sectionTitle}>🧑‍💼 호스트 정보</Text>
-            <Text style={styles.description}>호스트: {data.user.name}</Text>
+            <Text style={styles.sectionTitle}>🧑‍💼 {t('hostInfo')}</Text>
+            <Text style={styles.description}>
+              {t('hostTour')}: {data.user.name}
+            </Text>
 
-            <Text style={styles.sectionTitle}>📖 투어 설명</Text>
+            <Text style={styles.sectionTitle}>📖 {t('tourDescription')}</Text>
             <Text style={styles.description}>{data.description}</Text>
 
             <View style={{height: 100}} />
@@ -625,16 +674,16 @@ const Practice = () => {
 
         <View style={styles.bottomBar}>
           <Text style={styles.price}>
-            ₩{data.guidePrice.toLocaleString()} /인
+            ₩{data.guidePrice.toLocaleString()} {t('perPersonTour')}
           </Text>
           <View style={styles.buttonGroup}>
             <TouchableOpacity style={styles.chatBtn} onPress={handleChat}>
-              <Text style={styles.chatText}>상담하기</Text>
+              <Text style={styles.chatText}>{t('consultation')}</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.reserveBtn}
               onPress={handleReservation}>
-              <Text style={styles.reserveText}>예약하기</Text>
+              <Text style={styles.reserveText}>{t('reservationTour')}</Text>
             </TouchableOpacity>
           </View>
         </View>

@@ -17,6 +17,7 @@ import {useRoute} from '@react-navigation/native';
 import type {RouteProp} from '@react-navigation/native';
 import type {AppStackParamList} from '../../navigations/AppNavigator';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import {useTranslation} from 'react-i18next';
 
 // JWT 토큰 디코딩 함수
 const decodeJWT = (token: string) => {
@@ -36,14 +37,14 @@ const decodeJWT = (token: string) => {
   }
 };
 
-// 별점 텍스트 매핑
-const ratingTexts = [
-  '선택하세요',
-  '최악이에요',
-  '별로예요',
-  '보통이에요',
-  '좋아요',
-  '최고예요!',
+// 별점 텍스트 매핑 함수
+const getRatingTexts = (t: any) => [
+  t('selectRating'),
+  t('worstRating'),
+  t('badRating'),
+  t('averageRating'),
+  t('goodRating'),
+  t('excellentRating'),
 ];
 
 function renderStars(rating: number) {
@@ -53,6 +54,7 @@ function renderStars(rating: number) {
 }
 
 export default function ReviewScreen() {
+  const {t} = useTranslation();
   const route = useRoute<RouteProp<AppStackParamList, 'Practice'>>();
   const tourProgramId = route.params?.tourProgramId;
 
@@ -326,14 +328,14 @@ export default function ReviewScreen() {
     }
 
     if (!newContent.trim()) {
-      Alert.alert('알림', '리뷰 내용을 입력해주세요.');
+      Alert.alert(t('alert'), t('enterReviewContentAlert'));
       return;
     }
 
     // 로그인 상태 확인
     const token = await AsyncStorage.getItem('accessToken');
     if (!token) {
-      Alert.alert('알림', '리뷰를 작성하려면 로그인이 필요합니다.');
+      Alert.alert(t('alert'), t('loginRequiredTour'));
       return;
     }
 
@@ -395,22 +397,22 @@ export default function ReviewScreen() {
         setNewContent('');
         setNewImageUrl('');
         setNewRating(5);
-        Alert.alert('성공', '리뷰가 등록되었습니다!');
+        Alert.alert(t('successTour'), t('reviewRegistered'));
       } else {
         throw new Error(response.data.message || '리뷰 등록에 실패했습니다.');
       }
     } catch (error) {
       if (axios.isAxiosError(error)) {
         if (error.response?.status === 401) {
-          Alert.alert('알림', '로그인이 필요한 서비스입니다.');
+          Alert.alert(t('alert'), t('loginRequiredTour'));
         } else {
           Alert.alert(
-            '리뷰 등록 실패',
+            t('errorTour'),
             error.response?.data?.message || '알 수 없는 오류가 발생했습니다.',
           );
         }
       } else {
-        Alert.alert('리뷰 등록 실패', '알 수 없는 오류가 발생했습니다.');
+        Alert.alert(t('errorTour'), '알 수 없는 오류가 발생했습니다.');
       }
     } finally {
       setIsSubmitting(false);
@@ -431,13 +433,13 @@ export default function ReviewScreen() {
       JWT사용자ID: currentUserId,
     });
 
-    Alert.alert('리뷰 삭제', '정말로 이 리뷰를 삭제하시겠습니까?', [
+    Alert.alert(t('deleteReview'), t('deleteReviewConfirm'), [
       {
-        text: '취소',
+        text: t('cancelTour'),
         style: 'cancel',
       },
       {
-        text: '삭제',
+        text: t('deleteTour'),
         style: 'destructive',
         onPress: async () => {
           try {
@@ -451,7 +453,7 @@ export default function ReviewScreen() {
 
             const token = await AsyncStorage.getItem('accessToken');
             if (!token) {
-              Alert.alert('알림', '로그인이 필요한 서비스입니다.');
+              Alert.alert(t('alert'), t('loginRequiredTour'));
               return;
             }
 
@@ -543,7 +545,7 @@ export default function ReviewScreen() {
                 );
               }
 
-              Alert.alert('성공', '리뷰가 삭제되었습니다.');
+              Alert.alert(t('successTour'), t('reviewDeleted'));
             } else {
               throw new Error(
                 response.data.message || '리뷰 삭제에 실패했습니다.',
@@ -553,11 +555,11 @@ export default function ReviewScreen() {
             console.error('리뷰 삭제 실패:', error);
             if (axios.isAxiosError(error)) {
               Alert.alert(
-                '삭제 실패',
+                t('errorTour'),
                 error.response?.data?.message || '리뷰 삭제에 실패했습니다.',
               );
             } else {
-              Alert.alert('삭제 실패', '리뷰 삭제에 실패했습니다.');
+              Alert.alert(t('errorTour'), '리뷰 삭제에 실패했습니다.');
             }
           }
         },
@@ -569,24 +571,24 @@ export default function ReviewScreen() {
     <ScrollView style={{flex: 1, backgroundColor: '#fff'}}>
       {/* 리뷰 작성 폼 */}
       <View style={styles.writeBox}>
-        <Text style={styles.writeTitle}>리뷰 작성</Text>
+        <Text style={styles.writeTitle}>{t('writeReview')}</Text>
         <View style={styles.writeRow}>
-          <Text style={{marginRight: 8}}>별점</Text>
+          <Text style={{marginRight: 8}}>{t('ratingReview')}</Text>
           {renderStarInput()}
         </View>
         <Text style={{marginBottom: 8, color: '#1976d2', fontWeight: 'bold'}}>
-          {ratingTexts[Math.round(newRating)]}
+          {getRatingTexts(t)[Math.round(newRating)]}
         </Text>
         <TextInput
           style={styles.input}
-          placeholder="리뷰 내용을 입력하세요"
+          placeholder={t('enterReviewContent')}
           value={newContent}
           onChangeText={setNewContent}
           multiline
         />
         <TextInput
           style={styles.input}
-          placeholder="이미지 URL (선택)"
+          placeholder={t('imageUrlOptional')}
           value={newImageUrl}
           onChangeText={setNewImageUrl}
         />
@@ -595,7 +597,7 @@ export default function ReviewScreen() {
           onPress={handleSubmit}
           disabled={isSubmitting}>
           <Text style={styles.submitBtnText}>
-            {isSubmitting ? '등록 중...' : '리뷰 등록'}
+            {isSubmitting ? t('submittingReview') : t('submitReview')}
           </Text>
         </TouchableOpacity>
       </View>
@@ -640,15 +642,18 @@ export default function ReviewScreen() {
 
       {/* ⬇️ 총 리뷰 수 + 정렬 드롭다운 */}
       <View style={styles.reviewHeaderRow}>
-        <Text style={styles.totalReviewText}>총 리뷰 {reviews.length}개</Text>
+        <Text style={styles.totalReviewText}>
+          {t('totalReviews')} {reviews.length}
+          {t('reviewsCount')}
+        </Text>
         <View style={styles.pickerContainer}>
           <Picker
             selectedValue={sortOrder}
             onValueChange={value => setSortOrder(value)}
             style={styles.picker}>
-            <Picker.Item label="최신순" value="latest" />
-            <Picker.Item label="별점 높은순" value="rating" />
-            <Picker.Item label="별점 낮은순" value="lowRating" />
+            <Picker.Item label={t('latestReview')} value="latest" />
+            <Picker.Item label={t('highRating')} value="rating" />
+            <Picker.Item label={t('lowRating')} value="lowRating" />
           </Picker>
         </View>
       </View>
@@ -668,7 +673,9 @@ export default function ReviewScreen() {
               style={styles.avatar}
             />
             <View style={styles.flex1}>
-              <Text style={styles.nickname}>{review.name || '익명'}</Text>
+              <Text style={styles.nickname}>
+                {review.name || t('anonymousReview')}
+              </Text>
               <View style={styles.metaRow}>
                 <Text style={styles.smallText}>
                   {renderStars(review.rating || 0)}

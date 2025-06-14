@@ -10,8 +10,7 @@ import {
   SafeAreaView,
   TouchableOpacity,
 } from 'react-native';
-import {useRoute, useNavigation, RouteProp} from '@react-navigation/native';
-import {StackNavigationProp} from '@react-navigation/stack';
+import {useRoute, RouteProp} from '@react-navigation/native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
@@ -20,6 +19,7 @@ import {
   sendMessage,
   isWebSocketConnected,
 } from './chatsocket';
+import {useTranslation} from 'react-i18next';
 
 interface Message {
   id: number;
@@ -33,11 +33,9 @@ type RootStackParamList = {
 };
 
 type ChatRoomRouteProp = RouteProp<RootStackParamList, 'ChatRoom'>;
-type ChatRoomNavigationProp = StackNavigationProp<RootStackParamList>;
-
 const ChatRoom = () => {
+  const {t} = useTranslation();
   const {params} = useRoute<ChatRoomRouteProp>();
-  const navigation = useNavigation<ChatRoomNavigationProp>();
   const [input, setInput] = useState('');
   const [messages, setMessages] = useState<Message[]>([]);
   const [wsConnected, setWsConnected] = useState(false);
@@ -118,17 +116,13 @@ const ChatRoom = () => {
     }
 
     if (input.trim()) {
-      const newMessage: Message = {
-        id: Date.now(), // 임시 ID
-        userId,
-        message: input,
-        createdAt: new Date().toISOString(),
-      };
+      const messageText = input.trim();
+      setInput(''); // 먼저 입력 필드를 비워서 중복 전송 방지
 
-      setMessages(prev => [...prev, newMessage]);
-      sendMessage(params.roomId, userId, input); // ✅ WebSocket 전송만
+      // WebSocket으로만 전송 - 서버에서 받은 메시지가 상태에 추가됨
+      sendMessage(params.roomId, userId, messageText);
 
-      setInput('');
+      console.log('📤 메시지 전송:', messageText);
     }
   };
 
@@ -153,16 +147,6 @@ const ChatRoom = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}>
-          <Ionicons name="chevron-back" size={24} color="#000" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>채팅방</Text>
-        <View style={{width: 24}} />
-      </View>
-
       <FlatList
         ref={flatListRef}
         data={messages}
@@ -178,7 +162,7 @@ const ChatRoom = () => {
             style={styles.input}
             value={input}
             onChangeText={setInput}
-            placeholder="메시지를 입력하세요"
+            placeholder={t('enterMessage')}
             multiline
           />
           <TouchableOpacity
@@ -202,15 +186,6 @@ const ChatRoom = () => {
 
 const styles = StyleSheet.create({
   container: {flex: 1, backgroundColor: '#fff'},
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-  },
-  backButton: {padding: 5},
-  headerTitle: {flex: 1, textAlign: 'center', fontSize: 18, fontWeight: 'bold'},
   messagesList: {padding: 10},
   messageContainer: {marginVertical: 5, maxWidth: '80%'},
   myMessage: {alignSelf: 'flex-end'},

@@ -1,19 +1,34 @@
 import React from 'react';
-import { StyleSheet, View, Text, Dimensions } from 'react-native';
-import { colors } from '../../constants';
+import {StyleSheet, View, Text, Dimensions} from 'react-native';
+import {colors} from '../../constants';
+import {useTranslation} from 'react-i18next';
 
 function DayOfWeeks() {
+  const {t} = useTranslation();
+  const dayOfWeekKeys = [
+    'sunday',
+    'monday',
+    'tuesday',
+    'wednesday',
+    'thursday',
+    'friday',
+    'saturday',
+  ];
+
   return (
     <View style={styles.container}>
-      {['일', '월', '화', '수', '목', '금', '토'].map((dayOfWeek, i) => {
+      {dayOfWeekKeys.map((dayKey, i) => {
+        const dayOfWeek = t(dayKey);
         return (
           <View key={i} style={styles.item}>
-            <Text style={[
-              styles.text,
-              dayOfWeek === '토' && styles.saturdayText,
-              dayOfWeek === '일' && styles.sundayText,
-            ]}>
-              {dayOfWeek}</Text>
+            <Text
+              style={[
+                styles.text,
+                dayKey === 'saturday' && styles.saturdayText,
+                dayKey === 'sunday' && styles.sundayText,
+              ]}>
+              {dayOfWeek}
+            </Text>
           </View>
         );
       })}
@@ -22,24 +37,24 @@ function DayOfWeeks() {
 }
 
 const styles = StyleSheet.create({
-  container:{
+  container: {
     flexDirection: 'row',
     marginBottom: 5,
   },
-  item:{
+  item: {
     width: Dimensions.get('window').width / 7,
     alignItems: 'center',
   },
-  text:{
+  text: {
     fontSize: 12,
     color: colors.BLACK,
   },
   saturdayText: {
-    color:colors.BLUE_500,
+    color: colors.BLUE_500,
   },
-  sundayText:{
-    color:colors.RED_500
-  }
+  sundayText: {
+    color: colors.RED_500,
+  },
 });
 
 export default DayOfWeeks;

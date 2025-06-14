@@ -10,6 +10,7 @@ import DateBox from './DateBox';
 import MiniCalendar from './MiniCalendar';
 import dayjs from 'dayjs';
 import isBetween from 'dayjs/plugin/isBetween';
+import {useTranslation} from 'react-i18next';
 
 dayjs.extend(isBetween);
 
@@ -36,6 +37,7 @@ function CalendarHome({
   onPressDate,
   reservations,
 }: CalendarHomeProps) {
+  const {t} = useTranslation();
   const {month, year, lastDate, firstDOW} = monthYear;
   const [showMiniCalendar, setShowMiniCalendar] = useState(false);
 
@@ -61,7 +63,9 @@ function CalendarHome({
           style={styles.monthYearContainer}
           onPress={() => setShowMiniCalendar(true)}>
           <Text style={styles.titleText}>
-            {year}년 {month}월
+            {year}
+            {t('year')} {month}
+            {t('month')}
           </Text>
           <MaterialIcons
             name="keyboard-arrow-down"

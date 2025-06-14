@@ -12,6 +12,8 @@ import {useNavigation} from '@react-navigation/native';
 import {StackNavigationProp} from '@react-navigation/stack';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
+import {useTranslation} from 'react-i18next';
+import Ionicons from 'react-native-vector-icons/Ionicons';
 
 type RootStackParamList = {
   ChatRoom: {roomId: string; userId?: number};
@@ -32,6 +34,7 @@ interface ChatRoom {
 }
 
 const ChatMain = () => {
+  const {t} = useTranslation();
   const navigation = useNavigation<ChatNavigationProp>();
   const [chatRooms, setChatRooms] = useState<ChatRoom[]>([]);
   const [loading, setLoading] = useState(true);
@@ -59,67 +62,98 @@ const ChatMain = () => {
           },
         );
 
+        console.log('🟢 채팅방 목록 응답:', response.data);
+
         const rooms = response.data;
 
-        const transformed: ChatRoom[] = rooms.map((room: any) => ({
-          id: room.id,
-          user1Id: room.user1Id,
-          user2Id: room.user2Id,
-          name: room.name || `채팅방 ${room.id}`,
-          lastMessage: room.lastMessage || '최근 메시지 미지원',
-          time: room.updatedAt
-            ? new Date(room.updatedAt).toLocaleTimeString()
-            : '오전 10:00',
-          unread: Math.floor(Math.random() * 5),
-          avatar: 'https://via.placeholder.com/50',
-        }));
+        // 안전한 데이터 변환
+        const transformed: ChatRoom[] = Array.isArray(rooms)
+          ? rooms.map((room: any, index: number) => {
+              console.log(`🟢 채팅방 ${index}:`, room);
 
+              return {
+                id: Number(room?.id) || index,
+                user1Id: Number(room?.user1Id) || 0,
+                user2Id: Number(room?.user2Id) || 0,
+                name: String(
+                  room?.name || `${t('chatRoomTitle')} ${room?.id || index}`,
+                ),
+                lastMessage: String(
+                  room?.lastMessage || t('recentMessageNotSupported'),
+                ),
+                time: room?.updatedAt
+                  ? String(new Date(room.updatedAt).toLocaleTimeString())
+                  : String(t('morningTime')),
+                unread: Number(Math.floor(Math.random() * 5)),
+                avatar: String('https://via.placeholder.com/50'),
+              };
+            })
+          : [];
+
+        console.log('🟢 변환된 채팅방 목록:', transformed);
         setChatRooms(transformed);
       } catch (error) {
-        console.error('채팅방 목록 불러오기 실패:', error);
+        console.error(t('chatRoomLoadError'), error);
       } finally {
         setLoading(false);
       }
     };
 
     fetchChatRooms();
-  }, []);
+  }, [t]);
 
-  const renderChatRoom = ({item}: {item: ChatRoom}) => (
-    <TouchableOpacity
-      style={styles.chatRoom}
-      onPress={() => {
-        if (currentUserId !== null) {
-          navigation.navigate('ChatRoom', {
-            roomId: String(item.id),
-            userId: currentUserId,
-          });
-        }
-      }}>
-      <Image source={{uri: item.avatar}} style={styles.avatar} />
-      <View style={styles.chatInfo}>
-        <View style={styles.topRow}>
-          <Text style={styles.name}>{item.name}</Text>
-          <Text style={styles.time}>{item.time}</Text>
+  const renderChatRoom = ({item}: {item: ChatRoom}) => {
+    // 안전성 검사
+    if (!item) {
+      return null;
+    }
+
+    const safeName = String(
+      item.name || `${t('chatRoomTitle')} ${item.id || 'Unknown'}`,
+    );
+    const safeTime = String(item.time || '');
+    const safeLastMessage = String(
+      item.lastMessage || t('recentMessageNotSupported'),
+    );
+    const safeUnread = Number(item.unread || 0);
+    const safeAvatar = String(item.avatar || 'https://via.placeholder.com/50');
+
+    return (
+      <TouchableOpacity
+        style={styles.chatRoom}
+        onPress={() => {
+          if (currentUserId !== null && item.id) {
+            navigation.navigate('ChatRoom', {
+              roomId: String(item.id),
+              userId: currentUserId,
+            });
+          }
+        }}>
+        <Image source={{uri: safeAvatar}} style={styles.avatar} />
+        <View style={styles.chatInfo}>
+          <View style={styles.topRow}>
+            <Text style={styles.name}>{safeName}</Text>
+            <Text style={styles.time}>{safeTime}</Text>
+          </View>
+          <View style={styles.bottomRow}>
+            <Text style={styles.lastMessage} numberOfLines={1}>
+              {safeLastMessage}
+            </Text>
+            {safeUnread > 0 && (
+              <View style={styles.unreadBadge}>
+                <Text style={styles.unreadText}>{String(safeUnread)}</Text>
+              </View>
+            )}
+          </View>
         </View>
-        <View style={styles.bottomRow}>
-          <Text style={styles.lastMessage} numberOfLines={1}>
-            {item.lastMessage}
-          </Text>
-          {item.unread && item.unread > 0 && (
-            <View style={styles.unreadBadge}>
-              <Text style={styles.unreadText}>{item.unread}</Text>
-            </View>
-          )}
-        </View>
-      </View>
-    </TouchableOpacity>
-  );
+      </TouchableOpacity>
+    );
+  };
 
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>채팅 목록</Text>
+        <Text style={styles.headerTitle}>{t('chatList')}</Text>
       </View>
 
       {loading ? (
@@ -132,16 +166,41 @@ const ChatMain = () => {
         <FlatList
           data={chatRooms}
           renderItem={renderChatRoom}
-          keyExtractor={item => item.id.toString()}
+          keyExtractor={(item, index) => `chatroom-${item?.id || index}`}
           style={styles.list}
+          removeClippedSubviews={false}
         />
       )}
 
       <TouchableOpacity
         style={styles.newChatButton}
         onPress={() => navigation.navigate('NewChat')}>
-        <Text style={styles.newChatButtonText}>새 채팅</Text>
+        <Text style={styles.newChatButtonText}>{t('newChat')}</Text>
       </TouchableOpacity>
+
+      {/* 하단 탭 네비게이션 */}
+      <View style={styles.bottomTabContainer}>
+        <TouchableOpacity
+          style={styles.tabButton}
+          onPress={() => navigation.navigate('Main')}>
+          <Ionicons name="home" size={24} color="#666" />
+          <Text style={styles.tabLabel}>{t('home')}</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.tabButton}
+          onPress={() => navigation.navigate('WishlistScreen')}>
+          <Ionicons name="heart" size={24} color="#666" />
+          <Text style={styles.tabLabel}>{t('wishlist')}</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.tabButton}
+          onPress={() => navigation.navigate('MyPage')}>
+          <Ionicons name="person" size={24} color="#666" />
+          <Text style={styles.tabLabel}>{t('mypage')}</Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 };
@@ -217,6 +276,23 @@ const styles = StyleSheet.create({
     shadowRadius: 3.84,
   },
   newChatButtonText: {color: '#fff', fontSize: 14, fontWeight: '600'},
+  bottomTabContainer: {
+    flexDirection: 'row',
+    backgroundColor: '#fff',
+    borderTopWidth: 1,
+    borderTopColor: '#eee',
+    paddingVertical: 8,
+  },
+  tabButton: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 8,
+  },
+  tabLabel: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 4,
+  },
 });
 
 export default ChatMain;
