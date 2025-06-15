@@ -37,8 +37,11 @@ const App = () => {
           '',
         );
 
+        console.log('🟢 받은 accessToken:', accessToken);
+
         if (accessToken) {
           await AsyncStorage.setItem('accessToken', accessToken);
+          console.log('✅ accessToken 저장 완료');
           navigation.replace('Main');
         }
       } catch (error) {

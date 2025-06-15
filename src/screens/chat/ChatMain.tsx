@@ -1,4 +1,4 @@
-import React, {useEffect, useState} from 'react';
+import React, {useState, useCallback} from 'react';
 import {
   View,
   Text,
@@ -8,12 +8,13 @@ import {
   Image,
   ActivityIndicator,
 } from 'react-native';
-import {useNavigation} from '@react-navigation/native';
+import {useNavigation, useFocusEffect} from '@react-navigation/native';
 import {StackNavigationProp} from '@react-navigation/stack';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import {useTranslation} from 'react-i18next';
 import Ionicons from 'react-native-vector-icons/Ionicons';
+import {extractUserIdFromNaverJWT} from '../../utils/jwtUtils';
 
 type RootStackParamList = {
   ChatRoom: {roomId: string; userId?: number};
@@ -40,67 +41,78 @@ const ChatMain = () => {
   const [loading, setLoading] = useState(true);
   const [currentUserId, setCurrentUserId] = useState<number | null>(null);
 
-  useEffect(() => {
-    const fetchChatRooms = async () => {
-      try {
-        const token = await AsyncStorage.getItem('accessToken');
-        const userId = 1; // 실제로는 AsyncStorage에서 불러오기
-
-        if (!token || !userId) {
-          console.warn('JWT 토큰 또는 사용자 ID가 없습니다.');
-          return;
-        }
-
-        setCurrentUserId(Number(userId));
-        const response = await axios.get(
-          `http://10.147.17.114:8080/api/chat/rooms?userId=${userId}`,
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-              'Content-Type': 'application/json',
-            },
-          },
-        );
-
-        console.log('🟢 채팅방 목록 응답:', response.data);
-
-        const rooms = response.data;
-
-        // 안전한 데이터 변환
-        const transformed: ChatRoom[] = Array.isArray(rooms)
-          ? rooms.map((room: any, index: number) => {
-              console.log(`🟢 채팅방 ${index}:`, room);
-
-              return {
-                id: Number(room?.id) || index,
-                user1Id: Number(room?.user1Id) || 0,
-                user2Id: Number(room?.user2Id) || 0,
-                name: String(
-                  room?.name || `${t('chatRoomTitle')} ${room?.id || index}`,
-                ),
-                lastMessage: String(
-                  room?.lastMessage || t('recentMessageNotSupported'),
-                ),
-                time: room?.updatedAt
-                  ? String(new Date(room.updatedAt).toLocaleTimeString())
-                  : String(t('morningTime')),
-                unread: Number(Math.floor(Math.random() * 5)),
-                avatar: String('https://via.placeholder.com/50'),
-              };
-            })
-          : [];
-
-        console.log('🟢 변환된 채팅방 목록:', transformed);
-        setChatRooms(transformed);
-      } catch (error) {
-        console.error(t('chatRoomLoadError'), error);
-      } finally {
-        setLoading(false);
+  const fetchChatRooms = useCallback(async () => {
+    try {
+      setLoading(true);
+      const token = await AsyncStorage.getItem('accessToken');
+      if (!token) {
+        console.warn('JWT 토큰이 없습니다.');
+        return;
       }
-    };
 
-    fetchChatRooms();
+      const cleanToken = token.replace('Bearer ', '');
+
+      // JWT 토큰에서 사용자 ID 추출
+      const userId = extractUserIdFromNaverJWT(cleanToken);
+
+      console.log('🟢 채팅방 목록 요청:', {
+        userId,
+      });
+
+      setCurrentUserId(Number(userId));
+      const response = await axios.get(
+        `http://124.60.137.10:80/api/chat/rooms`,
+        {
+          headers: {
+            Authorization: `Bearer ${cleanToken}`,
+            'Content-Type': 'application/json',
+          },
+        },
+      );
+
+      console.log('🟢 채팅방 목록 응답:', response.data);
+
+      const rooms = response.data;
+
+      // API 명세에 맞는 데이터 변환
+      const transformed: ChatRoom[] = Array.isArray(rooms)
+        ? rooms.map((room: any, index: number) => {
+            console.log(`🟢 채팅방 ${index}:`, room);
+
+            // 상대방 ID 결정 (현재 사용자가 아닌 다른 사용자)
+            const otherUserId =
+              room.user1Id === userId ? room.user2Id : room.user1Id;
+
+            return {
+              id: Number(room?.id) || index,
+              user1Id: Number(room?.user1Id) || 0,
+              user2Id: Number(room?.user2Id) || 0,
+              name: String(
+                `${t('chatRoomTitle')} ${otherUserId}`, // 상대방 ID로 채팅방 이름 설정
+              ),
+              lastMessage: String(t('recentMessageNotSupported')),
+              time: String(t('morningTime')),
+              unread: Number(Math.floor(Math.random() * 5)),
+              avatar: String('https://via.placeholder.com/50'),
+            };
+          })
+        : [];
+
+      console.log('🟢 변환된 채팅방 목록:', transformed);
+      setChatRooms(transformed);
+    } catch (error) {
+      console.error(t('chatRoomLoadError'), error);
+    } finally {
+      setLoading(false);
+    }
   }, [t]);
+
+  // 화면이 포커스될 때마다 채팅방 목록 새로고침
+  useFocusEffect(
+    useCallback(() => {
+      fetchChatRooms();
+    }, [fetchChatRooms]),
+  );
 
   const renderChatRoom = ({item}: {item: ChatRoom}) => {
     // 안전성 검사

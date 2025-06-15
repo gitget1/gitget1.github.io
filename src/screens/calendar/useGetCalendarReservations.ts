@@ -33,7 +33,7 @@ const fetchCalendarReservations = async (start: string, end: string) => {
     // 2. 예약 상세 내역 조회 먼저 시도 (기존에 작동했던 API)
     console.log('📋 Fetching reservation details...');
     const reservationsResponse = await axios.get(
-      'http://10.147.17.114:8080/api/calendar/my-reservations',
+      'http://124.60.137.10:80/api/calendar/my-reservations',
       {
         params: {start, end},
         headers: {
@@ -90,7 +90,7 @@ const fetchCalendarReservations = async (start: string, end: string) => {
     try {
       console.log('📅 Fetching calendar status...');
       const statusResponse = await axios.get(
-        'http://10.147.17.114:8080/api/calendar/status',
+        'http://124.60.137.10:80/api/calendar/status',
         {
           params: {
             start: start.split('T')[0], // LocalDate 형식 (YYYY-MM-DD)
@@ -149,7 +149,7 @@ const fetchCalendarReservations = async (start: string, end: string) => {
       ) {
         console.error('🌐 Network connectivity issue detected');
         console.error(
-          '- Check if server is running on http://10.147.17.114:8080',
+          '- Check if server is running on http://124.60.137.10:80',
         );
         console.error('- Check device network connection');
 

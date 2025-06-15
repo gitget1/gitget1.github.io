@@ -220,7 +220,7 @@ const resources = {
       writeReview: '리뷰 작성',
       ratingReview: '별점',
       enterReviewContent: '리뷰 내용을 입력하세요',
-      imageUrlOptional: '이미지 URL (선택)',
+      imageUrlOptional: '이미지 선택',
       submitReview: '리뷰 등록',
       submittingReview: '등록 중...',
       totalReviews: '총 리뷰',

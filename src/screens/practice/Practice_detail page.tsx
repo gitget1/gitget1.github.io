@@ -59,9 +59,6 @@ const Practice = () => {
 
   console.log('🟢 PracticeDetail 화면 - tourProgramId:', tourProgramId);
 
-  // 더 이상 필요하지 않음 - 서버의 wishlisted 필드 사용
-  // const checkWishlistStatus = useCallback(...);
-
   useEffect(() => {
     const fetchTourData = async () => {
       try {
@@ -79,7 +76,7 @@ const Practice = () => {
         });
 
         const response = await axios.get(
-          `http://124.60.137.10/api/tour-program/${tourProgramId}`,
+          `http://124.60.137.10:8080/api/tour-program/${tourProgramId}`,
           {
             headers: {
               'Content-Type': 'application/json',
@@ -94,8 +91,6 @@ const Practice = () => {
         if (response.data.status === 'OK') {
           const tourData = response.data.data;
           setData(tourData);
-
-          // 서버에서 받은 wishlisted 값으로 찜하기 상태 설정
           setIsLiked(tourData.wishlisted || false);
 
           console.log('🟢 투어 데이터 로드 완료:', {
@@ -174,11 +169,9 @@ const Practice = () => {
         return;
       }
 
-      // 토큰에서 'Bearer ' 접두사 제거
       const cleanToken = token.replace('Bearer ', '');
-
-      // JWT 토큰 정보 확인
       const jwtPayload = decodeJWT(cleanToken);
+
       console.log('🔍 JWT 토큰 정보:', {
         userId: jwtPayload?.sub,
         role: jwtPayload?.role,
@@ -190,154 +183,57 @@ const Practice = () => {
       console.log('🟢 찜하기 토글 시작:', {
         currentState: isLiked ? '찜함' : '찜 안함',
         tourProgramId,
-        tourProgramIdType: typeof tourProgramId,
         action: isLiked ? '찜하기 취소' : '찜하기 추가',
-        userData: data?.user,
-        tokenPreview: cleanToken.substring(0, 20) + '...',
       });
 
-      if (!isLiked) {
-        // 찜하기 추가
-        console.log('🟢 찜하기 추가 요청 시작...', {
-          url: `http://124.60.137.10:80/api/wishlist/${tourProgramId}`,
-          tourProgramId: tourProgramId,
-          tourProgramIdType: typeof tourProgramId,
-          token: cleanToken.substring(0, 10) + '...',
-        });
-
-        const response = await axios.post(
-          `http://124.60.137.10:80/api/wishlist/${tourProgramId}`,
-          {}, // 빈 객체로 변경 (tourProgramId는 URL에 포함)
-          {
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${cleanToken}`,
-            },
-            timeout: 10000,
+      const response = await axios.post(
+        `http://124.60.137.10:8080/api/wishlist/${tourProgramId}`,
+        {},
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${cleanToken}`,
           },
-        );
+          timeout: 10000,
+        },
+      );
 
-        console.log('🟢 찜하기 추가 응답:', response.data);
+      console.log('🟢 찜하기 응답:', response.data);
 
-        if (response.data.status === 'OK') {
-          // 상태 즉시 업데이트
-          setIsLiked(true);
-          if (data) {
-            const newWishlistCount = data.wishlistCount + 1;
-            setData({
-              ...data,
-              wishlistCount: newWishlistCount,
-              wishlisted: true,
-            });
-            console.log('✅ 찜하기 추가 성공:', {
-              이전상태: '찜 안함 🤍',
-              새상태: '찜함 💖',
-              이전개수: data.wishlistCount,
-              새개수: newWishlistCount,
-              wishlisted: true,
-            });
-          }
-          Alert.alert(t('successTour'), t('wishlistAdded'), [
-            {
-              text: t('cancelTour'),
-              style: 'cancel',
-            },
-            {
-              text: t('confirmTour'),
-              onPress: () => {
-                navigation.navigate('WishlistScreen');
-              },
-            },
-          ]);
-        } else {
-          console.error('❌ 찜하기 추가 실패:', response.data);
-          Alert.alert('오류', '찜하기 추가에 실패했습니다.');
+      if (response.data.status === 'OK') {
+        const newIsLiked = !isLiked;
+        setIsLiked(newIsLiked);
+
+        if (data) {
+          const newWishlistCount = newIsLiked
+            ? data.wishlistCount + 1
+            : Math.max(0, data.wishlistCount - 1);
+
+          setData({
+            ...data,
+            wishlistCount: newWishlistCount,
+            wishlisted: newIsLiked,
+          });
         }
+
+        Alert.alert(
+          t('successTour'),
+          newIsLiked ? t('wishlistAdded') : t('wishlistRemoved'),
+        );
       } else {
-        // 찜하기 삭제
-        console.log('🟢 찜하기 취소 요청 시작...', {
-          url: `http://124.60.137.10:80/api/wishlist/${tourProgramId}`,
-          tourProgramId: tourProgramId,
-          tourProgramIdType: typeof tourProgramId,
-          token: cleanToken.substring(0, 10) + '...',
-          method: 'POST (찜하기 토글)',
-        });
-
-        // 찜하기는 토글 방식으로 작동 - 같은 엔드포인트에 POST 요청
-        const response = await axios.post(
-          `http://124.60.137.10:80/api/wishlist/${tourProgramId}`,
-          {}, // 빈 객체
-          {
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${cleanToken}`,
-            },
-            timeout: 10000,
-          },
-        );
-
-        console.log('🟢 찜하기 취소 응답:', response.data);
-
-        if (response.data.status === 'OK') {
-          // 상태 즉시 업데이트
-          setIsLiked(false);
-          if (data) {
-            const newWishlistCount = Math.max(0, data.wishlistCount - 1);
-            setData({
-              ...data,
-              wishlistCount: newWishlistCount,
-              wishlisted: false,
-            });
-            console.log('✅ 찜하기 취소 성공:', {
-              이전상태: '찜함 💖',
-              새상태: '찜 안함 🤍',
-              이전개수: data.wishlistCount,
-              새개수: newWishlistCount,
-              wishlisted: false,
-            });
-          }
-          Alert.alert(t('successTour'), t('wishlistRemoved'));
-        } else {
-          console.error('❌ 찜하기 취소 실패:', response.data);
-          Alert.alert('오류', '찜하기 취소에 실패했습니다.');
-        }
+        console.error('❌ 찜하기 실패:', response.data);
+        Alert.alert('오류', '찜하기 처리에 실패했습니다.');
       }
     } catch (error) {
       console.error('❌ 찜하기 처리 중 오류:', error);
       if (axios.isAxiosError(error)) {
-        console.error('❌ Axios 에러 상세:', {
-          status: error.response?.status,
-          data: error.response?.data,
-          message: error.message,
-        });
-
-        if (error.code === 'ECONNABORTED') {
-          Alert.alert(
-            t('errorTour'),
-            '서버 응답 시간이 초과되었습니다. 다시 시도해주세요.',
-          );
-        } else if (error.response?.status === 401) {
+        if (error.response?.status === 401) {
           Alert.alert(
             t('errorTour'),
             '로그인이 만료되었습니다. 다시 로그인해주세요.',
           );
         } else if (error.response?.status === 404) {
           Alert.alert(t('errorTour'), '해당 투어를 찾을 수 없습니다.');
-        } else if (error.response?.status === 500) {
-          console.error('❌ 서버 내부 오류:', error.response?.data);
-          Alert.alert(
-            t('errorTour'),
-            `서버에서 오류가 발생했습니다.\n${
-              error.response?.data?.message || '잠시 후 다시 시도해주세요.'
-            }`,
-          );
-        } else if (error.response?.status === 409) {
-          // 이미 찜한 상태에서 다시 찜하려고 할 때
-          console.log('🔄 찜하기 상태 동기화 필요 - 페이지 새로고침 권장');
-          Alert.alert(
-            '알림',
-            '찜하기 상태를 확인하기 위해 페이지를 새로고침해주세요.',
-          );
         } else {
           Alert.alert('오류', '찜하기 처리에 실패했습니다. 다시 시도해주세요.');
         }
@@ -362,28 +258,74 @@ const Practice = () => {
   const handleChat = async () => {
     try {
       const accessToken = await AsyncStorage.getItem('accessToken');
+      const refreshToken = await AsyncStorage.getItem('refreshToken');
+      const userInfo = await AsyncStorage.getItem('userInfo');
+
+      console.log('🔍 AsyncStorage 토큰 상태 확인:', {
+        accessToken: accessToken
+          ? accessToken.substring(0, 50) + '...'
+          : 'null',
+        refreshToken: refreshToken
+          ? refreshToken.substring(0, 30) + '...'
+          : 'null',
+        userInfo: userInfo ? JSON.parse(userInfo) : 'null',
+        accessTokenLength: accessToken?.length || 0,
+      });
+
       if (!accessToken) {
         Alert.alert(t('alert'), t('loginRequiredTour'));
         return;
       }
 
       const cleanToken = accessToken.replace('Bearer ', '');
-
-      // JWT 토큰에서 현재 사용자 ID 추출
       const jwtPayload = decodeJWT(cleanToken);
-      const currentUserId = parseInt(jwtPayload?.sub) || 1; // 현재 로그인한 사용자 ID (관광객)
-      const hostId = data?.user?.id || 2; // 프로그램 작성자 ID
+
+      if (!jwtPayload) {
+        Alert.alert('오류', '토큰이 유효하지 않습니다. 다시 로그인해주세요.');
+        return;
+      }
+
+      // 토큰 만료 확인
+      const currentTime = Math.floor(Date.now() / 1000);
+      if (jwtPayload.exp && jwtPayload.exp < currentTime) {
+        console.log('❌ JWT 토큰 만료됨:', {
+          만료시간: new Date(jwtPayload.exp * 1000).toLocaleString(),
+          현재시간: new Date(currentTime * 1000).toLocaleString(),
+        });
+
+        Alert.alert(
+          '로그인 만료',
+          '로그인이 만료되었습니다. 다시 로그인해주세요.',
+          [
+            {
+              text: '확인',
+              onPress: async () => {
+                await AsyncStorage.multiRemove([
+                  'accessToken',
+                  'refreshToken',
+                  'userInfo',
+                ]);
+                navigation.navigate('NaverLoginScreen');
+              },
+            },
+          ],
+        );
+        return;
+      }
+
+      const currentUserId = parseInt(jwtPayload?.sub) || 1;
+      const hostId = data?.user?.id || 2;
 
       console.log('🟢 채팅방 생성 요청:', {
         currentUserId: currentUserId + ' (관광객)',
-        hostId: hostId + ' (프로그램 작성자)',
-        accessToken: accessToken.substring(0, 10) + '...',
+        hostId: hostId + ' (가이드)',
+        tourTitle: data?.title,
+        guideName: data?.user?.name,
+        requestUrl: `http://124.60.137.10:8080/api/chat/rooms?userId=${hostId}`,
       });
 
-      // 채팅방 생성 또는 기존 채팅방 입장
-      // userId는 관광객 ID (현재 로그인한 사용자)
       const response = await axios.post(
-        `http://10.147.17.114:8080/api/chat/rooms?userId=${currentUserId}`,
+        `http://124.60.137.10:8080/api/chat/rooms?userId=${hostId}`,
         {},
         {
           headers: {
@@ -398,8 +340,6 @@ const Practice = () => {
 
       if (response.data && response.data.id) {
         const roomData = response.data;
-
-        // ChatRoom으로 이동
         navigation.navigate('ChatRoom', {
           roomId: roomData.id.toString(),
           userId: currentUserId,
@@ -417,7 +357,23 @@ const Practice = () => {
         });
 
         if (e.response?.status === 401) {
-          Alert.alert('오류', '로그인이 만료되었습니다. 다시 로그인해주세요.');
+          Alert.alert(
+            '인증 오류',
+            '로그인이 만료되었습니다. 다시 로그인해주세요.',
+            [
+              {
+                text: '확인',
+                onPress: async () => {
+                  await AsyncStorage.multiRemove([
+                    'accessToken',
+                    'refreshToken',
+                    'userInfo',
+                  ]);
+                  navigation.navigate('NaverLoginScreen');
+                },
+              },
+            ],
+          );
         } else if (e.response?.status === 404) {
           Alert.alert('오류', '사용자를 찾을 수 없습니다.');
         } else {
@@ -429,7 +385,7 @@ const Practice = () => {
     }
   };
 
-  // 투어 수정 - Make_program 화면으로 이동
+  // 투어 수정
   const handleEdit = () => {
     if (!data) return;
 
@@ -438,7 +394,6 @@ const Practice = () => {
       editData: data,
     });
 
-    // Make_program 화면으로 이동하면서 편집할 데이터 전달
     navigation.navigate('Make_program', {
       editData: data,
       tourProgramId: tourProgramId,
@@ -467,12 +422,8 @@ const Practice = () => {
 
             const cleanToken = token.replace('Bearer ', '');
 
-            console.log('🟢 투어 삭제 요청:', {
-              tourProgramId,
-            });
-
             const response = await axios.delete(
-              `http://124.60.137.10/api/tour-program/${tourProgramId}`,
+              `http://124.60.137.10:8080/api/tour-program/${tourProgramId}`,
               {
                 headers: {
                   Authorization: `Bearer ${cleanToken}`,
@@ -486,7 +437,6 @@ const Practice = () => {
                 {
                   text: t('confirmTour'),
                   onPress: () => {
-                    // TraitSelection 화면으로 이동
                     navigation.navigate('TraitSelection');
                   },
                 },
@@ -528,7 +478,6 @@ const Practice = () => {
         return;
       }
 
-      // 결제 화면으로 tourData만 전달
       navigation.navigate('PaymentScreen', {
         tourData: data,
       });
@@ -554,7 +503,7 @@ const Practice = () => {
       <SafeAreaView style={styles.container}>
         <ScrollView>
           {data.thumbnailUrl && (
-            <Image source={{uri: data.thumbnailUrl}} style={styles.map} />
+            <Image source={{uri: data.thumbnailUrl}} style={styles.thumbnail} />
           )}
           <View style={styles.whiteBox}>
             <Text style={styles.title}>{data.title}</Text>
@@ -734,12 +683,6 @@ const styles = StyleSheet.create({
   },
   dayTitle: {fontWeight: 'bold', marginBottom: 6},
   scheduleItem: {fontSize: 14, marginBottom: 4},
-  map: {
-    width: '100%',
-    height: 160,
-    borderRadius: 12,
-    marginTop: 10,
-  },
   description: {fontSize: 14, color: '#333'},
   bottomBar: {
     position: 'absolute',

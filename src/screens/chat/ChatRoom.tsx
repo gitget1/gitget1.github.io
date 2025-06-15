@@ -9,6 +9,7 @@ import {
   Platform,
   SafeAreaView,
   TouchableOpacity,
+  Alert,
 } from 'react-native';
 import {useRoute, RouteProp} from '@react-navigation/native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
@@ -20,6 +21,7 @@ import {
   isWebSocketConnected,
 } from './chatsocket';
 import {useTranslation} from 'react-i18next';
+import {extractUserIdFromNaverJWT} from '../../utils/jwtUtils';
 
 interface Message {
   id: number;
@@ -29,7 +31,12 @@ interface Message {
 }
 
 type RootStackParamList = {
-  ChatRoom: {roomId: string; userId?: number};
+  ChatRoom: {
+    roomId: string;
+    userId?: number;
+    tourTitle?: string;
+    hostName?: string;
+  };
 };
 
 type ChatRoomRouteProp = RouteProp<RootStackParamList, 'ChatRoom'>;
@@ -38,14 +45,14 @@ const ChatRoom = () => {
   const {params} = useRoute<ChatRoomRouteProp>();
   const [input, setInput] = useState('');
   const [messages, setMessages] = useState<Message[]>([]);
-  const [wsConnected, setWsConnected] = useState(false);
-  const userId = params.userId || 1;
+  const [_wsConnected, setWsConnected] = useState(false);
+  const [userId, setUserId] = useState<number>(params.userId || 1);
   const flatListRef = useRef<FlatList>(null);
 
   useEffect(() => {
     const fetchMessages = async (token: string): Promise<Message[]> => {
       const res = await fetch(
-        `http://10.147.17.114:8080/api/chat/rooms/${params.roomId}/messages`,
+        `http://124.60.137.10:8080/api/chat/rooms/${params.roomId}/messages`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -64,8 +71,19 @@ const ChatRoom = () => {
           return;
         }
 
+        const cleanToken = token.replace('Bearer ', '');
+
+        // JWT 토큰에서 사용자 ID 추출
+        const extractedUserId = extractUserIdFromNaverJWT(cleanToken);
+        setUserId(extractedUserId);
+
+        console.log('🟢 ChatRoom 초기화:', {
+          roomId: params.roomId,
+          userId: extractedUserId,
+        });
+
         // 1. 기존 메시지 불러오기
-        const res = await fetchMessages(token);
+        const res = await fetchMessages(cleanToken);
         setMessages(res);
         console.log('📋 기존 메시지 로드:', res.length, '개');
 
@@ -103,26 +121,67 @@ const ChatRoom = () => {
     return () => {
       disconnectWebSocket();
     };
-  }, [params.roomId, userId]);
+  }, [params.roomId, params.userId]);
 
   useEffect(() => {
     flatListRef.current?.scrollToEnd({animated: true});
   }, [messages]);
 
   const handleSend = async () => {
-    if (!wsConnected) {
-      console.warn('❌ WebSocket이 아직 연결되지 않았습니다.');
-      return;
-    }
-
     if (input.trim()) {
       const messageText = input.trim();
       setInput(''); // 먼저 입력 필드를 비워서 중복 전송 방지
 
-      // WebSocket으로만 전송 - 서버에서 받은 메시지가 상태에 추가됨
-      sendMessage(params.roomId, userId, messageText);
+      // WebSocket 연결 상태 실시간 확인
+      const isConnected = isWebSocketConnected();
+      console.log('🔍 WebSocket 연결 상태:', isConnected);
 
-      console.log('📤 메시지 전송:', messageText);
+      if (!isConnected) {
+        console.warn('❌ WebSocket 연결되어 있지 않습니다. 재연결 시도...');
+
+        // 재연결 시도
+        try {
+          const reconnected = await connectWebSocket(
+            params.roomId,
+            (msg: Message) => {
+              console.log('📩 새 메시지 수신:', msg);
+              setMessages(prev => [...prev, msg]);
+            },
+          );
+
+          if (reconnected) {
+            setWsConnected(true);
+            console.log('✅ WebSocket 재연결 성공');
+          } else {
+            console.error('❌ WebSocket 재연결 실패');
+            Alert.alert(
+              '연결 오류',
+              'WebSocket 연결에 실패했습니다. 다시 시도해주세요.',
+            );
+            return;
+          }
+        } catch (error) {
+          console.error('❌ WebSocket 재연결 중 오류:', error);
+          Alert.alert(
+            '연결 오류',
+            'WebSocket 연결에 실패했습니다. 다시 시도해주세요.',
+          );
+          return;
+        }
+      }
+
+      // 메시지 전송
+      const success = sendMessage(params.roomId, userId, messageText);
+      if (success) {
+        console.log('📤 메시지 전송 성공:', messageText);
+      } else {
+        console.error('❌ 메시지 전송 실패');
+        Alert.alert(
+          '전송 실패',
+          '메시지 전송에 실패했습니다. 다시 시도해주세요.',
+        );
+        setInput(messageText); // 실패 시 입력 내용 복원
+      }
     }
   };
 
@@ -137,7 +196,13 @@ const ChatRoom = () => {
           styles.messageBubble,
           item.userId === userId ? styles.myBubble : styles.otherBubble,
         ]}>
-        <Text style={styles.messageText}>{item.message}</Text>
+        <Text
+          style={[
+            styles.messageText,
+            item.userId === userId && styles.myMessageText,
+          ]}>
+          {item.message}
+        </Text>
       </View>
       <Text style={styles.timestamp}>
         {item.createdAt ? new Date(item.createdAt).toLocaleTimeString() : ''}
@@ -147,6 +212,21 @@ const ChatRoom = () => {
 
   return (
     <SafeAreaView style={styles.container}>
+      {/* 채팅방 헤더 */}
+      {(params.tourTitle || params.hostName) && (
+        <View style={styles.chatHeader}>
+          <Text style={styles.chatTitle}>
+            {params.hostName || '가이드'}님과의 상담
+          </Text>
+          {params.tourTitle && (
+            <Text style={styles.tourTitle}>📍 {params.tourTitle}</Text>
+          )}
+          <Text style={styles.connectionStatus}>
+            {isWebSocketConnected() ? '🟢 연결됨' : '🔴 연결 끊김'}
+          </Text>
+        </View>
+      )}
+
       <FlatList
         ref={flatListRef}
         data={messages}
@@ -186,6 +266,29 @@ const ChatRoom = () => {
 
 const styles = StyleSheet.create({
   container: {flex: 1, backgroundColor: '#fff'},
+  chatHeader: {
+    backgroundColor: '#f8f9fa',
+    padding: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e9ecef',
+  },
+  chatTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+    textAlign: 'center',
+  },
+  tourTitle: {
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
+    marginTop: 4,
+  },
+  connectionStatus: {
+    fontSize: 12,
+    textAlign: 'center',
+    marginTop: 4,
+  },
   messagesList: {padding: 10},
   messageContainer: {marginVertical: 5, maxWidth: '80%'},
   myMessage: {alignSelf: 'flex-end'},
@@ -194,6 +297,7 @@ const styles = StyleSheet.create({
   myBubble: {backgroundColor: '#0288d1'},
   otherBubble: {backgroundColor: '#f1f1f1'},
   messageText: {fontSize: 16, color: '#000'},
+  myMessageText: {fontSize: 16, color: '#fff'},
   timestamp: {fontSize: 12, color: '#666', marginTop: 2},
   inputContainer: {
     flexDirection: 'row',

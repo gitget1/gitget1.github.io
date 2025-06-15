@@ -7,9 +7,10 @@ import {
   SafeAreaView,
   TouchableOpacity,
   Alert,
-  Modal,
-  TextInput,
 } from 'react-native';
+import {useNavigation} from '@react-navigation/native';
+import type {StackNavigationProp} from '@react-navigation/stack';
+import type {AppStackParamList} from '../../navigations/AppNavigator';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -21,10 +22,8 @@ type Review = {
 };
 
 const MyReviewList = () => {
+  const navigation = useNavigation<StackNavigationProp<AppStackParamList>>();
   const [reviews, setReviews] = useState<Review[]>([]);
-  const [editingReview, setEditingReview] = useState<Review | null>(null);
-  const [modalVisible, setModalVisible] = useState(false);
-  const [editedContent, setEditedContent] = useState('');
 
   useEffect(() => {
     fetchReviews();
@@ -167,74 +166,10 @@ const MyReviewList = () => {
   };
 
   const handleEdit = (review: Review) => {
-    setEditingReview(review);
-    setEditedContent(review.content);
-    setModalVisible(true);
-  };
-
-  const saveEdited = async () => {
-    if (!editingReview) return;
-
-    try {
-      const token = await AsyncStorage.getItem('accessToken');
-      if (!token) {
-        Alert.alert('알림', '로그인이 필요한 서비스입니다.');
-        return;
-      }
-
-      const cleanToken = token.replace('Bearer ', '');
-
-      console.log('✏️ 리뷰 수정 요청:', {
-        reviewId: editingReview.tourProgramId,
-        content: editedContent,
-      });
-
-      const response = await axios.put(
-        `http://124.60.137.10/api/review/${editingReview.tourProgramId}`,
-        {
-          content: editedContent,
-        },
-        {
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${cleanToken}`,
-          },
-          timeout: 10000,
-        },
-      );
-
-      console.log('✅ 리뷰 수정 성공:', response.data);
-
-      setReviews(prev =>
-        prev.map(r =>
-          r.tourProgramId === editingReview?.tourProgramId
-            ? {...r, content: editedContent}
-            : r,
-        ),
-      );
-
-      setModalVisible(false);
-      setEditingReview(null);
-      Alert.alert('완료', '리뷰가 수정되었습니다.');
-    } catch (error) {
-      console.error('❌ 리뷰 수정 실패:', error);
-      if (axios.isAxiosError(error)) {
-        if (error.response?.status === 401) {
-          Alert.alert('오류', '로그인이 만료되었습니다.');
-        } else if (error.response?.status === 403) {
-          Alert.alert('오류', '수정 권한이 없습니다.');
-        } else if (error.response?.status === 404) {
-          Alert.alert('오류', '해당 리뷰를 찾을 수 없습니다.');
-        } else {
-          Alert.alert(
-            '오류',
-            error.response?.data?.message || '리뷰 수정에 실패했습니다.',
-          );
-        }
-      } else {
-        Alert.alert('오류', '네트워크 연결을 확인해주세요.');
-      }
-    }
+    // 해당 투어 프로그램의 상세 페이지로 이동
+    navigation.navigate('Practice', {
+      tourProgramId: review.tourProgramId,
+    });
   };
 
   return (
@@ -269,36 +204,6 @@ const MyReviewList = () => {
           reviews.length === 0 ? styles.emptyContainer : undefined
         }
       />
-
-      <Modal visible={modalVisible} animationType="slide" transparent>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalBox}>
-            <Text style={styles.modalTitle}>리뷰 수정</Text>
-            <TextInput
-              style={styles.input}
-              multiline
-              numberOfLines={4}
-              value={editedContent}
-              onChangeText={setEditedContent}
-            />
-            <View style={styles.modalButtons}>
-              <TouchableOpacity
-                style={[styles.modalBtn, {backgroundColor: '#ccc'}]}
-                onPress={() => {
-                  setModalVisible(false);
-                  setEditingReview(null);
-                }}>
-                <Text>취소</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.modalBtn, {backgroundColor: '#0288d1'}]}
-                onPress={saveEdited}>
-                <Text style={{color: 'white'}}>저장</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
     </SafeAreaView>
   );
 };
@@ -353,43 +258,6 @@ const styles = StyleSheet.create({
   emptyContainer: {
     flex: 1,
     justifyContent: 'center',
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.3)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalBox: {
-    width: '85%',
-    backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 20,
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    marginBottom: 12,
-  },
-  input: {
-    borderColor: '#ccc',
-    borderWidth: 1,
-    borderRadius: 8,
-    padding: 10,
-    minHeight: 80,
-    textAlignVertical: 'top',
-    fontSize: 15,
-  },
-  modalButtons: {
-    marginTop: 16,
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    gap: 12,
-  },
-  modalBtn: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 6,
   },
 });
 
