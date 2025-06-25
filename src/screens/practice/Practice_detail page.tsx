@@ -76,7 +76,11 @@ const Practice = () => {
         });
 
         const response = await axios.get(
+<<<<<<< HEAD
           `http://124.60.137.10:8080/api/tour-program/${tourProgramId}`,
+=======
+          `http://124.60.137.10/api/tour-program/${tourProgramId}`,
+>>>>>>> 67387e4 (졸작이후)
           {
             headers: {
               'Content-Type': 'application/json',
@@ -187,7 +191,11 @@ const Practice = () => {
       });
 
       const response = await axios.post(
+<<<<<<< HEAD
         `http://124.60.137.10:8080/api/wishlist/${tourProgramId}`,
+=======
+        `http://124.60.137.10/api/wishlist/${tourProgramId}`,
+>>>>>>> 67387e4 (졸작이후)
         {},
         {
           headers: {
@@ -321,11 +329,19 @@ const Practice = () => {
         hostId: hostId + ' (가이드)',
         tourTitle: data?.title,
         guideName: data?.user?.name,
+<<<<<<< HEAD
         requestUrl: `http://124.60.137.10:8080/api/chat/rooms?userId=${hostId}`,
       });
 
       const response = await axios.post(
         `http://124.60.137.10:8080/api/chat/rooms?userId=${hostId}`,
+=======
+        requestUrl: `http://124.60.137.10/api/chat/rooms?userId=${hostId}`,
+      });
+
+      const response = await axios.post(
+        `http://124.60.137.10/api/chat/rooms?userId=${hostId}`,
+>>>>>>> 67387e4 (졸작이후)
         {},
         {
           headers: {
@@ -423,7 +439,11 @@ const Practice = () => {
             const cleanToken = token.replace('Bearer ', '');
 
             const response = await axios.delete(
+<<<<<<< HEAD
               `http://124.60.137.10:8080/api/tour-program/${tourProgramId}`,
+=======
+              `http://124.60.137.10/api/tour-program/${tourProgramId}`,
+>>>>>>> 67387e4 (졸작이후)
               {
                 headers: {
                   Authorization: `Bearer ${cleanToken}`,
@@ -548,6 +568,7 @@ const Practice = () => {
             </View>
 
             <Text style={styles.sectionTitle}>🗓️ {t('scheduleTour')}</Text>
+<<<<<<< HEAD
             {Object.entries(groupedSchedules).map(([day, items], i) => (
               <View key={i} style={styles.scheduleCard}>
                 <Text style={styles.dayTitle}>{day}</Text>
@@ -559,6 +580,61 @@ const Practice = () => {
                 ))}
               </View>
             ))}
+=======
+            {/* 일정 타임라인 UI 시작 */}
+            {Object.entries(groupedSchedules).map(([day, items], i) => (
+              <View key={i} style={{marginBottom: 40, backgroundColor: '#f7f7f7', borderRadius: 12, padding: 12}}>
+                <Text style={{fontWeight: 'bold', fontSize: 16, marginBottom: 10, color: '#0288d1'}}>{day}</Text>
+                {items.map((item, idx) => (
+                  <React.Fragment key={idx}>
+                    {/* 장소 카드 */}
+                    <View style={{flexDirection: 'row', alignItems: 'flex-start'}}>
+                      <View style={{alignItems: 'center', width: 30}}>
+                        <View style={{width: 12, height: 12, borderRadius: 6, backgroundColor: '#0288d1', marginTop: 8}} />
+                        {/* 선 + 이동시간 */}
+                        {idx < items.length - 1 && (
+                          <View style={{alignItems: 'center'}}>
+                            <View style={{width: 2, height: 30, backgroundColor: '#0288d1'}} />
+                            <Text style={{
+                              color: '#0288d1',
+                              fontWeight: 'bold',
+                              fontSize: 12,
+                              marginVertical: 2,
+                              backgroundColor: '#f7f7f7',
+                              paddingHorizontal: 4,
+                              borderRadius: 6,
+                              textAlign: 'center',
+                            }}>
+                              이동시간: 정보 없음
+                            </Text>
+                            <View style={{width: 2, height: 30, backgroundColor: '#0288d1'}} />
+                          </View>
+                        )}
+                      </View>
+                      <View style={{
+                        backgroundColor: '#fff',
+                        borderRadius: 8,
+                        padding: 12,
+                        marginBottom: 10,
+                        flex: 1,
+                        shadowColor: '#000',
+                        shadowOpacity: 0.05,
+                        shadowRadius: 4,
+                        elevation: 2
+                      }}>
+                        <Text style={{fontWeight: 'bold', fontSize: 15, marginBottom: 4}}>
+                          장소 {idx + 1}. {item.placeName}
+                        </Text>
+                        <Text style={{color: '#555', marginBottom: 4}}>{item.placeDescription}</Text>
+                        <Text style={{color: '#888', fontSize: 13}}>소요시간: {item.travelTime}분</Text>
+                      </View>
+                    </View>
+                  </React.Fragment>
+                ))}
+              </View>
+            ))}
+            {/* 일정 타임라인 UI 끝 */}
+>>>>>>> 67387e4 (졸작이후)
 
             <Text style={styles.sectionTitle}>🗺 {t('mapTour')}</Text>
             <View
@@ -675,6 +751,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     marginTop: 20,
   },
+<<<<<<< HEAD
   scheduleCard: {
     backgroundColor: '#f9f9f9',
     padding: 12,
@@ -683,6 +760,9 @@ const styles = StyleSheet.create({
   },
   dayTitle: {fontWeight: 'bold', marginBottom: 6},
   scheduleItem: {fontSize: 14, marginBottom: 4},
+=======
+  dayTitle: {fontWeight: 'bold', marginBottom: 6},
+>>>>>>> 67387e4 (졸작이후)
   description: {fontSize: 14, color: '#333'},
   bottomBar: {
     position: 'absolute',
