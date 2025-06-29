@@ -87,6 +87,7 @@ const MainHomeScreen = () => {
   const handleTraitSelection = () => navigation.navigate('TraitSelection');
   const handleCalendar = () => navigation.navigate('CalendarHome');
   const handleChat = () => navigation.navigate('ChatMain');
+  const handleTranslator = () => navigation.navigate('Translator');
 
   const changeLanguage = (languageCode: string) => {
     i18n.changeLanguage(languageCode);
@@ -189,6 +190,12 @@ const MainHomeScreen = () => {
               label: t('chat'),
               action: handleChat,
               bg: '#FFCDD2',
+            },
+            {
+              icon: '🌍',
+              label: t('realTimeTranslator'),
+              action: handleTranslator,
+              bg: '#E8F5E8',
             },
           ].map((item, index) => (
             <TouchableOpacity

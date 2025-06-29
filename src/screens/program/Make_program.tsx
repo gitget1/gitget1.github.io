@@ -614,19 +614,34 @@ function Make_program() {
             minLength={2}
             fetchDetails={true}
             onPress={(data, details = null) => {
-              if (details) {
-                const {lat, lng} = details.geometry.location;
-                setPlan(p => ({
-                  ...p,
-                  place: data.description,
-                  coordinate: {latitude: lat, longitude: lng},
-                }));
-                setPlaceModalVisible(false);
+              try {
+                if (details && details.geometry && details.geometry.location) {
+                  const {lat, lng} = details.geometry.location;
+                  console.log('📍 선택된 장소 정보:');
+                  console.log('  - 장소명:', data.description);
+                  console.log('  - Place ID:', data.place_id);
+                  console.log('  - 위도:', lat);
+                  console.log('  - 경도:', lng);
+                  
+                  setPlan(p => ({
+                    ...p,
+                    place: data.description,
+                    coordinate: {latitude: lat, longitude: lng},
+                  }));
+                  setPlaceModalVisible(false);
+                } else {
+                  console.warn('⚠️ 장소 상세 정보를 가져올 수 없습니다:', details);
+                  Alert.alert('알림', '장소 정보를 가져올 수 없습니다. 다시 시도해주세요.');
+                }
+              } catch (error) {
+                console.error('❌ 장소 선택 중 오류 발생:', error);
+                Alert.alert('오류', '장소 선택 중 문제가 발생했습니다.');
               }
             }}
             query={{
               key: GOOGLE_API_KEY,
               language: 'ko',
+              types: 'establishment', // 장소 타입 제한
             }}
             styles={{
               textInput: styles.input,
@@ -636,7 +651,8 @@ function Make_program() {
               },
             }}
             enablePoweredByContainer={false}
-            debounce={300}
+            debounce={500} // 디바운스 시간 증가
+            timeout={15000} // 타임아웃 설정
           />
           <Button title="닫기" onPress={() => setPlaceModalVisible(false)} />
         </View>

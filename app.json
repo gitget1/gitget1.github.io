@@ -1,4 +1,9 @@
 {
   "name": "Tourapps",
-  "displayName": "Tourapps"
+  "displayName": "Tourapps",
+  "project": {
+    "android": {
+      "packageName": "com.tourapps"
+    }
+  }
 }

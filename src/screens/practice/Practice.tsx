@@ -62,6 +62,10 @@ export default function ReviewScreen() {
   console.log('🟢 Practice 화면 - 받은 tourProgramId:', tourProgramId);
   console.log('🟢 Practice 화면 - tourProgramId 타입:', typeof tourProgramId);
 
+  // 투어 정보 state 추가
+  const [tourInfo, setTourInfo] = useState<any>(null);
+  const [tourLoading, setTourLoading] = useState(true);
+
   // 평균 별점과 별점 분포 계산 함수
   const calculateRatingStats = (reviews: any[]) => {
     if (reviews.length === 0) return {average: 0, distribution: []};
@@ -127,6 +131,42 @@ export default function ReviewScreen() {
     };
     getCurrentUser();
   }, []);
+
+  // 투어 정보 가져오기
+  useEffect(() => {
+    const fetchTourInfo = async () => {
+      if (!tourProgramId) {
+        setTourLoading(false);
+        return;
+      }
+
+      try {
+        setTourLoading(true);
+        const token = await AsyncStorage.getItem('accessToken');
+        
+        const response = await axios.get(
+          `http://124.60.137.10/api/tour-program/${tourProgramId}`,
+          {
+            headers: token ? {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`,
+            } : undefined,
+            timeout: 10000,
+          },
+        );
+
+        if (response.data.status === 'OK') {
+          setTourInfo(response.data.data);
+        }
+      } catch (error) {
+        console.error('투어 정보 로딩 실패:', error);
+      } finally {
+        setTourLoading(false);
+      }
+    };
+
+    fetchTourInfo();
+  }, [tourProgramId]);
 
   useEffect(() => {
     const fetchReviews = async () => {
@@ -391,8 +431,12 @@ export default function ReviewScreen() {
           imageUrls: newImageUrl ? [newImageUrl] : [],
           name: '나',
           user: {name: '나'},
-          user_id: createdReview.user_id || currentUserId,
+          user_id: currentUserId, // 현재 사용자 ID를 명시적으로 설정
         };
+        
+        console.log('🟢 새로 추가되는 리뷰 정보:', newReview);
+        console.log('🟢 현재 사용자 ID:', currentUserId);
+        
         setReviews([newReview, ...reviews]);
         setNewContent('');
         setNewImageUrl('');
@@ -567,8 +611,39 @@ export default function ReviewScreen() {
     ]);
   };
 
+  // 번역 키 매핑
+  const getTranslatedText = (key: string): string => {
+    const translations: {[key: string]: string} = {
+      'wishlist': '찜',
+      'totalReviews': '리뷰',
+    };
+    return translations[key] || key;
+  };
+
   return (
     <ScrollView style={{flex: 1, backgroundColor: '#fff'}}>
+      {/* 투어 정보 헤더 */}
+      {!tourLoading && tourInfo && (
+        <View style={styles.tourHeader}>
+          <View style={styles.tourInfo}>
+            <Text style={styles.tourTitle} numberOfLines={2}>
+              {tourInfo.title || '제목 없음'}
+            </Text>
+            <Text style={styles.tourRegion}>
+              📍 {tourInfo.region || '지역 정보 없음'}
+            </Text>
+          </View>
+          <View style={styles.tourStats}>
+            <Text style={styles.reviewCount}>
+              💬 {getTranslatedText('totalReviews')} {reviews.length}
+            </Text>
+            <Text style={styles.wishlistCount}>
+              🤍 {getTranslatedText('wishlist')} {tourInfo.wishlistCount || 0}
+            </Text>
+          </View>
+        </View>
+      )}
+
       {/* 리뷰 작성 폼 */}
       <View style={styles.writeBox}>
         <Text style={styles.writeTitle}>{t('writeReview')}</Text>
@@ -643,7 +718,7 @@ export default function ReviewScreen() {
       {/* ⬇️ 총 리뷰 수 + 정렬 드롭다운 */}
       <View style={styles.reviewHeaderRow}>
         <Text style={styles.totalReviewText}>
-          {t('totalReviews')} {reviews.length}
+          {getTranslatedText('totalReviews')} {reviews.length}
           {t('reviewsCount')}
         </Text>
         <View style={styles.pickerContainer}>
@@ -687,27 +762,20 @@ export default function ReviewScreen() {
             </View>
             {/* 본인이 작성한 리뷰인 경우만 삭제 버튼 표시 */}
             {(() => {
+              // 디버깅을 위한 로그
               console.log(`🔍 리뷰 ${i} 삭제 버튼 조건 확인:`, {
                 reviewUserId: review.user_id,
                 currentUserId: currentUserId,
                 reviewName: review.name,
                 reviewUserName: review.user?.name,
-                userIdMatch: review.user_id === currentUserId,
-                nameMatch: review.name === '나',
-                shouldShow:
-                  review.user_id === currentUserId ||
-                  review.name === '나' ||
-                  review.user?.name === currentUserId, // JWT 사용자 ID와 매칭
+                reviewId: review.id,
+                reviewContent: review.content?.substring(0, 20),
               });
 
-              // JWT 토큰의 사용자 ID와 매칭하거나, 본인이 작성한 리뷰인 경우
-              const isMyReview =
-                review.user_id === currentUserId ||
-                review.name === '나' ||
-                review.user?.name === currentUserId ||
-                (currentUserId &&
-                  currentUserId.includes('naver') &&
-                  review.name === '김경탁'); // 임시 매칭
+              // 임시로 모든 리뷰에 삭제 버튼 표시 (테스트용)
+              const isMyReview = true;
+
+              console.log(`🔍 리뷰 ${i} 삭제 버튼 표시 여부:`, isMyReview);
 
               return isMyReview ? (
                 <TouchableOpacity
@@ -929,5 +997,37 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 12,
     fontWeight: 'bold',
+  },
+  tourHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderColor: '#eee',
+  },
+  tourInfo: {
+    flex: 1,
+  },
+  tourTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 4,
+  },
+  tourRegion: {
+    fontSize: 14,
+    color: '#666',
+  },
+  tourStats: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  reviewCount: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    marginRight: 16,
+  },
+  wishlistCount: {
+    fontSize: 14,
+    color: '#666',
   },
 });

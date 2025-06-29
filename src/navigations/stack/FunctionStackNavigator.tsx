@@ -6,6 +6,8 @@ import Test from '../../screens/function/Test';
 import TourByPreference from '../../screens/function/TourByPreference';
 import TourByRegion from '../../screens/function/TourByRegion';
 import TodayRecommend from '../../screens/function/TodayRecommend';
+import TranslatorScreen from '../../screens/function/TranslatorScreen';
+import TranslatorHistoryScreen from '../../screens/function/TranslatorHistoryScreen';
 import {useNavigation} from '@react-navigation/native';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 
@@ -14,6 +16,8 @@ export type FunctionStackParamList = {
   TourByPreference: undefined;
   TourByRegion: undefined;
   TodayRecommend: undefined;
+  Translator: undefined;
+  TranslatorHistory: undefined;
 };
 
 type RootStackParamList = {
@@ -74,6 +78,16 @@ const FunctionStackNavigator = () => {
         name="TodayRecommend"
         component={TodayRecommend}
         options={{title: '오늘의 추천'}}
+      />
+      <Stack.Screen
+        name="Translator"
+        component={TranslatorScreen}
+        options={{title: '실시간 번역기'}}
+      />
+      <Stack.Screen
+        name="TranslatorHistory"
+        component={TranslatorHistoryScreen}
+        options={{title: '번역 히스토리'}}
       />
     </Stack.Navigator>
   );

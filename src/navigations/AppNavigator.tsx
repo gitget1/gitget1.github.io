@@ -11,6 +11,7 @@ import TraitSelection from '../screens/Select_mbti/Trait_Selection';
 import ResultScreen from '../screens/mbti/ResultScreen';
 import Practice from '../screens/practice/Practice';
 import Practice1 from '../screens/practice/Practice_detail page';
+import PlaceDetailScreen from '../screens/practice/PlaceDetailScreen';
 import MyReviewList from '../screens/mypage/MyReviewList';
 import MyPage from '../screens/mypage/MyPage';
 import PaymentScreen from '../screens/payment/PaymentScreen';
@@ -21,13 +22,15 @@ import IamportPaymentScreen from '../screens/payment/IamportPaymentScreen';
 import CalendarScreen from '../screens/calendar/CalendarScreen';
 import ChatMain from '../screens/chat/ChatMain';
 import ChatRoom from '../screens/chat/ChatRoom';
+import TranslatorScreen from '../screens/function/TranslatorScreen';
+import TranslatorHistoryScreen from '../screens/function/TranslatorHistoryScreen';
 import {useTranslation} from 'react-i18next';
 
 export type AppStackParamList = {
   AuthStack: undefined;
   Main: undefined;
   FunctionStack: {
-    screen: 'Test' | 'TourByPreference' | 'TourByRegion' | 'TodayRecommend';
+    screen: 'Test' | 'TourByPreference' | 'TourByRegion' | 'TodayRecommend' | 'Translator' | 'TranslatorHistory';
   };
   QuestionScreen: undefined;
   MyPage: undefined;
@@ -56,7 +59,8 @@ export type AppStackParamList = {
     result: any;
   };
   Practice: {tourProgramId: number};
-  PracticeDetail: {tourProgramId: number; refresh?: boolean};
+  PracticeDetail: {tourProgramId: number; refresh?: boolean; selectedLanguage?: string};
+  PlaceDetail: {placeName: string; placeDescription: string; lat: number; lon: number};
   IamportPayment: {
     userCode: string;
     data: {
@@ -77,6 +81,8 @@ export type AppStackParamList = {
   PaymentScreen: undefined;
   PaymentComplete: undefined;
   WishlistScreen: undefined;
+  Translator: undefined;
+  TranslatorHistory: undefined;
 };
 
 export type AppStackScreenProps<T extends keyof AppStackParamList> =
@@ -251,6 +257,33 @@ const AppNavigator = () => {
         options={{
           headerShown: true,
           title: t('mypage'),
+          headerTitleStyle: {fontSize: 20},
+        }}
+      />
+      <Stack.Screen
+        name="Translator"
+        component={TranslatorScreen}
+        options={{
+          headerShown: true,
+          title: '실시간 번역기',
+          headerTitleStyle: {fontSize: 20},
+        }}
+      />
+      <Stack.Screen
+        name="TranslatorHistory"
+        component={TranslatorHistoryScreen}
+        options={{
+          headerShown: true,
+          title: '번역 히스토리',
+          headerTitleStyle: {fontSize: 20},
+        }}
+      />
+      <Stack.Screen
+        name="PlaceDetail"
+        component={PlaceDetailScreen}
+        options={{
+          headerShown: true,
+          title: t('placeDetail'),
           headerTitleStyle: {fontSize: 20},
         }}
       />
