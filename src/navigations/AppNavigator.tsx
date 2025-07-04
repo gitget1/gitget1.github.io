@@ -60,7 +60,7 @@ export type AppStackParamList = {
   };
   Practice: {tourProgramId: number};
   PracticeDetail: {tourProgramId: number; refresh?: boolean; selectedLanguage?: string};
-  PlaceDetail: {placeName: string; placeDescription: string; lat: number; lon: number};
+  PlaceDetail: {placeName: string; placeDescription: string; lat: number; lon: number; placeId?: string; language?: string};
   IamportPayment: {
     userCode: string;
     data: {

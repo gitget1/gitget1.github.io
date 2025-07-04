@@ -477,24 +477,69 @@ const TraitDropdown = () => {
       </View>
       {/* 언어 선택 모달 */}
       {showLanguageModal && (
-        <View style={{position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', zIndex: 10}}>
-          <View style={{backgroundColor: '#fff', padding: 20, borderRadius: 10, width: '80%', maxHeight: '80%'}}>
+        <View style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.5)',
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 10,
+        }}>
+          <View style={{
+            backgroundColor: '#fff',
+            padding: 20,
+            borderRadius: 10,
+            width: '80%',
+            maxHeight: '80%',
+            overflow: 'hidden',
+            alignItems: 'center',
+            paddingBottom: 20,
+          }}>
             <Text style={{fontSize: 18, fontWeight: 'bold', marginBottom: 20, textAlign: 'center'}}>🌍 언어 선택</Text>
-            {supportedLanguages.map(language => (
-              <TouchableOpacity
-                key={language.code}
-                style={{flexDirection: 'row', alignItems: 'center', padding: 15, borderRadius: 8, marginBottom: 8, backgroundColor: selectedLanguage === language.code ? '#e3f2fd' : '#fff', borderColor: selectedLanguage === language.code ? '#007AFF' : '#eee', borderWidth: selectedLanguage === language.code ? 1 : 0}}
-                onPress={() => handleLanguageChange(language.code)}
-              >
-                <Text style={{fontSize: 20, marginRight: 15}}>{language.flag}</Text>
-                <Text style={{fontSize: 16, flex: 1}}>{language.name}</Text>
-                {selectedLanguage === language.code && (
-                  <Ionicons name="checkmark" size={20} color="#007AFF" />
-                )}
-              </TouchableOpacity>
-            ))}
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={{paddingVertical: 10, alignItems: 'center'}}
+              style={{width: '100%'}}
+            >
+              {supportedLanguages.map(language => (
+                <TouchableOpacity
+                  key={language.code}
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    padding: 15,
+                    borderRadius: 8,
+                    marginBottom: 8,
+                    backgroundColor: selectedLanguage === language.code ? '#e3f2fd' : '#fff',
+                    borderColor: selectedLanguage === language.code ? '#007AFF' : '#eee',
+                    borderWidth: selectedLanguage === language.code ? 1 : 0,
+                    width: '100%',
+                    justifyContent: 'center',
+                  }}
+                  onPress={() => handleLanguageChange(language.code)}
+                >
+                  <Text style={{fontSize: 20, marginRight: 15}}>{language.flag}</Text>
+                  <Text style={{fontSize: 16}}>{language.name}</Text>
+                  {selectedLanguage === language.code && (
+                    <Ionicons name="checkmark" size={20} color="#007AFF" />
+                  )}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
             <TouchableOpacity
-              style={{backgroundColor: '#007AFF', padding: 12, borderRadius: 8, marginTop: 15, width: '100%', alignItems: 'center'}}
+              style={{
+                backgroundColor: '#007AFF',
+                padding: 12,
+                borderRadius: 8,
+                marginTop: 15,
+                width: '90%',
+                alignItems: 'center',
+                alignSelf: 'center',
+                marginHorizontal: '5%',
+              }}
               onPress={() => setShowLanguageModal(false)}
             >
               <Text style={{color: '#fff', fontSize: 16, fontWeight: 'bold'}}>닫기</Text>

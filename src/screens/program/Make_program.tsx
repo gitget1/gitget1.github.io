@@ -33,6 +33,7 @@ interface DayPlan {
     latitude: number;
     longitude: number;
   };
+  placeId?: string;
 }
 
 interface DaySchedule {
@@ -127,6 +128,7 @@ function Make_program() {
               latitude: schedule.lat,
               longitude: schedule.lon,
             },
+            placeId: schedule.placeId,
           });
           return acc;
         },
@@ -281,7 +283,7 @@ function Make_program() {
 
       // ✅ Presigned URL 요청
       const presignedRes = await axios.get(
-        `http://124.60.137.10:80/api/upload`,
+        `http://124.60.137.10:8083/api/upload`,
         {
           params: {
             fileName,
@@ -428,6 +430,7 @@ function Make_program() {
             lon: plan.coordinate?.longitude ?? 0,
             placeDescription: plan.memo,
             travelTime: plan.travelTime ?? 0,
+            placeId: plan.placeId,
           })),
         ),
       };
@@ -440,7 +443,7 @@ function Make_program() {
         try {
           // 먼저 프로그램 존재 여부 확인
           const checkResponse = await axios.get(
-            `http://124.60.137.10:80/api/tour-program/${tourProgramId}`,
+            `http://124.60.137.10:8083/api/tour-program/${tourProgramId}`,
             {
               headers: {
                 Authorization: `Bearer ${token.replace('Bearer ', '')}`,
@@ -452,7 +455,7 @@ function Make_program() {
             // 수정 요청
             console.log('수정 요청 시작');
             response = await axios.put(
-              `http://124.60.137.10:80/api/tour-program/${tourProgramId}`,
+              `http://124.60.137.10:8083/api/tour-program/${tourProgramId}`,
               data,
               {
                 headers: {
@@ -482,7 +485,7 @@ function Make_program() {
                 onPress: async () => {
                   try {
                     response = await axios.post(
-                      'http://124.60.137.10:80/api/tour-program',
+                      'http://124.60.137.10:8083/api/tour-program',
                       data,
                       {
                         headers: {
@@ -627,6 +630,7 @@ function Make_program() {
                     ...p,
                     place: data.description,
                     coordinate: {latitude: lat, longitude: lng},
+                    placeId: data.place_id,
                   }));
                   setPlaceModalVisible(false);
                 } else {

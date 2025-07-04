@@ -33,6 +33,7 @@ type Schedule = {
   placeName: string;
   placeDescription: string;
   travelTime: number;
+  placeId: string;
 };
 
 type TourData = {
@@ -127,6 +128,16 @@ const Practice = () => {
 
         if (response.data.status === 'OK') {
           const tourData = response.data.data;
+          
+          // schedules 데이터 구조 확인
+          console.log('🟢 서버에서 받은 tourData:', JSON.stringify(tourData, null, 2));
+          console.log('🟢 schedules 배열:', tourData.schedules);
+          if (tourData.schedules && tourData.schedules.length > 0) {
+            console.log('🟢 첫 번째 schedule:', JSON.stringify(tourData.schedules[0], null, 2));
+            console.log('🟢 첫 번째 schedule의 placeId:', tourData.schedules[0].placeId);
+            console.log('🟢 첫 번째 schedule의 placeId 타입:', typeof tourData.schedules[0].placeId);
+          }
+          
           setData({
             ...tourData,
             wishlistCount: tourData.wishlistCount,
@@ -137,6 +148,7 @@ const Practice = () => {
             tourProgramId: tourData.tourProgramId || tourData.id,
             wishlisted: tourData.wishlisted,
             wishlistCount: tourData.wishlistCount,
+            schedulesCount: tourData.schedules?.length || 0,
           });
         } else {
           console.error('❌ 서버 응답 에러:', response.data);
@@ -955,11 +967,24 @@ const Practice = () => {
   };
 
   const handlePlacePress = (item: Schedule) => {
+    console.log('🟢 handlePlacePress 호출됨');
+    console.log('🟢 item 객체:', JSON.stringify(item, null, 2));
+    console.log('🟢 item.placeId:', item.placeId);
+    console.log('🟢 item.placeId 타입:', typeof item.placeId);
+    console.log('🟢 item.placeId 존재 여부:', !!item.placeId);
+    
+    // placeId가 없으면 위도/경도 조합으로 임시 생성
+    const tempPlaceId = item.placeId || `${item.lat}_${item.lon}`;
+    console.log('🟢 사용할 placeId:', tempPlaceId);
+    
+    console.log('🟢 PlaceDetail로 이동 시도');
     navigation.navigate('PlaceDetail', {
-      placeName: item.placeName || getTranslatedUIText('장소명 없음', selectedLanguage),
+      placeName: item.placeName,
       placeDescription: item.placeDescription || getTranslatedUIText('설명 없음', selectedLanguage),
       lat: item.lat,
       lon: item.lon,
+      placeId: tempPlaceId,
+      language: selectedLanguage,
     });
   };
 

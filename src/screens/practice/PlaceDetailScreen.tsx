@@ -12,6 +12,7 @@ import {
   Dimensions,
   Modal,
   TextInput,
+  Linking,
 } from 'react-native';
 import {useNavigation, useRoute} from '@react-navigation/native';
 import type {StackNavigationProp} from '@react-navigation/stack';
@@ -20,39 +21,41 @@ import type {AppStackParamList} from '../../navigations/AppNavigator';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import {useTranslation} from 'react-i18next';
-import {getTourismInfo, getTourismDetail, getTourismImages, testApiConnection} from '../../api/publicData';
+import axios from 'axios';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const {width} = Dimensions.get('window');
 
-type PlaceDetail = {
-  id: string;
+// 새로운 API 응답 타입 정의
+type TourApiResponse = {
   name: string;
-  description: string;
   address: string;
-  phone: string;
-  website: string;
+  description: string;
+  imageUrl: string;
+  link: string;
+};
+
+type GoogleResponse = {
   openingHours: string;
-  category: string;
-  images: string[];
-  coordinates: {
-    lat: number;
-    lng: number;
-  };
-  ourAppRating: number;
-  ourAppReviewCount: number;
-  platformRatings: {
-    google: {rating: number; reviewCount: number};
-    naver: {rating: number; reviewCount: number};
-    kakao: {rating: number; reviewCount: number};
-  };
-  reviews: {
-    id: string;
-    author: string;
-    rating: number;
-    content: string;
-    date: string;
-    platform: 'our' | 'google' | 'naver' | 'kakao';
-  }[];
+  phone: string;
+};
+
+type GoogleMapApiResponse = {
+  reviewCount: number;
+  rating: number;
+  googleMapsUrl: string;
+};
+
+type PlaceDetailData = {
+  tourApiResponse: TourApiResponse;
+  googleResponse: GoogleResponse;
+  googleMapApiResponse: GoogleMapApiResponse;
+};
+
+type PlaceDetailResponse = {
+  status: string;
+  message: string;
+  data: PlaceDetailData;
 };
 
 type PlaceDetailRouteProp = RouteProp<AppStackParamList, 'PlaceDetail'>;
@@ -61,9 +64,9 @@ const PlaceDetailScreen = () => {
   const {t} = useTranslation();
   const navigation = useNavigation<StackNavigationProp<AppStackParamList>>();
   const route = useRoute<PlaceDetailRouteProp>();
-  const {placeName, placeDescription, lat, lon} = route.params;
+  const {placeName, placeDescription, lat, lon, placeId, language} = route.params;
 
-  const [placeDetail, setPlaceDetail] = useState<PlaceDetail | null>(null);
+  const [placeDetail, setPlaceDetail] = useState<PlaceDetailData | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedTab, setSelectedTab] = useState<'info' | 'reviews'>('info');
   const [showReviewModal, setShowReviewModal] = useState(false);
@@ -72,207 +75,112 @@ const PlaceDetailScreen = () => {
     content: '',
   });
 
-  // 공공데이터 포털에서 장소 정보 가져오기
+  // 새로운 API로 장소 정보 가져오기
   const fetchPlaceData = async () => {
     try {
       setLoading(true);
       
-      // 0. API 연결 테스트
-      console.log('🧪 API 연결 테스트 시작');
-      const apiTestResult = await testApiConnection();
-      if (!apiTestResult) {
-        console.log('⚠️ API 연결 실패, 기본 데이터 사용');
-        // API 연결 실패 시 기본 데이터 사용
-        const defaultPlaceData: PlaceDetail = {
-          id: '1',
-          name: placeName,
-          description: placeDescription,
-          address: '주소 정보 없음',
-          phone: '전화번호 정보 없음',
-          website: '웹사이트 정보 없음',
-          openingHours: '영업시간 정보 없음',
-          category: '카테고리 정보 없음',
-          images: [
-            'https://via.placeholder.com/400x300/FF6B6B/FFFFFF?text=이미지+없음',
-          ],
-          coordinates: {lat, lng: lon},
-          ourAppRating: 4.5,
-          ourAppReviewCount: 127,
-          platformRatings: {
-            google: {rating: 4.3, reviewCount: 234},
-            naver: {rating: 4.7, reviewCount: 156},
-            kakao: {rating: 4.1, reviewCount: 89},
-          },
-          reviews: [
-            {
-              id: '1',
-              author: '김여행자',
-              rating: 5,
-              content: '정말 멋진 곳이에요! 분위기도 좋고 음식도 맛있어요. 다음에 또 방문하고 싶어요.',
-              date: '2024-01-15',
-              platform: 'our',
-            },
-            {
-              id: '2',
-              author: 'TravelLover',
-              rating: 4,
-              content: '좋은 경험이었습니다. 다만 주말에는 사람이 많아서 조금 시끄러워요.',
-              date: '2024-01-10',
-              platform: 'our',
-            },
-          ],
-        };
-        setPlaceDetail(defaultPlaceData);
+      const token = await AsyncStorage.getItem('accessToken');
+      if (!token) {
+        Alert.alert('알림', '로그인이 필요합니다.');
+        navigation.goBack();
         return;
       }
+
+      const cleanToken = token.replace('Bearer ', '');
       
-      console.log('✅ API 연결 성공, 데이터 조회 시작');
+      // 요청 파라미터 구성 - 위도/경도 조합을 그대로 placeId로 사용
+      const requestData = {
+        placeName: placeName || '장소명 없음',
+        placeId: placeId, // 위도/경도 조합 그대로 사용
+        language: language || 'kor'
+      };
+
+      const apiUrl = 'http://124.60.137.10:8083/api/place/detail';
+      const queryParams = new URLSearchParams({
+        placeName: requestData.placeName,
+        placeId: requestData.placeId,
+        language: requestData.language
+      });
       
-      // 1. 장소 검색
-      const tourismInfo: any = await getTourismInfo(placeName, lat, lon);
-      
-      if (tourismInfo) {
-        console.log('✅ 장소 정보 조회 성공:', tourismInfo.title);
-        
-        // 2. 상세 정보 가져오기
-        const detailInfo: any = await getTourismDetail(tourismInfo.contentid, tourismInfo.contenttypeid);
-        
-        // 3. 이미지 가져오기
-        const images = await getTourismImages(tourismInfo.contentid);
-        
-        // 4. 데이터 구성
-        const placeData: PlaceDetail = {
-          id: tourismInfo.contentid || '1',
-          name: tourismInfo.title || placeName,
-          description: detailInfo?.overview || placeDescription,
-          address: detailInfo?.addr1 || '주소 정보 없음',
-          phone: detailInfo?.tel || '전화번호 정보 없음',
-          website: detailInfo?.homepage || '웹사이트 정보 없음',
-          openingHours: detailInfo?.usetime || '영업시간 정보 없음',
-          category: detailInfo?.cat3 || '카테고리 정보 없음',
-          images: images.length > 0 ? images : [
-            'https://via.placeholder.com/400x300/FF6B6B/FFFFFF?text=이미지+없음',
-          ],
-          coordinates: {lat, lng: lon},
-          ourAppRating: 4.5,
-          ourAppReviewCount: 127,
-          platformRatings: {
-            google: {rating: 4.3, reviewCount: 234},
-            naver: {rating: 4.7, reviewCount: 156},
-            kakao: {rating: 4.1, reviewCount: 89},
+      const fullUrl = `${apiUrl}?${queryParams.toString()}`;
+      console.log('🟢 장소 상세 정보 요청 URL:', fullUrl);
+      console.log('🟢 장소 상세 정보 요청 파라미터:', requestData);
+      console.log('🟢 디코딩된 placeName:', decodeURIComponent(requestData.placeName));
+      console.log('🟢 디코딩된 placeId:', requestData.placeId);
+      console.log('🟢 디코딩된 language:', requestData.language);
+      console.log('🟢 placeId 타입: 위도/경도 조합');
+
+      const response = await axios.get(
+        fullUrl,
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${cleanToken}`,
           },
-          reviews: [
-            {
-              id: '1',
-              author: '김여행자',
-              rating: 5,
-              content: '정말 멋진 곳이에요! 분위기도 좋고 음식도 맛있어요. 다음에 또 방문하고 싶어요.',
-              date: '2024-01-15',
-              platform: 'our',
-            },
-            {
-              id: '2',
-              author: 'TravelLover',
-              rating: 4,
-              content: '좋은 경험이었습니다. 다만 주말에는 사람이 많아서 조금 시끄러워요.',
-              date: '2024-01-10',
-              platform: 'our',
-            },
-          ],
-        };
-        
-        setPlaceDetail(placeData);
+          timeout: 10000,
+        },
+      );
+
+      console.log('🟢 서버 응답:', response.data);
+
+      if (response.data.status === '100 CONTINUE') {
+        setPlaceDetail(response.data.data);
+        console.log('🟢 장소 상세 정보 로드 완료');
       } else {
-        console.log('⚠️ 공공데이터에서 정보를 찾지 못함, 기본 데이터 사용');
-        // 공공데이터에서 정보를 찾지 못한 경우 기본 데이터 사용
-        const defaultPlaceData: PlaceDetail = {
-          id: '1',
-          name: placeName,
-          description: placeDescription,
-          address: '주소 정보 없음',
-          phone: '전화번호 정보 없음',
-          website: '웹사이트 정보 없음',
-          openingHours: '영업시간 정보 없음',
-          category: '카테고리 정보 없음',
-          images: [
-            'https://via.placeholder.com/400x300/FF6B6B/FFFFFF?text=이미지+없음',
-          ],
-          coordinates: {lat, lng: lon},
-          ourAppRating: 4.5,
-          ourAppReviewCount: 127,
-          platformRatings: {
-            google: {rating: 4.3, reviewCount: 234},
-            naver: {rating: 4.7, reviewCount: 156},
-            kakao: {rating: 4.1, reviewCount: 89},
-          },
-          reviews: [
-            {
-              id: '1',
-              author: '김여행자',
-              rating: 5,
-              content: '정말 멋진 곳이에요! 분위기도 좋고 음식도 맛있어요. 다음에 또 방문하고 싶어요.',
-              date: '2024-01-15',
-              platform: 'our',
-            },
-            {
-              id: '2',
-              author: 'TravelLover',
-              rating: 4,
-              content: '좋은 경험이었습니다. 다만 주말에는 사람이 많아서 조금 시끄러워요.',
-              date: '2024-01-10',
-              platform: 'our',
-            },
-          ],
-        };
-        
-        setPlaceDetail(defaultPlaceData);
+        console.error('❌ 서버 응답 에러:', response.data);
+        throw new Error(response.data.message || '장소 정보를 불러오는데 실패했습니다.');
       }
     } catch (error) {
       console.error('❌ 장소 정보 로딩 실패:', error);
-      Alert.alert('오류', '장소 정보를 불러오는데 실패했습니다. 기본 정보로 표시됩니다.');
-      
-      // 에러 발생 시에도 기본 데이터 표시
-      const defaultPlaceData: PlaceDetail = {
-        id: '1',
-        name: placeName,
-        description: placeDescription,
-        address: '주소 정보 없음',
-        phone: '전화번호 정보 없음',
-        website: '웹사이트 정보 없음',
-        openingHours: '영업시간 정보 없음',
-        category: '카테고리 정보 없음',
-        images: [
-          'https://via.placeholder.com/400x300/FF6B6B/FFFFFF?text=이미지+없음',
-        ],
-        coordinates: {lat, lng: lon},
-        ourAppRating: 4.5,
-        ourAppReviewCount: 127,
-        platformRatings: {
-          google: {rating: 4.3, reviewCount: 234},
-          naver: {rating: 4.7, reviewCount: 156},
-          kakao: {rating: 4.1, reviewCount: 89},
-        },
-        reviews: [
-          {
-            id: '1',
-            author: '김여행자',
-            rating: 5,
-            content: '정말 멋진 곳이에요! 분위기도 좋고 음식도 맛있어요. 다음에 또 방문하고 싶어요.',
-            date: '2024-01-15',
-            platform: 'our',
-          },
-          {
-            id: '2',
-            author: 'TravelLover',
-            rating: 4,
-            content: '좋은 경험이었습니다. 다만 주말에는 사람이 많아서 조금 시끄러워요.',
-            date: '2024-01-10',
-            platform: 'our',
-          },
-        ],
-      };
-      
-      setPlaceDetail(defaultPlaceData);
+      if (axios.isAxiosError(error)) {
+        console.error('❌ Axios 에러 상세:', {
+          status: error.response?.status,
+          data: error.response?.data,
+          message: error.message,
+        });
+
+        if (error.response?.status === 500) {
+          console.log('⚠️ 서버 500 에러 - 임시 데이터 사용');
+          // 임시 더미 데이터 생성
+          const dummyData: PlaceDetailData = {
+            tourApiResponse: {
+              name: placeName,
+              address: `${lat}, ${lon}`,
+              description: `${placeName}에 대한 상세 정보입니다. 서버에서 정확한 정보를 가져오는 중입니다.`,
+              imageUrl: 'https://via.placeholder.com/400x300?text=장소+이미지',
+              link: ''
+            },
+            googleResponse: {
+              openingHours: '정보 없음',
+              phone: '정보 없음'
+            },
+            googleMapApiResponse: {
+              reviewCount: 0,
+              rating: 0,
+              googleMapsUrl: `https://www.google.com/maps?q=${lat},${lon}`
+            }
+          };
+          setPlaceDetail(dummyData);
+          return; // 에러 처리 중단
+        }
+
+        if (error.code === 'ECONNABORTED') {
+          Alert.alert('오류', '서버 응답 시간이 초과되었습니다.');
+        } else if (error.response?.status === 401) {
+          Alert.alert('오류', '로그인이 만료되었습니다.');
+          navigation.goBack();
+        } else if (error.response?.status === 404) {
+          Alert.alert('오류', '해당 장소를 찾을 수 없습니다.');
+          navigation.goBack();
+        } else {
+          Alert.alert('오류', '장소 정보를 불러오는데 실패했습니다.');
+          navigation.goBack();
+        }
+      } else {
+        Alert.alert('오류', '네트워크 오류가 발생했습니다.');
+        navigation.goBack();
+      }
     } finally {
       setLoading(false);
     }
@@ -280,7 +188,35 @@ const PlaceDetailScreen = () => {
 
   useEffect(() => {
     fetchPlaceData();
-  }, [placeName, lat, lon]);
+  }, []);
+
+  const handleWriteReview = () => {
+    setShowReviewModal(true);
+  };
+
+  const handleSubmitReview = () => {
+    // 리뷰 제출 로직 (API 연동 필요)
+    console.log('리뷰 제출:', newReview);
+    setShowReviewModal(false);
+    setNewReview({rating: 0, content: ''});
+    Alert.alert('성공', '리뷰가 등록되었습니다.');
+  };
+
+  const handleOpenWebsite = async (url: string) => {
+    try {
+      await Linking.openURL(url);
+    } catch (error) {
+      Alert.alert('오류', '웹사이트를 열 수 없습니다.');
+    }
+  };
+
+  const handleOpenGoogleMaps = async (url: string) => {
+    try {
+      await Linking.openURL(url);
+    } catch (error) {
+      Alert.alert('오류', 'Google Maps를 열 수 없습니다.');
+    }
+  };
 
   const renderStars = (rating: number) => {
     const stars: JSX.Element[] = [];
@@ -290,7 +226,7 @@ const PlaceDetailScreen = () => {
           key={i}
           name={i <= rating ? 'star' : 'star-border'}
           size={16}
-          color={i <= rating ? '#FFD700' : '#DDD'}
+          color={i <= rating ? '#FFD700' : '#ccc'}
         />,
       );
     }
@@ -319,44 +255,8 @@ const PlaceDetailScreen = () => {
       case 'kakao':
         return 'Kakao';
       default:
-        return '우리앱';
+        return 'Unknown';
     }
-  };
-
-  // 리뷰 작성 함수
-  const handleWriteReview = () => {
-    if (newReview.rating === 0) {
-      Alert.alert('알림', '별점을 선택해주세요.');
-      return;
-    }
-    if (newReview.content.trim() === '') {
-      Alert.alert('알림', '리뷰 내용을 입력해주세요.');
-      return;
-    }
-
-    // 실제로는 API 호출
-    const review = {
-      id: Date.now().toString(),
-      author: '나',
-      rating: newReview.rating,
-      content: newReview.content,
-      date: new Date().toISOString().split('T')[0],
-      platform: 'our' as const,
-    };
-
-    setPlaceDetail(prev => {
-      if (!prev) return prev;
-      return {
-        ...prev,
-        reviews: [review, ...prev.reviews],
-        ourAppReviewCount: prev.ourAppReviewCount + 1,
-        ourAppRating: (prev.ourAppRating * prev.ourAppReviewCount + newReview.rating) / (prev.ourAppReviewCount + 1),
-      };
-    });
-
-    setNewReview({rating: 0, content: ''});
-    setShowReviewModal(false);
-    Alert.alert('성공', '리뷰가 등록되었습니다!');
   };
 
   if (loading) {
@@ -371,175 +271,148 @@ const PlaceDetailScreen = () => {
   if (!placeDetail) {
     return (
       <View style={styles.errorContainer}>
+        <Icon name="error" size={64} color="#FF3B30" />
         <Text style={styles.errorText}>장소 정보를 불러올 수 없습니다.</Text>
+        <TouchableOpacity style={styles.retryButton} onPress={fetchPlaceData}>
+          <Text style={styles.retryButtonText}>다시 시도</Text>
+        </TouchableOpacity>
       </View>
     );
   }
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* 헤더 */}
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}>
-          <Icon name="arrow-back" size={24} color="#333" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle} numberOfLines={1}>
-          {placeDetail.name}
-        </Text>
-        <View style={styles.headerRight} />
-      </View>
+      <ScrollView>
+        {/* 헤더 */}
+        <View style={styles.header}>
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => navigation.goBack()}>
+            <Icon name="arrow-back" size={24} color="#333" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle} numberOfLines={1}>
+            {placeDetail.tourApiResponse.name}
+          </Text>
+          <TouchableOpacity style={styles.shareButton}>
+            <Icon name="share" size={24} color="#333" />
+          </TouchableOpacity>
+        </View>
 
-      <ScrollView style={styles.scrollView}>
-        {/* 이미지 슬라이더 */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={styles.imageSlider}>
-          {placeDetail.images.map((image, index) => (
-            <Image
-              key={index}
-              source={{uri: image}}
-              style={styles.placeImage}
-              resizeMode="cover"
-              onError={() => {
-                // 이미지 로딩 실패 시 기본 이미지로 교체
-                setPlaceDetail(prev => {
-                  if (!prev) return prev;
-                  const newImages = [...prev.images];
-                  newImages[index] = 'https://via.placeholder.com/400x300/FF6B6B/FFFFFF?text=이미지+로딩+실패';
-                  return {...prev, images: newImages};
-                });
-              }}
-            />
-          ))}
-        </ScrollView>
+        {/* 이미지 */}
+        {placeDetail.tourApiResponse.imageUrl && (
+          <Image
+            source={{uri: placeDetail.tourApiResponse.imageUrl}}
+            style={styles.mainImage}
+            resizeMode="cover"
+          />
+        )}
 
-        {/* 탭 버튼 */}
+        {/* 기본 정보 */}
+        <View style={styles.infoContainer}>
+          <Text style={styles.placeName}>{placeDetail.tourApiResponse.name}</Text>
+          
+          <View style={styles.ratingContainer}>
+            <View style={styles.starsContainer}>
+              {renderStars(placeDetail.googleMapApiResponse.rating)}
+            </View>
+            <Text style={styles.ratingText}>
+              {placeDetail.googleMapApiResponse.rating.toFixed(1)} ({placeDetail.googleMapApiResponse.reviewCount}개 리뷰)
+            </Text>
+          </View>
+
+          <View style={styles.addressContainer}>
+            <Icon name="location-on" size={16} color="#666" />
+            <Text style={styles.addressText}>{placeDetail.tourApiResponse.address}</Text>
+          </View>
+
+          {placeDetail.googleResponse.phone && (
+            <View style={styles.phoneContainer}>
+              <Icon name="phone" size={16} color="#666" />
+              <Text style={styles.phoneText}>{placeDetail.googleResponse.phone}</Text>
+            </View>
+          )}
+
+          {placeDetail.googleResponse.openingHours && (
+            <View style={styles.hoursContainer}>
+              <Icon name="schedule" size={16} color="#666" />
+              <Text style={styles.hoursText}>{placeDetail.googleResponse.openingHours}</Text>
+            </View>
+          )}
+        </View>
+
+        {/* 탭 네비게이션 */}
         <View style={styles.tabContainer}>
           <TouchableOpacity
-            style={[styles.tabButton, selectedTab === 'info' && styles.activeTab]}
+            style={[styles.tab, selectedTab === 'info' && styles.activeTab]}
             onPress={() => setSelectedTab('info')}>
             <Text style={[styles.tabText, selectedTab === 'info' && styles.activeTabText]}>
-              장소 정보
+              정보
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.tabButton, selectedTab === 'reviews' && styles.activeTab]}
+            style={[styles.tab, selectedTab === 'reviews' && styles.activeTab]}
             onPress={() => setSelectedTab('reviews')}>
             <Text style={[styles.tabText, selectedTab === 'reviews' && styles.activeTabText]}>
-              리뷰 & 평점
+              리뷰
             </Text>
           </TouchableOpacity>
         </View>
 
         {/* 탭 컨텐츠 */}
         {selectedTab === 'info' ? (
-          <View style={styles.infoContainer}>
-            {/* 기본 정보 */}
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>기본 정보</Text>
-              <View style={styles.infoItem}>
-                <Icon name="location-on" size={20} color="#007AFF" />
-                <Text style={styles.infoText}>{placeDetail.address}</Text>
-              </View>
-              <View style={styles.infoItem}>
-                <Icon name="phone" size={20} color="#007AFF" />
-                <Text style={styles.infoText}>{placeDetail.phone}</Text>
-              </View>
-              <View style={styles.infoItem}>
-                <Icon name="language" size={20} color="#007AFF" />
-                <Text style={styles.infoText}>{placeDetail.website}</Text>
-              </View>
-              <View style={styles.infoItem}>
-                <Icon name="schedule" size={20} color="#007AFF" />
-                <Text style={styles.infoText}>{placeDetail.openingHours}</Text>
-              </View>
-              <View style={styles.infoItem}>
-                <Icon name="category" size={20} color="#007AFF" />
-                <Text style={styles.infoText}>{placeDetail.category}</Text>
-              </View>
-            </View>
+          <View style={styles.infoContent}>
+            <Text style={styles.sectionTitle}>장소 소개</Text>
+            <Text style={styles.descriptionText}>
+              {placeDetail.tourApiResponse.description || '장소에 대한 설명이 없습니다.'}
+            </Text>
 
-            {/* 설명 */}
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>장소 설명</Text>
-              <Text style={styles.descriptionText}>{placeDetail.description}</Text>
+            {/* 링크 버튼들 */}
+            <View style={styles.linkButtonsContainer}>
+              {placeDetail.tourApiResponse.link && (
+                <TouchableOpacity
+                  style={styles.linkButton}
+                  onPress={() => handleOpenWebsite(placeDetail.tourApiResponse.link)}>
+                  <Icon name="language" size={20} color="#007AFF" />
+                  <Text style={styles.linkButtonText}>공식 웹사이트</Text>
+                </TouchableOpacity>
+              )}
+
+              {placeDetail.googleMapApiResponse.googleMapsUrl && (
+                <TouchableOpacity
+                  style={styles.linkButton}
+                  onPress={() => handleOpenGoogleMaps(placeDetail.googleMapApiResponse.googleMapsUrl)}>
+                  <Icon name="map" size={20} color="#007AFF" />
+                  <Text style={styles.linkButtonText}>Google Maps</Text>
+                </TouchableOpacity>
+              )}
             </View>
           </View>
         ) : (
-          <View style={styles.reviewsContainer}>
-            {/* 평점 비교 */}
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>평점 비교</Text>
-              
-              {/* 우리앱 평점 */}
-              <View style={styles.ratingCard}>
-                <View style={styles.ratingHeader}>
-                  <Text style={styles.platformName}>⭐ 우리앱</Text>
-                  <View style={styles.ratingStars}>
-                    {renderStars(placeDetail.ourAppRating)}
-                  </View>
-                </View>
-                <View style={styles.ratingDetails}>
-                  <Text style={styles.ratingScore}>{placeDetail.ourAppRating}</Text>
-                  <Text style={styles.reviewCount}>
-                    리뷰 {placeDetail.ourAppReviewCount}개
-                  </Text>
-                </View>
-              </View>
-
-              {/* 플랫폼별 평점 */}
-              {Object.entries(placeDetail.platformRatings).map(([platform, data]) => (
-                <View key={platform} style={styles.ratingCard}>
-                  <View style={styles.ratingHeader}>
-                    <Text style={styles.platformName}>
-                      {getPlatformIcon(platform)} {getPlatformName(platform)}
-                    </Text>
-                    <View style={styles.ratingStars}>
-                      {renderStars(data.rating)}
-                    </View>
-                  </View>
-                  <View style={styles.ratingDetails}>
-                    <Text style={styles.ratingScore}>{data.rating}</Text>
-                    <Text style={styles.reviewCount}>
-                      리뷰 {data.reviewCount}개
-                    </Text>
-                  </View>
-                </View>
-              ))}
+          <View style={styles.reviewsContent}>
+            <View style={styles.reviewsHeader}>
+              <Text style={styles.sectionTitle}>
+                리뷰 ({placeDetail.googleMapApiResponse.reviewCount}개)
+              </Text>
+              <TouchableOpacity style={styles.writeReviewButton} onPress={handleWriteReview}>
+                <Text style={styles.writeReviewButtonText}>리뷰 작성</Text>
+              </TouchableOpacity>
             </View>
 
-            {/* 리뷰 목록 */}
-            <View style={styles.section}>
-              <View style={styles.reviewHeader}>
-                <Text style={styles.sectionTitle}>리뷰 목록</Text>
-                <TouchableOpacity
-                  style={styles.writeReviewButton}
-                  onPress={() => setShowReviewModal(true)}>
-                  <Icon name="edit" size={20} color="white" />
-                  <Text style={styles.writeReviewText}>리뷰 작성</Text>
-                </TouchableOpacity>
-              </View>
-              {placeDetail.reviews.map((review) => (
-                <View key={review.id} style={styles.reviewCard}>
-                  <View style={styles.reviewHeader}>
-                    <View style={styles.reviewAuthor}>
-                      <Text style={styles.authorName}>{review.author}</Text>
-                      <Text style={styles.platformTag}>
-                        {getPlatformIcon(review.platform)} {getPlatformName(review.platform)}
-                      </Text>
-                    </View>
-                    <View style={styles.reviewRating}>
-                      {renderStars(review.rating)}
-                    </View>
-                  </View>
-                  <Text style={styles.reviewContent}>{review.content}</Text>
-                  <Text style={styles.reviewDate}>{review.date}</Text>
+            <View style={styles.reviewStats}>
+              <View style={styles.ratingDisplay}>
+                <Text style={styles.ratingNumber}>{placeDetail.googleMapApiResponse.rating.toFixed(1)}</Text>
+                <View style={styles.starsContainer}>
+                  {renderStars(placeDetail.googleMapApiResponse.rating)}
                 </View>
-              ))}
+                <Text style={styles.reviewCountText}>
+                  {placeDetail.googleMapApiResponse.reviewCount}개의 리뷰
+                </Text>
+              </View>
             </View>
+
+            <Text style={styles.noReviewsText}>
+              Google Maps 리뷰를 확인하려면 Google Maps를 열어주세요.
+            </Text>
           </View>
         )}
       </ScrollView>
@@ -551,64 +424,47 @@ const PlaceDetailScreen = () => {
         animationType="slide"
         onRequestClose={() => setShowReviewModal(false)}>
         <View style={styles.modalOverlay}>
-          <View style={styles.reviewModalContainer}>
-            <View style={styles.reviewModalHeader}>
-              <Text style={styles.reviewModalTitle}>리뷰 작성</Text>
+          <View style={styles.modalContainer}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>리뷰 작성</Text>
               <TouchableOpacity
                 onPress={() => setShowReviewModal(false)}
                 style={styles.closeButton}>
                 <Icon name="close" size={24} color="#666" />
               </TouchableOpacity>
             </View>
-            
-            <View style={styles.reviewModalContent}>
-              {/* 별점 선택 */}
-              <View style={styles.ratingSelection}>
-                <Text style={styles.ratingLabel}>별점 선택</Text>
-                <View style={styles.starSelection}>
-                  {[1, 2, 3, 4, 5].map((star) => (
-                    <TouchableOpacity
-                      key={star}
-                      onPress={() => setNewReview(prev => ({...prev, rating: star}))}>
-                      <Icon
-                        name={star <= newReview.rating ? 'star' : 'star-border'}
-                        size={32}
-                        color={star <= newReview.rating ? '#FFD700' : '#DDD'}
-                      />
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </View>
 
-              {/* 리뷰 내용 입력 */}
-              <View style={styles.reviewInputContainer}>
-                <Text style={styles.reviewInputLabel}>리뷰 내용</Text>
-                <TextInput
-                  style={styles.reviewInput}
-                  placeholder="이 장소에 대한 리뷰를 작성해주세요..."
-                  placeholderTextColor="#999"
-                  value={newReview.content}
-                  onChangeText={(text) => setNewReview(prev => ({...prev, content: text}))}
-                  multiline
-                  numberOfLines={4}
-                  textAlignVertical="top"
-                />
-              </View>
-
-              {/* 버튼 */}
-              <View style={styles.reviewModalButtons}>
-                <TouchableOpacity
-                  style={styles.cancelButton}
-                  onPress={() => setShowReviewModal(false)}>
-                  <Text style={styles.cancelButtonText}>취소</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.submitButton}
-                  onPress={handleWriteReview}>
-                  <Text style={styles.submitButtonText}>등록</Text>
-                </TouchableOpacity>
+            <View style={styles.ratingInputContainer}>
+              <Text style={styles.ratingLabel}>평점</Text>
+              <View style={styles.starsInputContainer}>
+                {[1, 2, 3, 4, 5].map(star => (
+                  <TouchableOpacity
+                    key={star}
+                    onPress={() => setNewReview({...newReview, rating: star})}>
+                    <Icon
+                      name={star <= newReview.rating ? 'star' : 'star-border'}
+                      size={32}
+                      color={star <= newReview.rating ? '#FFD700' : '#ccc'}
+                    />
+                  </TouchableOpacity>
+                ))}
               </View>
             </View>
+
+            <TextInput
+              style={styles.reviewInput}
+              placeholder="리뷰를 작성해주세요..."
+              value={newReview.content}
+              onChangeText={text => setNewReview({...newReview, content: text})}
+              multiline
+              numberOfLines={4}
+            />
+
+            <TouchableOpacity
+              style={styles.submitButton}
+              onPress={handleSubmitReview}>
+              <Text style={styles.submitButtonText}>리뷰 등록</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </Modal>
@@ -627,29 +483,44 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   loadingText: {
-    marginTop: 10,
+    marginTop: 16,
+    fontSize: 16,
     color: '#666',
   },
   errorContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    padding: 20,
   },
   errorText: {
+    marginTop: 16,
+    fontSize: 16,
     color: '#666',
+    textAlign: 'center',
+  },
+  retryButton: {
+    marginTop: 20,
+    backgroundColor: '#007AFF',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 8,
+  },
+  retryButtonText: {
+    color: 'white',
+    fontWeight: '600',
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    padding: 16,
     backgroundColor: 'white',
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
   },
   backButton: {
-    padding: 8,
+    padding: 4,
   },
   headerTitle: {
     flex: 1,
@@ -658,250 +529,227 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginHorizontal: 16,
   },
-  headerRight: {
-    width: 40,
+  shareButton: {
+    padding: 4,
   },
-  scrollView: {
+  mainImage: {
+    width: '100%',
+    height: 250,
+  },
+  infoContainer: {
+    backgroundColor: 'white',
+    padding: 20,
+    marginBottom: 8,
+  },
+  placeName: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginBottom: 12,
+    color: '#333',
+  },
+  ratingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  starsContainer: {
+    flexDirection: 'row',
+    marginRight: 8,
+  },
+  ratingText: {
+    fontSize: 14,
+    color: '#666',
+  },
+  addressContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  addressText: {
+    marginLeft: 8,
+    fontSize: 14,
+    color: '#666',
     flex: 1,
   },
-  imageSlider: {
-    height: 200,
+  phoneContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
   },
-  placeImage: {
-    width: width,
-    height: 200,
+  phoneText: {
+    marginLeft: 8,
+    fontSize: 14,
+    color: '#666',
+  },
+  hoursContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  hoursText: {
+    marginLeft: 8,
+    fontSize: 14,
+    color: '#666',
+    flex: 1,
   },
   tabContainer: {
     flexDirection: 'row',
     backgroundColor: 'white',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
+    marginBottom: 8,
   },
-  tabButton: {
+  tab: {
     flex: 1,
-    paddingVertical: 12,
+    paddingVertical: 16,
     alignItems: 'center',
-    borderRadius: 8,
   },
   activeTab: {
-    backgroundColor: '#007AFF',
+    borderBottomWidth: 2,
+    borderBottomColor: '#007AFF',
   },
   tabText: {
     fontSize: 16,
     color: '#666',
   },
   activeTabText: {
-    color: 'white',
-    fontWeight: 'bold',
+    color: '#007AFF',
+    fontWeight: '600',
   },
-  infoContainer: {
-    padding: 16,
-  },
-  reviewsContainer: {
-    padding: 16,
-  },
-  section: {
+  infoContent: {
     backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
+    padding: 20,
   },
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    marginBottom: 16,
-    color: '#333',
-  },
-  infoItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
     marginBottom: 12,
-  },
-  infoText: {
-    marginLeft: 12,
-    fontSize: 16,
     color: '#333',
-    flex: 1,
   },
   descriptionText: {
-    fontSize: 16,
-    lineHeight: 24,
-    color: '#333',
-  },
-  ratingCard: {
-    backgroundColor: '#f8f9fa',
-    borderRadius: 8,
-    padding: 16,
-    marginBottom: 12,
-  },
-  ratingHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  platformName: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  ratingStars: {
-    flexDirection: 'row',
-  },
-  ratingDetails: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  ratingScore: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#007AFF',
-    marginRight: 8,
-  },
-  reviewCount: {
-    fontSize: 14,
-    color: '#666',
-  },
-  reviewCard: {
-    backgroundColor: '#f8f9fa',
-    borderRadius: 8,
-    padding: 16,
-    marginBottom: 12,
-  },
-  reviewHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  reviewAuthor: {
-    flex: 1,
-  },
-  authorName: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  platformTag: {
-    fontSize: 12,
-    color: '#666',
-    marginTop: 2,
-  },
-  reviewRating: {
-    flexDirection: 'row',
-  },
-  reviewContent: {
     fontSize: 14,
     lineHeight: 20,
-    color: '#333',
-    marginBottom: 8,
+    color: '#666',
+    marginBottom: 20,
   },
-  reviewDate: {
-    fontSize: 12,
-    color: '#999',
+  linkButtonsContainer: {
+    gap: 12,
+  },
+  linkButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f8f9fa',
+    padding: 16,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#e9ecef',
+  },
+  linkButtonText: {
+    marginLeft: 12,
+    fontSize: 16,
+    color: '#007AFF',
+    fontWeight: '500',
+  },
+  reviewsContent: {
+    backgroundColor: 'white',
+    padding: 20,
+  },
+  reviewsHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
   },
   writeReviewButton: {
     backgroundColor: '#007AFF',
-    padding: 12,
-    borderRadius: 8,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 6,
   },
-  writeReviewText: {
+  writeReviewButtonText: {
     color: 'white',
-    fontSize: 16,
+    fontWeight: '600',
+  },
+  reviewStats: {
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  ratingDisplay: {
+    alignItems: 'center',
+  },
+  ratingNumber: {
+    fontSize: 48,
     fontWeight: 'bold',
-    marginLeft: 8,
+    color: '#333',
+    marginBottom: 8,
+  },
+  reviewCountText: {
+    fontSize: 14,
+    color: '#666',
+    marginTop: 8,
+  },
+  noReviewsText: {
+    textAlign: 'center',
+    fontSize: 14,
+    color: '#999',
+    fontStyle: 'italic',
   },
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: 'flex-end',
   },
-  reviewModalContainer: {
+  modalContainer: {
     backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 16,
-    width: '80%',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 20,
     maxHeight: '80%',
   },
-  reviewModalHeader: {
+  modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 20,
   },
-  reviewModalTitle: {
+  modalTitle: {
     fontSize: 18,
     fontWeight: 'bold',
     color: '#333',
   },
   closeButton: {
-    padding: 8,
+    padding: 4,
   },
-  reviewModalContent: {
-    flex: 1,
-  },
-  ratingSelection: {
-    marginBottom: 16,
+  ratingInputContainer: {
+    marginBottom: 20,
   },
   ratingLabel: {
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: '600',
+    marginBottom: 12,
     color: '#333',
-    marginBottom: 8,
   },
-  starSelection: {
+  starsInputContainer: {
     flexDirection: 'row',
-  },
-  reviewInputContainer: {
-    marginBottom: 16,
-  },
-  reviewInputLabel: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 8,
+    justifyContent: 'center',
   },
   reviewInput: {
-    backgroundColor: '#f8f9fa',
+    borderWidth: 1,
+    borderColor: '#ddd',
     borderRadius: 8,
     padding: 12,
     fontSize: 16,
-    color: '#333',
-  },
-  reviewModalButtons: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  cancelButton: {
-    backgroundColor: '#666',
-    padding: 12,
-    borderRadius: 8,
-    flex: 1,
-    marginRight: 8,
-  },
-  cancelButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: 'bold',
-    textAlign: 'center',
+    minHeight: 100,
+    textAlignVertical: 'top',
+    marginBottom: 20,
   },
   submitButton: {
     backgroundColor: '#007AFF',
-    padding: 12,
+    paddingVertical: 16,
     borderRadius: 8,
-    flex: 1,
-    marginLeft: 8,
+    alignItems: 'center',
   },
   submitButtonText: {
     color: 'white',
     fontSize: 16,
-    fontWeight: 'bold',
-    textAlign: 'center',
+    fontWeight: '600',
   },
 });
 
