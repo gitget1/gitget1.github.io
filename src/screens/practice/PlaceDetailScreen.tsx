@@ -97,13 +97,8 @@ const PlaceDetailScreen = () => {
       };
 
       const apiUrl = 'http://124.60.137.10:8083/api/place/detail';
-      const queryParams = new URLSearchParams({
-        placeName: requestData.placeName,
-        placeId: requestData.placeId,
-        language: requestData.language
-      });
-      
-      const fullUrl = `${apiUrl}?${queryParams.toString()}`;
+      // 쿼리 파라미터를 정확히 placeName, placeId, language 순서로 설정
+      const fullUrl = `${apiUrl}?placeName=${encodeURIComponent(requestData.placeName)}&placeId=${encodeURIComponent(requestData.placeId)}&language=${encodeURIComponent(requestData.language)}`;
       console.log('🟢 장소 상세 정보 요청 URL:', fullUrl);
       console.log('🟢 장소 상세 정보 요청 파라미터:', requestData);
       console.log('🟢 디코딩된 placeName:', decodeURIComponent(requestData.placeName));

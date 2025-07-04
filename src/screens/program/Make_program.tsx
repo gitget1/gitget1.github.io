@@ -328,6 +328,10 @@ function Make_program() {
   // Day별 일정 추가
   const addPlan = (dayIdx: number) => {
     if (!plan.place || !plan.coordinate) return;
+    if (!plan.placeId) {
+      Alert.alert('오류', '장소 고유 ID(placeId)가 없습니다. 장소를 다시 선택해 주세요.');
+      return;
+    }
     const newDays = [...days];
     newDays[dayIdx].plans.push({...plan});
     setDays(newDays);
@@ -423,14 +427,14 @@ function Make_program() {
           : [],
         schedules: days.flatMap((day, dayIdx) =>
           day.plans.map((plan, seq) => ({
-            day: dayIdx + 1,
+            day: dayIdx + 1, // 1부터 시작
             scheduleSequence: seq,
-            placeName: plan.place,
+            placeId: plan.placeId || '', // 반드시 구글 고유 id만 저장
+            placeName: plan.place, // 장소명만 저장
             lat: plan.coordinate?.latitude ?? 0,
             lon: plan.coordinate?.longitude ?? 0,
             placeDescription: plan.memo,
             travelTime: plan.travelTime ?? 0,
-            placeId: plan.placeId,
           })),
         ),
       };
@@ -620,17 +624,16 @@ function Make_program() {
               try {
                 if (details && details.geometry && details.geometry.location) {
                   const {lat, lng} = details.geometry.location;
-                  console.log('📍 선택된 장소 정보:');
-                  console.log('  - 장소명:', data.description);
-                  console.log('  - Place ID:', data.place_id);
-                  console.log('  - 위도:', lat);
-                  console.log('  - 경도:', lng);
-                  
+                  // 장소명에서 상세주소 제외, 쉼표 앞 첫 단어만 추출
+                  let onlyPlaceName = data.description;
+                  if (onlyPlaceName && onlyPlaceName.includes(',')) {
+                    onlyPlaceName = onlyPlaceName.split(',')[0].trim();
+                  }
                   setPlan(p => ({
                     ...p,
-                    place: data.description,
+                    place: onlyPlaceName, // 장소명만 저장
                     coordinate: {latitude: lat, longitude: lng},
-                    placeId: data.place_id,
+                    placeId: data.place_id, // 구글 고유 id만 저장
                   }));
                   setPlaceModalVisible(false);
                 } else {

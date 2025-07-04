@@ -100,7 +100,7 @@ const TraitDropdown = () => {
             
             // MBTI 상세 정보 가져오기
             const detailResponse = await axios.get(
-              `http://124.60.137.10:80/api/mbti/detail-mbti?mbtiId=${userMbti.mbtiId}&mbti=${userMbti.mbti}`,
+              `http://124.60.137.10:8083/api/mbti/detail-mbti?mbtiId=${userMbti.mbtiId}&mbti=${userMbti.mbti}`,
               {
                 headers: token ? {Authorization: `Bearer ${token}`} : {},
                 timeout: 10000,
@@ -200,7 +200,7 @@ const TraitDropdown = () => {
           queryParams.push(`regions=all`); // 더미 값으로 'all' 사용
         }
 
-        const apiUrl = `http://124.60.137.10/api/tour-program?${queryParams.join(
+        const apiUrl = `http://124.60.137.10:8083/api/tour-program?${queryParams.join(
           '&',
         )}`;
         console.log('🟢 최종 요청 URL:', apiUrl);
@@ -284,7 +284,7 @@ const TraitDropdown = () => {
       console.log('🟢 MBTI 상세 요청용 토큰:', token);
 
       const res = await axios.get(
-        `http://124.60.137.10:80/api/mbti/detail-mbti?mbtiId=${item.mbtiId}&mbti=${item.mbti}`,
+        `http://124.60.137.10:8083/api/mbti/detail-mbti?mbtiId=${item.mbtiId}&mbti=${item.mbti}`,
         {
           headers: token ? {Authorization: `Bearer ${token}`} : {},
         },

@@ -114,7 +114,7 @@ const Practice = () => {
         });
 
         const response = await axios.get(
-          `http://124.60.137.10/api/tour-program/${tourProgramId}`,
+          `http://124.60.137.10:8083/api/tour-program/${tourProgramId}`,
           {
             headers: {
               'Content-Type': 'application/json',
@@ -775,7 +775,7 @@ const Practice = () => {
 
       const cleanToken = token.replace('Bearer ', '');
       const response = await axios.post(
-        `http://124.60.137.10/api/tour-program/${tourProgramId}/wishlist`,
+        `http://124.60.137.10/api/wishlist/${tourProgramId}`,
         {},
         {
           headers: {
@@ -825,7 +825,7 @@ const Practice = () => {
 
       const cleanToken = token.replace('Bearer ', '');
       const response = await axios.post(
-        'http://124.60.137.10/api/chat/create',
+        'http://124.60.137.10/api/chat/rooms',
         {
           tourProgramId: tourProgramId,
         },
@@ -894,7 +894,7 @@ const Practice = () => {
 
               const cleanToken = token.replace('Bearer ', '');
               const response = await axios.delete(
-                `http://124.60.137.10/api/tour-program/${tourProgramId}`,
+                `http://124.60.137.10:80/api/tour-program/${tourProgramId}`,
                 {
                   headers: {
                     Authorization: `Bearer ${cleanToken}`,
@@ -967,24 +967,24 @@ const Practice = () => {
   };
 
   const handlePlacePress = (item: Schedule) => {
-    console.log('🟢 handlePlacePress 호출됨');
-    console.log('🟢 item 객체:', JSON.stringify(item, null, 2));
-    console.log('🟢 item.placeId:', item.placeId);
-    console.log('🟢 item.placeId 타입:', typeof item.placeId);
-    console.log('🟢 item.placeId 존재 여부:', !!item.placeId);
-    
-    // placeId가 없으면 위도/경도 조합으로 임시 생성
-    const tempPlaceId = item.placeId || `${item.lat}_${item.lon}`;
-    console.log('🟢 사용할 placeId:', tempPlaceId);
-    
-    console.log('🟢 PlaceDetail로 이동 시도');
+    // placeName에서 상세주소가 아닌 장소명만 추출 (예: '경복궁, 서울특별시 종로구...' -> '경복궁')
+    let onlyPlaceName = item.placeName;
+    if (onlyPlaceName && onlyPlaceName.includes(',')) {
+      onlyPlaceName = onlyPlaceName.split(',')[0].trim();
+    }
+    const logObj = {
+      placeName: onlyPlaceName,
+      placeId: item.placeId || '',
+      language: 'kor',
+    };
+    console.log('장소 상세 요청 파라미터:', JSON.stringify(logObj, null, 2));
     navigation.navigate('PlaceDetail', {
-      placeName: item.placeName,
-      placeDescription: item.placeDescription || getTranslatedUIText('설명 없음', selectedLanguage),
+      placeName: onlyPlaceName,
+      placeDescription: item.placeDescription,
       lat: item.lat,
       lon: item.lon,
-      placeId: tempPlaceId,
-      language: selectedLanguage,
+      placeId: item.placeId || '',
+      language: 'kor',
     });
   };
 
@@ -1303,7 +1303,7 @@ const Practice = () => {
                               onPress={() => handlePlacePress(item)}
                             >
                               <Text style={{fontSize: 15, lineHeight: 22}} selectable={true}>
-                                {getTranslatedUIText('장소', selectedLanguage)} {String(idx + 1)}. {item.placeName || getTranslatedUIText('장소명 없음', selectedLanguage)}
+                                {getTranslatedUIText('장소', selectedLanguage)} {String(idx + 1)}. {(item.placeName && item.placeName.includes(',')) ? item.placeName.split(',')[0].trim() : (item.placeName || getTranslatedUIText('장소명 없음', selectedLanguage))}
                                 {'\n'}
                                 {item.placeDescription || getTranslatedUIText('설명 없음', selectedLanguage)}
                                 {'\n'}

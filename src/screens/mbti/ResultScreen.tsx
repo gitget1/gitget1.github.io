@@ -34,7 +34,7 @@ export default function ResultScreen({
       console.log('📦 저장 요청용 Access Token:', token);
       console.log('📤 서버로 보낼 payload:', payload);
       const response = await axios.post(
-        'http://124.60.137.10:80/api/mbti',
+        'http://124.60.137.10:8083/api/mbti',
         payload,
         {
           headers: {
