@@ -352,7 +352,13 @@ export default function QuestionScreen({navigation}: Props) {
             Alert.alert(t('notification'), t('loginRequired'));
             return;
           }
-          console.log('📦 현재 언어1:', i18n.language);
+
+          console.log('📤 최종 제출된 답변:', updatedAnswers); // ✅ 추가
+          console.log(
+            '🌐 호출 URL:',
+            `${API_URL}/rag_recommend?language=${i18n.language}`,
+          ); // ✅ 추가
+
           const res = await axios.post(
             `${API_URL}/rag_recommend?language=${i18n.language}`,
             {
@@ -367,9 +373,12 @@ export default function QuestionScreen({navigation}: Props) {
               },
             },
           );
+
+          console.log('✅ 분석 결과 응답:', res.data); // ✅ 응답 로그 추가
+
           navigation.navigate('Result', {result: res.data});
         } catch (error) {
-          console.error(error);
+          console.error('❌ 분석 중 오류 발생:', error);
           if (axios.isAxiosError(error) && error.response?.status === 401) {
             Alert.alert(t('notification'), t('loginRequired'));
           } else {

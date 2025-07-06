@@ -86,18 +86,24 @@ const TraitDropdown = () => {
         // 1. 먼저 사용자가 저장한 MBTI가 있는지 확인
         try {
           console.log('🟢 사용자 저장 MBTI 확인 중...');
-          const userMbtiResponse = await axios.get('http://124.60.137.10:80/api/mbti/user-mbti', {
-            headers: token ? {Authorization: `Bearer ${token}`} : {},
-            timeout: 10000,
-          });
-          
+          const userMbtiResponse = await axios.get(
+            'http://124.60.137.10:8083/api/mbti/user-mbti',
+            {
+              headers: token ? {Authorization: `Bearer ${token}`} : {},
+              timeout: 10000,
+            },
+          );
+
           console.log('🟢 사용자 MBTI 응답:', userMbtiResponse.data);
-          
-          if (userMbtiResponse.data.status === 'OK' && userMbtiResponse.data.data) {
+
+          if (
+            userMbtiResponse.data.status === 'OK' &&
+            userMbtiResponse.data.data
+          ) {
             // 사용자가 저장한 MBTI가 있으면 해당 MBTI를 선택
             const userMbti = userMbtiResponse.data.data;
             console.log('🟢 사용자 저장 MBTI 발견:', userMbti);
-            
+
             // MBTI 상세 정보 가져오기
             const detailResponse = await axios.get(
               `http://124.60.137.10:8083/api/mbti/detail-mbti?mbtiId=${userMbti.mbtiId}&mbti=${userMbti.mbti}`,
@@ -106,21 +112,33 @@ const TraitDropdown = () => {
                 timeout: 10000,
               },
             );
-            
-            if (detailResponse.data.status === 'OK' && detailResponse.data.data) {
-              console.log('🟢 사용자 MBTI 상세 정보:', detailResponse.data.data);
+
+            if (
+              detailResponse.data.status === 'OK' &&
+              detailResponse.data.data
+            ) {
+              console.log(
+                '🟢 사용자 MBTI 상세 정보:',
+                detailResponse.data.data,
+              );
               setSelectedMbti(detailResponse.data.data);
             }
           }
         } catch (userMbtiError) {
-          console.log('🟡 사용자 저장 MBTI 없음 또는 조회 실패:', userMbtiError);
+          console.log(
+            '🟡 사용자 저장 MBTI 없음 또는 조회 실패:',
+            userMbtiError,
+          );
           // 사용자 MBTI가 없으면 전체 목록을 가져옴
         }
 
         // 2. 전체 MBTI 목록 가져오기
-        const res = await axios.get('http://124.60.137.10:80/api/mbti/all-mbti', {
-          headers: token ? {Authorization: `Bearer ${token}`} : {},
-        });
+        const res = await axios.get(
+          'http://124.60.137.10:8083/api/mbti/all-mbti',
+          {
+            headers: token ? {Authorization: `Bearer ${token}`} : {},
+          },
+        );
 
         console.log('🟢 MBTI 목록 응답:', res.data);
         setMbtiList(res.data.data);
@@ -379,12 +397,18 @@ const TraitDropdown = () => {
       const translatedPostsList: TourProgram[] = [];
       for (let i = 0; i < posts.length; i++) {
         const post = posts[i];
-        const textsToTranslate = [post.title || '', post.description || '', ...(post.hashtags || [])].filter(text => text.trim() !== '');
+        const textsToTranslate = [
+          post.title || '',
+          post.description || '',
+          ...(post.hashtags || []),
+        ].filter(text => text.trim() !== '');
         const batchSize = 3;
         const translatedTexts: string[] = [];
         for (let j = 0; j < textsToTranslate.length; j += batchSize) {
           const batch = textsToTranslate.slice(j, j + batchSize);
-          const batchPromises = batch.map(text => translateTextContent(text, targetLang));
+          const batchPromises = batch.map(text =>
+            translateTextContent(text, targetLang),
+          );
           const batchResults = await Promise.all(batchPromises);
           translatedTexts.push(...batchResults);
         }
@@ -393,7 +417,9 @@ const TraitDropdown = () => {
           ...post,
           title: translatedTexts[textIndex++] || post.title,
           description: translatedTexts[textIndex++] || post.description,
-          hashtags: (post.hashtags || []).map(() => translatedTexts[textIndex++] || ''),
+          hashtags: (post.hashtags || []).map(
+            () => translatedTexts[textIndex++] || '',
+          ),
         };
         translatedPostsList.push(translatedPost);
         const progress = ((i + 1) / posts.length) * 100;
@@ -452,58 +478,121 @@ const TraitDropdown = () => {
     <View style={{flex: 1}}>
       {/* 번역 중 표시 */}
       {translating && (
-        <View style={{backgroundColor: '#e3f2fd', padding: 15, borderRadius: 10, margin: 20, alignItems: 'center', borderWidth: 1, borderColor: '#007AFF'}}>
+        <View
+          style={{
+            backgroundColor: '#e3f2fd',
+            padding: 15,
+            borderRadius: 10,
+            margin: 20,
+            alignItems: 'center',
+            borderWidth: 1,
+            borderColor: '#007AFF',
+          }}>
           <Text style={{fontWeight: 'bold', color: '#007AFF', marginBottom: 8}}>
             번역 중... {translationProgress.toFixed(0)}%
           </Text>
-          <View style={{width: '100%', height: 8, backgroundColor: '#e0e0e0', borderRadius: 4, overflow: 'hidden'}}>
-            <View style={{height: '100%', backgroundColor: '#007AFF', borderRadius: 4, width: `${translationProgress}%`}} />
+          <View
+            style={{
+              width: '100%',
+              height: 8,
+              backgroundColor: '#e0e0e0',
+              borderRadius: 4,
+              overflow: 'hidden',
+            }}>
+            <View
+              style={{
+                height: '100%',
+                backgroundColor: '#007AFF',
+                borderRadius: 4,
+                width: `${translationProgress}%`,
+              }}
+            />
           </View>
         </View>
       )}
       {/* 번역 버튼 */}
-      <View style={{flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', padding: 10}}>
+      <View
+        style={{
+          flexDirection: 'row',
+          justifyContent: 'flex-end',
+          alignItems: 'center',
+          padding: 10,
+        }}>
         <TouchableOpacity
-          style={{flexDirection: 'row', alignItems: 'center', backgroundColor: '#007AFF', paddingHorizontal: 20, paddingVertical: 12, borderRadius: 25, borderWidth: 2, borderColor: '#007AFF', minWidth: 150, justifyContent: 'center'}}
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            backgroundColor: '#007AFF',
+            paddingHorizontal: 20,
+            paddingVertical: 12,
+            borderRadius: 25,
+            borderWidth: 2,
+            borderColor: '#007AFF',
+            minWidth: 150,
+            justifyContent: 'center',
+          }}
           onPress={() => setShowLanguageModal(true)}
-          disabled={translating}
-        >
+          disabled={translating}>
           <Ionicons name="language" size={20} color="#fff" />
-          <Text style={{fontSize: 16, fontWeight: 'bold', color: '#fff', marginHorizontal: 8}}>
-            {supportedLanguages.find(lang => lang.code === selectedLanguage)?.flag}
-            {selectedLanguage === 'ko' ? '한국어' : supportedLanguages.find(lang => lang.code === selectedLanguage)?.name}
+          <Text
+            style={{
+              fontSize: 16,
+              fontWeight: 'bold',
+              color: '#fff',
+              marginHorizontal: 8,
+            }}>
+            {
+              supportedLanguages.find(lang => lang.code === selectedLanguage)
+                ?.flag
+            }
+            {selectedLanguage === 'ko'
+              ? '한국어'
+              : supportedLanguages.find(lang => lang.code === selectedLanguage)
+                  ?.name}
           </Text>
         </TouchableOpacity>
       </View>
       {/* 언어 선택 모달 */}
       {showLanguageModal && (
-        <View style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(0,0,0,0.5)',
-          justifyContent: 'center',
-          alignItems: 'center',
-          zIndex: 10,
-        }}>
-          <View style={{
-            backgroundColor: '#fff',
-            padding: 20,
-            borderRadius: 10,
-            width: '80%',
-            maxHeight: '80%',
-            overflow: 'hidden',
+        <View
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0,0,0,0.5)',
+            justifyContent: 'center',
             alignItems: 'center',
-            paddingBottom: 20,
+            zIndex: 10,
           }}>
-            <Text style={{fontSize: 18, fontWeight: 'bold', marginBottom: 20, textAlign: 'center'}}>🌍 언어 선택</Text>
+          <View
+            style={{
+              backgroundColor: '#fff',
+              padding: 20,
+              borderRadius: 10,
+              width: '80%',
+              maxHeight: '80%',
+              overflow: 'hidden',
+              alignItems: 'center',
+              paddingBottom: 20,
+            }}>
+            <Text
+              style={{
+                fontSize: 18,
+                fontWeight: 'bold',
+                marginBottom: 20,
+                textAlign: 'center',
+              }}>
+              🌍 언어 선택
+            </Text>
             <ScrollView
               showsVerticalScrollIndicator={false}
-              contentContainerStyle={{paddingVertical: 10, alignItems: 'center'}}
-              style={{width: '100%'}}
-            >
+              contentContainerStyle={{
+                paddingVertical: 10,
+                alignItems: 'center',
+              }}
+              style={{width: '100%'}}>
               {supportedLanguages.map(language => (
                 <TouchableOpacity
                   key={language.code}
@@ -513,15 +602,18 @@ const TraitDropdown = () => {
                     padding: 15,
                     borderRadius: 8,
                     marginBottom: 8,
-                    backgroundColor: selectedLanguage === language.code ? '#e3f2fd' : '#fff',
-                    borderColor: selectedLanguage === language.code ? '#007AFF' : '#eee',
+                    backgroundColor:
+                      selectedLanguage === language.code ? '#e3f2fd' : '#fff',
+                    borderColor:
+                      selectedLanguage === language.code ? '#007AFF' : '#eee',
                     borderWidth: selectedLanguage === language.code ? 1 : 0,
                     width: '100%',
                     justifyContent: 'center',
                   }}
-                  onPress={() => handleLanguageChange(language.code)}
-                >
-                  <Text style={{fontSize: 20, marginRight: 15}}>{language.flag}</Text>
+                  onPress={() => handleLanguageChange(language.code)}>
+                  <Text style={{fontSize: 20, marginRight: 15}}>
+                    {language.flag}
+                  </Text>
                   <Text style={{fontSize: 16}}>{language.name}</Text>
                   {selectedLanguage === language.code && (
                     <Ionicons name="checkmark" size={20} color="#007AFF" />
@@ -540,9 +632,10 @@ const TraitDropdown = () => {
                 alignSelf: 'center',
                 marginHorizontal: '5%',
               }}
-              onPress={() => setShowLanguageModal(false)}
-            >
-              <Text style={{color: '#fff', fontSize: 16, fontWeight: 'bold'}}>닫기</Text>
+              onPress={() => setShowLanguageModal(false)}>
+              <Text style={{color: '#fff', fontSize: 16, fontWeight: 'bold'}}>
+                닫기
+              </Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -609,7 +702,9 @@ const TraitDropdown = () => {
                   style={styles.dropdownButton}
                   onPress={() => setShowDropdown(!showDropdown)}>
                   <Text style={styles.dropdownButtonText}>
-                    {selectedMbti ? `${selectedMbti.mbti} (내 MBTI)` : t('selectPersonality')}
+                    {selectedMbti
+                      ? `${selectedMbti.mbti} (내 MBTI)`
+                      : t('selectPersonality')}
                   </Text>
                 </TouchableOpacity>
               </View>

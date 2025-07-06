@@ -19,6 +19,19 @@ export default function ResultScreen({
 }: AppStackScreenProps<'Result'>) {
   const {t} = useTranslation();
   const {result} = route.params;
+  // const result = {
+  //   mbti: 'ENFJ',
+  //   trait: {
+  //     main_title: '사람 좋아하는 인싸 여행자',
+  //     description:
+  //       '친화력 1등! 혼자 여행가도 문제없어. 사람을 잘 챙기고 잘 어울림. 아 그거? 혹시나 해서 가져왔지~ 여행 준비성 철저한 편. 이번 휴가에 거기 가볼래!? 추진력 갑.. 부드럽게 계획 제시하는 편. 새로운 여행지 가보는 것 좋아함.',
+  //   },
+  //   recommendation:
+  //     '사람을 잘 챙기고 리더십도 있는 타입. 단체 여행을 잘 이끌며 새로운 지역을 탐험하는 걸 즐깁니다. 타인의 필요를 잘 캐치하고 계획도 잘 세우는 든든한 여행 동반자!',
+  //   tags: ['친화력', '사교성', '리더십', '계획적', '여행 준비성'],
+  //   recommended_regions: ['부산', '전주', '제주도'],
+  //   user_answer_id: 1,
+  // };
   const [selectedFeedback, setSelectedFeedback] = useState<string | null>(null);
 
   const handleSave = async () => {
@@ -34,7 +47,7 @@ export default function ResultScreen({
       console.log('📦 저장 요청용 Access Token:', token);
       console.log('📤 서버로 보낼 payload:', payload);
       const response = await axios.post(
-        'http://124.60.137.10:8083/api/mbti',
+        'http://124.60.137.10:80/api/mbti',
         payload,
         {
           headers: {
