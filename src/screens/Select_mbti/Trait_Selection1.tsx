@@ -64,8 +64,8 @@ const TraitSelection1 = () => {
   useEffect(() => {
     // 예시: 실제 API로 대체
     setMbtiList(['ENFP', 'ISTJ', 'INTP', 'ENTJ', 'ISFP', 'ESFJ', 'INFP', 'ESTJ']);
-    setHashtagList(['맛집', '자연', '역사', '힐링', '계획여행']);
-    setRegionList(['서울', '부산', '제주', '강릉', '남해']);
+    setHashtagList(['맛집', '자연', '역사', '힐링여행', '계획여행']);
+    setRegionList(['서울', '부산', '제주', '강릉', '남해', '아산']);
   }, []);
 
   // 선택값이 바뀔 때마다 프로그램 불러오기

@@ -473,16 +473,14 @@ const PlaceDetailScreen = () => {
 
             {/* 링크 버튼들 */}
             <View style={styles.linkButtonsContainer}>
-              {placeDetail.tourApiResponse.link && (
-                <TouchableOpacity
-                  style={styles.linkButton}
-                  onPress={() =>
-                    handleOpenWebsite(placeDetail.tourApiResponse.link)
-                  }>
-                  <Icon name="language" size={20} color="#007AFF" />
-                  <Text style={styles.linkButtonText}>공식 웹사이트</Text>
-                </TouchableOpacity>
-              )}
+              <TouchableOpacity
+                style={styles.linkButton}
+                onPress={() =>
+                  handleOpenWebsite('http://onyangmuseum.or.kr/')
+                }>
+                <Icon name="language" size={20} color="#007AFF" />
+                <Text style={styles.linkButtonText}>공식 웹사이트</Text>
+              </TouchableOpacity>
             </View>
           </View>
         ) : (
