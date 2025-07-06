@@ -25,6 +25,7 @@ import ChatRoom from '../screens/chat/ChatRoom';
 import TranslatorScreen from '../screens/function/TranslatorScreen';
 import TranslatorHistoryScreen from '../screens/function/TranslatorHistoryScreen';
 import {useTranslation} from 'react-i18next';
+import TraitSelection1 from '../screens/Select_mbti/Trait_Selection1';
 
 export type AppStackParamList = {
   AuthStack: undefined;
@@ -83,6 +84,7 @@ export type AppStackParamList = {
   WishlistScreen: undefined;
   Translator: undefined;
   TranslatorHistory: undefined;
+  TraitSelection1: undefined;
 };
 
 export type AppStackScreenProps<T extends keyof AppStackParamList> =
@@ -287,6 +289,7 @@ const AppNavigator = () => {
           headerTitleStyle: {fontSize: 20},
         }}
       />
+      <Stack.Screen name="TraitSelection1" component={TraitSelection1} />
     </Stack.Navigator>
   );
 };

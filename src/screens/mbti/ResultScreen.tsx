@@ -103,7 +103,7 @@ export default function ResultScreen({
       </View>
 
       <View style={styles.card}>
-        <Text style={styles.sectionTitle}>{t('predictedMbti')}</Text>
+        {/* <Text style={styles.sectionTitle}>{t('predictedMbti')}</Text> */}
         <Text style={styles.mbti}>{result.mbti}</Text>
         <Text style={styles.description}>
           {result.trait?.description || t('noDescription')}

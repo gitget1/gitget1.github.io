@@ -14,7 +14,7 @@ import WebView from 'react-native-webview';
 import {useNavigation} from '@react-navigation/native';
 
 // 백엔드 URL 설정
-const backendUrl = 'http://124.60.137.10:80';
+const backendUrl = 'http://124.60.137.10:8083';
 
 const App = () => {
   console.log('start');
