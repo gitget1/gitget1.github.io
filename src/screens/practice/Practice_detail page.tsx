@@ -775,7 +775,7 @@ const Practice = () => {
 
       const cleanToken = token.replace('Bearer ', '');
       const response = await axios.post(
-        `http://124.60.137.10/api/wishlist/${tourProgramId}`,
+        `http://124.60.137.10:8083/api/wishlist/${tourProgramId}`,
         {},
         {
           headers: {
@@ -825,7 +825,7 @@ const Practice = () => {
 
       const cleanToken = token.replace('Bearer ', '');
       const response = await axios.post(
-        'http://124.60.137.10/api/chat/rooms',
+        'http://124.60.137.10:8083/api/chat/rooms',
         {
           tourProgramId: tourProgramId,
         },
@@ -894,7 +894,7 @@ const Practice = () => {
 
               const cleanToken = token.replace('Bearer ', '');
               const response = await axios.delete(
-                `http://124.60.137.10:80/api/tour-program/${tourProgramId}`,
+                `http://124.60.137.10:8083/api/tour-program/${tourProgramId}`,
                 {
                   headers: {
                     Authorization: `Bearer ${cleanToken}`,
@@ -934,7 +934,7 @@ const Practice = () => {
 
       const cleanToken = token.replace('Bearer ', '');
       const response = await axios.post(
-        'http://124.60.137.10/api/reservation/create',
+        'http://124.60.137.10:8083/api/reservation/create',
         {
           tourProgramId: tourProgramId,
         },
@@ -972,18 +972,25 @@ const Practice = () => {
     if (onlyPlaceName && onlyPlaceName.includes(',')) {
       onlyPlaceName = onlyPlaceName.split(',')[0].trim();
     }
+    // placeId가 없으면 lat/lon 조합으로 대체
+    let placeId = item.placeId;
+    if (!placeId || placeId === 'null' || placeId === 'undefined') {
+      placeId = `${item.lat},${item.lon}`;
+    }
+    // placeName을 encodeURIComponent로 인코딩
+    const encodedPlaceName = encodeURIComponent(onlyPlaceName);
     const logObj = {
-      placeName: onlyPlaceName,
-      placeId: item.placeId || '',
+      placeName: encodedPlaceName,
+      placeId: placeId,
       language: 'kor',
     };
     console.log('장소 상세 요청 파라미터:', JSON.stringify(logObj, null, 2));
     navigation.navigate('PlaceDetail', {
-      placeName: onlyPlaceName,
+      placeName: encodedPlaceName,
       placeDescription: item.placeDescription,
       lat: item.lat,
       lon: item.lon,
-      placeId: item.placeId || '',
+      placeId: placeId,
       language: 'kor',
     });
   };

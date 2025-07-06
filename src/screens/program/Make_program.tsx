@@ -534,7 +534,7 @@ function Make_program() {
         // 새로 등록
         console.log('새로 등록 요청 시작');
         response = await axios.post(
-          'http://124.60.137.10:80/api/tour-program',
+          'http://124.60.137.10:8083/api/tour-program',
           data,
           {
             headers: {
@@ -624,10 +624,14 @@ function Make_program() {
               try {
                 if (details && details.geometry && details.geometry.location) {
                   const {lat, lng} = details.geometry.location;
-                  // 장소명에서 상세주소 제외, 쉼표 앞 첫 단어만 추출
+                  // 장소명에서 상세주소 제외, 쉼표 앞 첫 단어 또는 마지막 단어만 추출
                   let onlyPlaceName = data.description;
                   if (onlyPlaceName && onlyPlaceName.includes(',')) {
                     onlyPlaceName = onlyPlaceName.split(',')[0].trim();
+                  } else if (onlyPlaceName) {
+                    // 쉼표가 없으면 마지막 단어만 추출
+                    const words = onlyPlaceName.trim().split(' ');
+                    onlyPlaceName = words[words.length - 1];
                   }
                   setPlan(p => ({
                     ...p,

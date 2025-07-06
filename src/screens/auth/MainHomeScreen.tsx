@@ -197,6 +197,12 @@ const MainHomeScreen = () => {
               action: handleTranslator,
               bg: '#E8F5E8',
             },
+            {
+              icon: '🔎',
+              label: '성향별 맞춤 찾기',
+              action: () => navigation.navigate('TraitSelection1'),
+              bg: '#FFF9C4',
+            },
           ].map((item, index) => (
             <TouchableOpacity
               key={index}

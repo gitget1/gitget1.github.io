@@ -86,6 +86,7 @@ const TraitDropdown = () => {
         // 1. 먼저 사용자가 저장한 MBTI가 있는지 확인
         try {
           console.log('🟢 사용자 저장 MBTI 확인 중...');
+
           const userMbtiResponse = await axios.get(
             'http://124.60.137.10:8083/api/mbti/user-mbti',
             {
@@ -133,6 +134,7 @@ const TraitDropdown = () => {
         }
 
         // 2. 전체 MBTI 목록 가져오기
+
         const res = await axios.get(
           'http://124.60.137.10:8083/api/mbti/all-mbti',
           {
