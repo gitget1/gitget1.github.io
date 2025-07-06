@@ -69,7 +69,8 @@ const PlaceDetailScreen = () => {
   const {t} = useTranslation();
   const navigation = useNavigation<StackNavigationProp<AppStackParamList>>();
   const route = useRoute<PlaceDetailRouteProp>();
-  const {placeName, placeDescription, lat, lon, placeId, language} = route.params;
+  const {placeName, placeDescription, lat, lon, placeId, language} =
+    route.params;
 
   const [placeDetail, setPlaceDetail] = useState<PlaceDetailData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -84,7 +85,7 @@ const PlaceDetailScreen = () => {
   const fetchPlaceData = async () => {
     try {
       setLoading(true);
-      
+
       const token = await AsyncStorage.getItem('accessToken');
       if (!token) {
         Alert.alert('알림', '로그인이 필요합니다.');
@@ -93,38 +94,45 @@ const PlaceDetailScreen = () => {
       }
 
       const cleanToken = token.replace('Bearer ', '');
-      
+
       // 요청 파라미터 구성 - 위도/경도 조합을 그대로 placeId로 사용
       const requestData = {
         placeName: placeName || '장소명 없음',
         placeId: placeId, // 위도/경도 조합 그대로 사용
-        language: language || 'kor'
+        language: language || 'kor',
       };
 
       const apiUrl = 'http://124.60.137.10:8083/api/place';
       // 쿼리 파라미터를 정확히 placeName, placeId, language 순서로 설정
-      const fullUrl = `${apiUrl}?placeName=${requestData.placeName}&placeId=${encodeURIComponent(requestData.placeId)}&language=${encodeURIComponent(requestData.language)}`;
+      const fullUrl = `${apiUrl}?placeName=${
+        requestData.placeName
+      }&placeId=${encodeURIComponent(
+        requestData.placeId,
+      )}&language=${encodeURIComponent(requestData.language)}`;
       console.log('🟢 [PlaceDetailScreen] 실제 요청 URL:', fullUrl);
       console.log('🟢 [PlaceDetailScreen] 실제 요청 파라미터:', requestData);
-      console.log('🟢 디코딩된 placeName:', decodeURIComponent(requestData.placeName));
+      console.log(
+        '🟢 디코딩된 placeName:',
+        decodeURIComponent(requestData.placeName),
+      );
       console.log('🟢 디코딩된 placeId:', requestData.placeId);
       console.log('🟢 디코딩된 language:', requestData.language);
       console.log('🟢 placeId 타입: 위도/경도 조합');
 
-      const response = await axios.get(
-        fullUrl,
-        {
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${cleanToken}`,
-          },
-          timeout: 10000,
+      const response = await axios.get(fullUrl, {
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${cleanToken}`,
         },
-      );
+        timeout: 10000,
+      });
 
       console.log('🟢 서버 응답:', response.data);
 
-      if (response.data.status === '100 CONTINUE' || response.data.status === 'OK') {
+      if (
+        response.data.status === '100 CONTINUE' ||
+        response.data.status === 'OK'
+      ) {
         setPlaceDetail({
           ...response.data.data,
           tourApiResponse: response.data.data.tourApiPlaceInfo,
@@ -134,7 +142,9 @@ const PlaceDetailScreen = () => {
         console.log('🟢 장소 상세 정보 로드 완료');
       } else {
         console.error('❌ 서버 응답 에러:', response.data);
-        throw new Error(response.data.message || '장소 정보를 불러오는데 실패했습니다.');
+        throw new Error(
+          response.data.message || '장소 정보를 불러오는데 실패했습니다.',
+        );
       }
     } catch (error) {
       console.error('❌ 장소 정보 로딩 실패:', error);
@@ -154,17 +164,17 @@ const PlaceDetailScreen = () => {
               address: `${lat}, ${lon}`,
               description: `${placeName}에 대한 상세 정보입니다. 서버에서 정확한 정보를 가져오는 중입니다.`,
               imageUrl: 'https://via.placeholder.com/400x300?text=장소+이미지',
-              link: ''
+              link: '',
             },
             googleResponse: {
               openingHours: '정보 없음',
-              phone: '정보 없음'
+              phone: '정보 없음',
             },
             googleMapApiResponse: {
               reviewCount: 0,
               rating: 0,
-              googleMapsUrl: `https://www.google.com/maps?q=${lat},${lon}`
-            }
+              googleMapsUrl: `https://www.google.com/maps?q=${lat},${lon}`,
+            },
           };
           setPlaceDetail(dummyData);
           return; // 에러 처리 중단
@@ -207,9 +217,14 @@ const PlaceDetailScreen = () => {
         placeId: placeId, // 현재 장소의 placeId
         // 필요하다면 placeName, lat, lon 등 추가 가능
       };
-      const permissionUrl = `http://124.60.137.10:8083/api/place/user/permission?placeId=${encodeURIComponent(placeId)}`;
+      const permissionUrl = `http://124.60.137.10:8083/api/place/user/permission?placeId=${encodeURIComponent(
+        placeId,
+      )}`;
       console.log('🟢 [PlaceDetailScreen] 리뷰 권한 요청 URL:', permissionUrl);
-      console.log('🟢 [PlaceDetailScreen] 리뷰 권한 요청 파라미터:', permissionParams);
+      console.log(
+        '🟢 [PlaceDetailScreen] 리뷰 권한 요청 파라미터:',
+        permissionParams,
+      );
       const permissionRes = await axios.get(
         `http://124.60.137.10:8083/api/place/user/permission`,
         {
@@ -217,9 +232,12 @@ const PlaceDetailScreen = () => {
           headers: {
             Authorization: `Bearer ${token.replace('Bearer ', '')}`,
           },
-        }
+        },
       );
-      if (permissionRes.data.status === 'OK' && permissionRes.data.data?.hasPermission) {
+      if (
+        permissionRes.data.status === 'OK' &&
+        permissionRes.data.data?.hasPermission
+      ) {
         setShowReviewModal(true);
       } else {
         Alert.alert('리뷰 작성 불가', '현장 방문 인증이 필요합니다.');
@@ -344,16 +362,22 @@ const PlaceDetailScreen = () => {
 
         {/* 기본 정보 */}
         <View style={styles.infoContainer}>
-          <Text style={styles.placeName}>{placeDetail?.tourApiResponse?.name || '장소명 없음'}</Text>
+          <Text style={styles.placeName}>
+            {placeDetail?.tourApiResponse?.name || '장소명 없음'}
+          </Text>
           <View style={styles.addressContainer}>
             <Icon name="location-on" size={16} color="#666" />
-            <Text style={styles.addressText}>{placeDetail?.tourApiResponse?.address || ''}</Text>
+            <Text style={styles.addressText}>
+              {placeDetail?.tourApiResponse?.address || ''}
+            </Text>
           </View>
 
           {placeDetail?.googleResponse?.phone && (
             <View style={styles.phoneContainer}>
               <Icon name="phone" size={16} color="#666" />
-              <Text style={styles.phoneText}>{placeDetail.googleResponse.phone}</Text>
+              <Text style={styles.phoneText}>
+                {placeDetail.googleResponse.phone}
+              </Text>
             </View>
           )}
 
@@ -361,13 +385,25 @@ const PlaceDetailScreen = () => {
             <View style={{marginBottom: 8}}>
               <View style={{flexDirection: 'row', alignItems: 'center'}}>
                 <Icon name="schedule" size={18} color="#666" />
-                <Text style={{marginLeft: 8, fontSize: 15, color: '#666'}}>영업시간</Text>
+                <Text style={{marginLeft: 8, fontSize: 15, color: '#666'}}>
+                  영업시간
+                </Text>
               </View>
               {/* 요일별로 줄바꿈 및 월~일 순서 정렬 */}
               <View style={{marginLeft: 26, marginTop: 4}}>
                 {(() => {
-                  const daysOrder = ['월요일', '화요일', '수요일', '목요일', '금요일', '토요일', '일요일'];
-                  const hoursArr = placeDetail.googleResponse.openingHours.split(',').map(s => s.trim());
+                  const daysOrder = [
+                    '월요일',
+                    '화요일',
+                    '수요일',
+                    '목요일',
+                    '금요일',
+                    '토요일',
+                    '일요일',
+                  ];
+                  const hoursArr = placeDetail.googleResponse.openingHours
+                    .split(',')
+                    .map(s => s.trim());
                   // 요일별로 객체화
                   const dayMap: {[key: string]: string} = {};
                   hoursArr.forEach(str => {
@@ -378,7 +414,9 @@ const PlaceDetailScreen = () => {
                     }
                   });
                   return daysOrder.map(day => (
-                    <Text key={day} style={{fontSize: 15, color: '#666', lineHeight: 22}}>
+                    <Text
+                      key={day}
+                      style={{fontSize: 15, color: '#666', lineHeight: 22}}>
                       {day}: {dayMap[day] || '-'}
                     </Text>
                   ));
@@ -386,7 +424,14 @@ const PlaceDetailScreen = () => {
               </View>
               {/* GPS로 리뷰권한 받기 버튼 */}
               <TouchableOpacity
-                style={{marginTop: 12, alignSelf: 'flex-start', backgroundColor: '#1976D2', borderRadius: 8, paddingHorizontal: 16, paddingVertical: 10}}
+                style={{
+                  marginTop: 12,
+                  alignSelf: 'flex-start',
+                  backgroundColor: '#1976D2',
+                  borderRadius: 8,
+                  paddingHorizontal: 16,
+                  paddingVertical: 10,
+                }}
                 onPress={async () => {
                   try {
                     const token = await AsyncStorage.getItem('accessToken');
@@ -394,31 +439,51 @@ const PlaceDetailScreen = () => {
                       Alert.alert('알림', '로그인이 필요합니다.');
                       return;
                     }
-                    const permissionUrl = `http://124.60.137.10:8083/api/place/user/permission?placeId=${encodeURIComponent(placeId)}`;
-                    const permissionParams = { placeId: placeId };
-                    console.log('🟢 [PlaceDetailScreen] GPS 리뷰권한 요청 URL:', permissionUrl);
-                    console.log('🟢 [PlaceDetailScreen] GPS 리뷰권한 요청 파라미터:', permissionParams);
+                    const permissionUrl = `http://124.60.137.10:8083/api/place/user/permission?placeId=${encodeURIComponent(
+                      placeId,
+                    )}`;
+                    const permissionParams = {placeId: placeId};
+                    console.log(
+                      '🟢 [PlaceDetailScreen] GPS 리뷰권한 요청 URL:',
+                      permissionUrl,
+                    );
+                    console.log(
+                      '🟢 [PlaceDetailScreen] GPS 리뷰권한 요청 파라미터:',
+                      permissionParams,
+                    );
                     const res = await axios.get(
                       `http://124.60.137.10:8083/api/place/user/permission`,
                       {
-                        params: { placeId: placeId },
-                        headers: { Authorization: `Bearer ${token.replace('Bearer ', '')}` },
-                      }
+                        params: {placeId: placeId},
+                        headers: {
+                          Authorization: `Bearer ${token.replace(
+                            'Bearer ',
+                            '',
+                          )}`,
+                        },
+                      },
                     );
-                    if (res.data.status === 'OK' && res.data.data?.hasPermission) {
+                    if (
+                      res.data.status === 'OK' &&
+                      res.data.data?.hasPermission
+                    ) {
                       Alert.alert('성공', '성공적으로 권한을 받았습니다.');
                     } else {
                       Alert.alert('경고', '현장 방문 인증이 필요합니다.');
                     }
                   } catch (error) {
                     if (axios.isAxiosError(error)) {
-                      console.log('❌ [PlaceDetailScreen] 권한 오류 응답:', error.response?.data);
+                      console.log(
+                        '❌ [PlaceDetailScreen] 권한 오류 응답:',
+                        error.response?.data,
+                      );
                     }
                     Alert.alert('오류', '권한 확인 중 문제가 발생했습니다.');
                   }
-                }}
-              >
-                <Text style={{color: '#fff', fontWeight: 'bold', fontSize: 15}}>GPS로 리뷰권한 받기</Text>
+                }}>
+                <Text style={{color: '#fff', fontWeight: 'bold', fontSize: 15}}>
+                  GPS로 리뷰권한 받기
+                </Text>
               </TouchableOpacity>
             </View>
           )}
@@ -429,14 +494,22 @@ const PlaceDetailScreen = () => {
           <TouchableOpacity
             style={[styles.tab, selectedTab === 'info' && styles.activeTab]}
             onPress={() => setSelectedTab('info')}>
-            <Text style={[styles.tabText, selectedTab === 'info' && styles.activeTabText]}>
+            <Text
+              style={[
+                styles.tabText,
+                selectedTab === 'info' && styles.activeTabText,
+              ]}>
               정보
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.tab, selectedTab === 'reviews' && styles.activeTab]}
             onPress={() => setSelectedTab('reviews')}>
-            <Text style={[styles.tabText, selectedTab === 'reviews' && styles.activeTabText]}>
+            <Text
+              style={[
+                styles.tabText,
+                selectedTab === 'reviews' && styles.activeTabText,
+              ]}>
               리뷰
             </Text>
           </TouchableOpacity>
@@ -447,7 +520,8 @@ const PlaceDetailScreen = () => {
           <View style={styles.infoContent}>
             <Text style={styles.sectionTitle}>장소 소개</Text>
             <Text style={styles.descriptionText}>
-              {placeDetail.tourApiResponse.description || '장소에 대한 설명이 없습니다.'}
+              {placeDetail.tourApiResponse.description ||
+                '장소에 대한 설명이 없습니다.'}
             </Text>
 
             {/* 링크 버튼들 */}
@@ -455,7 +529,9 @@ const PlaceDetailScreen = () => {
               {placeDetail.tourApiResponse.link && (
                 <TouchableOpacity
                   style={styles.linkButton}
-                  onPress={() => handleOpenWebsite(placeDetail.tourApiResponse.link)}>
+                  onPress={() =>
+                    handleOpenWebsite(placeDetail.tourApiResponse.link)
+                  }>
                   <Icon name="language" size={20} color="#007AFF" />
                   <Text style={styles.linkButtonText}>공식 웹사이트</Text>
                 </TouchableOpacity>
@@ -465,109 +541,346 @@ const PlaceDetailScreen = () => {
         ) : (
           <View style={styles.reviewsContent}>
             {/* 평점 비교 카드 UI */}
-            <Text style={{fontWeight: 'bold', fontSize: 18, marginBottom: 12}}>평점 비교</Text>
+            <Text style={{fontWeight: 'bold', fontSize: 18, marginBottom: 12}}>
+              평점 비교
+            </Text>
             {(() => {
               // 평점 비교 카드: Google/Naver/Kakao
               const ratingCards = [
-                { platform: 'Google', icon: '🔍', rating: placeDetail?.googleMapApiResponse?.rating ?? 0, reviewCount: placeDetail?.googleMapApiResponse?.reviewCount ?? 0 },
-                { platform: 'Naver', icon: '🟢', rating: 4.2, reviewCount: 120 }, // 더미 데이터
-                { platform: 'Kakao', icon: '🟡', rating: 4.0, reviewCount: 80 },  // 더미 데이터
+                {
+                  platform: 'Google',
+                  icon: '🔍',
+                  rating: placeDetail?.googleMapApiResponse?.rating ?? 0,
+                  reviewCount:
+                    placeDetail?.googleMapApiResponse?.reviewCount ?? 0,
+                },
+                {platform: 'Naver', icon: '🟢', rating: 4.2, reviewCount: 120}, // 더미 데이터
+                {platform: 'Kakao', icon: '🟡', rating: 4.0, reviewCount: 80}, // 더미 데이터
               ];
               // 우리앱 평점
-              const ourAppRating = { platform: '우리앱', icon: '⭐', rating: placeDetail?.travelLocalEvaluation?.rating ?? 0, reviewCount: placeDetail?.travelLocalEvaluation?.reviewCount ?? 0 };
+              const ourAppRating = {
+                platform: '우리앱',
+                icon: '⭐',
+                rating: placeDetail?.travelLocalEvaluation?.rating ?? 0,
+                reviewCount:
+                  placeDetail?.travelLocalEvaluation?.reviewCount ?? 0,
+              };
               // 최신 리뷰 미리보기(최신 5개)
-              const previewReviews = placeDetail?.travelLocalEvaluation?.reviews?.slice(0, 5) || [];
+              const previewReviews =
+                placeDetail?.travelLocalEvaluation?.reviews?.slice(0, 5) || [];
               return (
                 <>
                   {/* 평점 비교 카드 (Google/Naver/Kakao) */}
                   {ratingCards.map((item, idx) => (
-                    <View key={item.platform} style={{
-                      backgroundColor: '#fff', borderRadius: 12, padding: 16, marginBottom: 12,
-                      flexDirection: 'column', elevation: 2
-                    }}>
-                      <View style={{flexDirection: 'row', alignItems: 'center'}}>
-                        <Text style={{fontSize: 20, marginRight: 8}}>{item.icon}</Text>
+                    <View
+                      key={item.platform}
+                      style={{
+                        backgroundColor: '#fff',
+                        borderRadius: 12,
+                        padding: 16,
+                        marginBottom: 12,
+                        flexDirection: 'column',
+                        elevation: 2,
+                      }}>
+                      <View
+                        style={{flexDirection: 'row', alignItems: 'center'}}>
+                        <Text style={{fontSize: 20, marginRight: 8}}>
+                          {item.icon}
+                        </Text>
                         <View style={{flex: 1}}>
-                          <Text style={{fontWeight: 'bold'}}>{item.platform}</Text>
-                          <View style={{flexDirection: 'row', alignItems: 'center', marginTop: 4}}>
-                            <Text style={{color: '#1976D2', fontWeight: 'bold', fontSize: 22}}>{item.rating ? item.rating.toFixed(1) : '-'}</Text>
-                            <Text style={{color: '#888', marginLeft: 4}}>리뷰 {item.reviewCount}개</Text>
+                          <Text style={{fontWeight: 'bold'}}>
+                            {item.platform}
+                          </Text>
+                          <View
+                            style={{
+                              flexDirection: 'row',
+                              alignItems: 'center',
+                              marginTop: 4,
+                            }}>
+                            <Text
+                              style={{
+                                color: '#1976D2',
+                                fontWeight: 'bold',
+                                fontSize: 22,
+                              }}>
+                              {item.rating ? item.rating.toFixed(1) : '-'}
+                            </Text>
+                            <Text style={{color: '#888', marginLeft: 4}}>
+                              리뷰 {item.reviewCount}개
+                            </Text>
                           </View>
                         </View>
                         <View style={{flexDirection: 'row', marginLeft: 8}}>
-                          {[1,2,3,4,5].map(i => (
-                            <Text key={i} style={{color: i <= Math.round(item.rating) ? '#FFD700' : '#ccc', fontSize: 18}}>★</Text>
+                          {[1, 2, 3, 4, 5].map(i => (
+                            <Text
+                              key={i}
+                              style={{
+                                color:
+                                  i <= Math.round(item.rating)
+                                    ? '#FFD700'
+                                    : '#ccc',
+                                fontSize: 18,
+                              }}>
+                              ★
+                            </Text>
                           ))}
                         </View>
                       </View>
                       {/* 지도 버튼: 플랫폼별로 다르게 */}
-                      {item.platform === 'Google' && placeDetail?.googleMapApiResponse?.googleMapsUrl && (
-                        <TouchableOpacity
-                          style={{alignSelf: 'flex-end', backgroundColor: '#f8f9fa', borderRadius: 8, borderWidth: 1, borderColor: '#e9ecef', paddingHorizontal: 12, paddingVertical: 8, flexDirection: 'row', alignItems: 'center', marginTop: 12}}
-                          onPress={() => handleOpenGoogleMaps(placeDetail.googleMapApiResponse.googleMapsUrl)}>
-                          <Icon name="map" size={20} color="#007AFF" />
-                          <Text style={{marginLeft: 8, color: '#007AFF', fontWeight: '500', fontSize: 15}}>Google Maps</Text>
-                        </TouchableOpacity>
-                      )}
-                      {item.platform === 'Naver' && placeDetail?.tourApiResponse?.name && (
-                        <TouchableOpacity
-                          style={{alignSelf: 'flex-end', backgroundColor: '#03C75A', borderRadius: 8, borderWidth: 1, borderColor: '#e9ecef', paddingHorizontal: 12, paddingVertical: 8, flexDirection: 'row', alignItems: 'center', marginTop: 12}}
-                          onPress={() => handleOpenWebsite(`https://map.naver.com/v5/search/${encodeURIComponent(placeDetail.tourApiResponse.name)}`)}>
-                          <Icon name="map" size={20} color="#fff" />
-                          <Text style={{marginLeft: 8, color: '#fff', fontWeight: '500', fontSize: 15}}>네이버 지도</Text>
-                        </TouchableOpacity>
-                      )}
-                      {item.platform === 'Kakao' && placeDetail?.tourApiResponse?.name && (
-                        <TouchableOpacity
-                          style={{alignSelf: 'flex-end', backgroundColor: '#FEE500', borderRadius: 8, borderWidth: 1, borderColor: '#e9ecef', paddingHorizontal: 12, paddingVertical: 8, flexDirection: 'row', alignItems: 'center', marginTop: 12}}
-                          onPress={() => handleOpenWebsite(`https://map.kakao.com/?q=${encodeURIComponent(placeDetail.tourApiResponse.name)}`)}>
-                          <Icon name="map" size={20} color="#3C1E1E" />
-                          <Text style={{marginLeft: 8, color: '#3C1E1E', fontWeight: '500', fontSize: 15}}>카카오맵</Text>
-                        </TouchableOpacity>
-                      )}
+                      {item.platform === 'Google' &&
+                        placeDetail?.googleMapApiResponse?.googleMapsUrl && (
+                          <TouchableOpacity
+                            style={{
+                              alignSelf: 'flex-end',
+                              backgroundColor: '#f8f9fa',
+                              borderRadius: 8,
+                              borderWidth: 1,
+                              borderColor: '#e9ecef',
+                              paddingHorizontal: 12,
+                              paddingVertical: 8,
+                              flexDirection: 'row',
+                              alignItems: 'center',
+                              marginTop: 12,
+                            }}
+                            onPress={() =>
+                              handleOpenGoogleMaps(
+                                placeDetail.googleMapApiResponse.googleMapsUrl,
+                              )
+                            }>
+                            <Icon name="map" size={20} color="#007AFF" />
+                            <Text
+                              style={{
+                                marginLeft: 8,
+                                color: '#007AFF',
+                                fontWeight: '500',
+                                fontSize: 15,
+                              }}>
+                              Google Maps
+                            </Text>
+                          </TouchableOpacity>
+                        )}
+                      {item.platform === 'Naver' &&
+                        placeDetail?.tourApiResponse?.name && (
+                          <TouchableOpacity
+                            style={{
+                              alignSelf: 'flex-end',
+                              backgroundColor: '#03C75A',
+                              borderRadius: 8,
+                              borderWidth: 1,
+                              borderColor: '#e9ecef',
+                              paddingHorizontal: 12,
+                              paddingVertical: 8,
+                              flexDirection: 'row',
+                              alignItems: 'center',
+                              marginTop: 12,
+                            }}
+                            onPress={() =>
+                              handleOpenWebsite(
+                                `https://map.naver.com/v5/search/${encodeURIComponent(
+                                  placeDetail.tourApiResponse.name,
+                                )}`,
+                              )
+                            }>
+                            <Icon name="map" size={20} color="#fff" />
+                            <Text
+                              style={{
+                                marginLeft: 8,
+                                color: '#fff',
+                                fontWeight: '500',
+                                fontSize: 15,
+                              }}>
+                              네이버 지도
+                            </Text>
+                          </TouchableOpacity>
+                        )}
+                      {item.platform === 'Kakao' &&
+                        placeDetail?.tourApiResponse?.name && (
+                          <TouchableOpacity
+                            style={{
+                              alignSelf: 'flex-end',
+                              backgroundColor: '#FEE500',
+                              borderRadius: 8,
+                              borderWidth: 1,
+                              borderColor: '#e9ecef',
+                              paddingHorizontal: 12,
+                              paddingVertical: 8,
+                              flexDirection: 'row',
+                              alignItems: 'center',
+                              marginTop: 12,
+                            }}
+                            onPress={() =>
+                              handleOpenWebsite(
+                                `https://map.kakao.com/?q=${encodeURIComponent(
+                                  placeDetail.tourApiResponse.name,
+                                )}`,
+                              )
+                            }>
+                            <Icon name="map" size={20} color="#3C1E1E" />
+                            <Text
+                              style={{
+                                marginLeft: 8,
+                                color: '#3C1E1E',
+                                fontWeight: '500',
+                                fontSize: 15,
+                              }}>
+                              카카오맵
+                            </Text>
+                          </TouchableOpacity>
+                        )}
                     </View>
                   ))}
                   {/* 우리앱 평점 + 최신 리뷰 미리보기 하나의 박스 */}
-                  <View style={{backgroundColor: '#fff', borderRadius: 12, padding: 16, marginBottom: 16, elevation: 2}}>
-                    <View style={{flexDirection: 'row', alignItems: 'center', marginBottom: 8}}>
-                      <Text style={{fontSize: 20, marginRight: 8}}>{ourAppRating.icon}</Text>
-                      <Text style={{fontWeight: 'bold', fontSize: 16}}>{ourAppRating.platform}</Text>
-                      <Text style={{color: '#1976D2', fontWeight: 'bold', fontSize: 18, marginLeft: 8}}>{ourAppRating.rating ? ourAppRating.rating.toFixed(1) : '-'}</Text>
-                      <Text style={{color: '#888', marginLeft: 4}}>리뷰 {ourAppRating.reviewCount}개</Text>
+                  <View
+                    style={{
+                      backgroundColor: '#fff',
+                      borderRadius: 12,
+                      padding: 16,
+                      marginBottom: 16,
+                      elevation: 2,
+                    }}>
+                    <View
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        marginBottom: 8,
+                      }}>
+                      <Text style={{fontSize: 20, marginRight: 8}}>
+                        {ourAppRating.icon}
+                      </Text>
+                      <Text style={{fontWeight: 'bold', fontSize: 16}}>
+                        {ourAppRating.platform}
+                      </Text>
+                      <Text
+                        style={{
+                          color: '#1976D2',
+                          fontWeight: 'bold',
+                          fontSize: 18,
+                          marginLeft: 8,
+                        }}>
+                        {ourAppRating.rating
+                          ? ourAppRating.rating.toFixed(1)
+                          : '-'}
+                      </Text>
+                      <Text style={{color: '#888', marginLeft: 4}}>
+                        리뷰 {ourAppRating.reviewCount}개
+                      </Text>
                       <View style={{flexDirection: 'row', marginLeft: 8}}>
-                        {[1,2,3,4,5].map(i => (
-                          <Text key={i} style={{color: i <= Math.round(ourAppRating.rating) ? '#FFD700' : '#ccc', fontSize: 18}}>★</Text>
+                        {[1, 2, 3, 4, 5].map(i => (
+                          <Text
+                            key={i}
+                            style={{
+                              color:
+                                i <= Math.round(ourAppRating.rating)
+                                  ? '#FFD700'
+                                  : '#ccc',
+                              fontSize: 18,
+                            }}>
+                            ★
+                          </Text>
                         ))}
                       </View>
                     </View>
-                    <Text style={{fontWeight: 'bold', fontSize: 15, marginBottom: 8}}>최신 리뷰</Text>
-                    {previewReviews.length > 0 ? previewReviews.map((review, idx) => {
-                      // 인코딩된 값이면 '익명'으로 대체
-                      let displayName = review.name || '';
-                      if (
-                        /^naver_|^kakao_|^google_/i.test(displayName) ||
-                        displayName.length > 15
-                      ) {
-                        displayName = '익명';
-                      }
-                      return (
-                        <View key={idx} style={{backgroundColor: '#f8f9fa', borderRadius: 8, padding: 12, marginBottom: 8}}>
-                          <View style={{flexDirection: 'row', alignItems: 'center', marginBottom: 4}}>
-                            <Text style={{fontWeight: 'bold', marginRight: 8, fontSize: 13}} numberOfLines={1}>{displayName}</Text>
-                            <Text style={{color: '#1976D2', fontWeight: 'bold', fontSize: 13}}>{review.rating?.toFixed(1) ?? '-'}</Text>
-                            <Text style={{color: '#888', marginLeft: 8, fontSize: 11}}>{review.createdAt ? new Date(review.createdAt).toLocaleDateString() : ''}</Text>
+                    <Text
+                      style={{
+                        fontWeight: 'bold',
+                        fontSize: 15,
+                        marginBottom: 8,
+                      }}>
+                      최신 리뷰
+                    </Text>
+                    {previewReviews.length > 0 ? (
+                      previewReviews.map((review, idx) => {
+                        // 인코딩된 값이면 '익명'으로 대체
+                        let displayName = review.name || '';
+                        if (
+                          /^naver_|^kakao_|^google_/i.test(displayName) ||
+                          displayName.length > 15
+                        ) {
+                          displayName = '익명';
+                        }
+                        return (
+                          <View
+                            key={idx}
+                            style={{
+                              backgroundColor: '#f8f9fa',
+                              borderRadius: 8,
+                              padding: 12,
+                              marginBottom: 8,
+                            }}>
+                            <View
+                              style={{
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                marginBottom: 4,
+                              }}>
+                              <Text
+                                style={{
+                                  fontWeight: 'bold',
+                                  marginRight: 8,
+                                  fontSize: 13,
+                                }}
+                                numberOfLines={1}>
+                                {displayName}
+                              </Text>
+                              <Text
+                                style={{
+                                  color: '#1976D2',
+                                  fontWeight: 'bold',
+                                  fontSize: 13,
+                                }}>
+                                {review.rating?.toFixed(1) ?? '-'}
+                              </Text>
+                              <Text
+                                style={{
+                                  color: '#888',
+                                  marginLeft: 8,
+                                  fontSize: 11,
+                                }}>
+                                {review.createdAt
+                                  ? new Date(
+                                      review.createdAt,
+                                    ).toLocaleDateString()
+                                  : ''}
+                              </Text>
+                            </View>
+                            <Text
+                              style={{fontSize: 13, color: '#333'}}
+                              numberOfLines={2}>
+                              {review.content}
+                            </Text>
                           </View>
-                          <Text style={{fontSize: 13, color: '#333'}} numberOfLines={2}>{review.content}</Text>
-                        </View>
-                      );
-                    }) : (
-                      <Text style={{color: '#888', fontSize: 13, marginBottom: 8}}>아직 등록된 리뷰가 없습니다.</Text>
+                        );
+                      })
+                    ) : (
+                      <Text
+                        style={{color: '#888', fontSize: 13, marginBottom: 8}}>
+                        아직 등록된 리뷰가 없습니다.
+                      </Text>
                     )}
                     <TouchableOpacity
-                      style={{alignSelf: 'center', backgroundColor: '#1976D2', borderRadius: 20, paddingHorizontal: 18, paddingVertical: 6, marginTop: 4}}
-                      onPress={() => navigation.navigate('Practice', { placeId: route.params?.placeId || route.params?.tourProgramId })}
-                    >
-                      <Text style={{color: '#fff', fontWeight: 'bold', fontSize: 18}}>+</Text>
+                      style={{
+                        alignSelf: 'center',
+                        backgroundColor: '#1976D2',
+                        borderRadius: 20,
+                        paddingHorizontal: 18,
+                        paddingVertical: 6,
+                        marginTop: 4,
+                      }}
+                      onPress={() =>
+                        navigation.navigate('Practice', {
+                          placeId:
+                            route.params?.placeId ||
+                            route.params?.tourProgramId,
+                        })
+                      }>
+                      <Text
+                        style={{
+                          color: '#fff',
+                          fontWeight: 'bold',
+                          fontSize: 18,
+                        }}>
+                        +
+                      </Text>
                     </TouchableOpacity>
                   </View>
                 </>
@@ -903,4 +1216,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default PlaceDetailScreen; 
+export default PlaceDetailScreen;
