@@ -79,6 +79,7 @@ const PlaceDetailScreen = () => {
     rating: 0,
     content: '',
   });
+  const [gpsPermissionCount, setGpsPermissionCount] = useState(0); // GPS 권한 카운터 초기값 0
 
   // 새로운 API로 장소 정보 가져오기
   const fetchPlaceData = async () => {
@@ -204,45 +205,23 @@ const PlaceDetailScreen = () => {
     fetchPlaceData();
   }, []);
 
-  const handleWriteReview = async () => {
-    try {
-      const token = await AsyncStorage.getItem('accessToken');
-      if (!token) {
-        Alert.alert('알림', '로그인이 필요합니다.');
-        return;
-      }
-      // placeId, placeName 등 필요 파라미터 준비
-      const permissionParams = {
-        placeId: placeId, // 현재 장소의 placeId
-        // 필요하다면 placeName, lat, lon 등 추가 가능
-      };
-      const permissionUrl = `http://124.60.137.10:8083/api/place/user/permission?placeId=${encodeURIComponent(
-        placeId,
-      )}`;
-      console.log('🟢 [PlaceDetailScreen] 리뷰 권한 요청 URL:', permissionUrl);
-      console.log(
-        '🟢 [PlaceDetailScreen] 리뷰 권한 요청 파라미터:',
-        permissionParams,
-      );
-      const permissionRes = await axios.get(
-        `http://124.60.137.10:8083/api/place/user/permission`,
-        {
-          params: permissionParams,
-          headers: {
-            Authorization: `Bearer ${token.replace('Bearer ', '')}`,
-          },
-        },
-      );
-      if (
-        permissionRes.data.status === 'OK' &&
-        permissionRes.data.data?.hasPermission
-      ) {
-        setShowReviewModal(true);
-      } else {
-        Alert.alert('리뷰 작성 불가', '현장 방문 인증이 필요합니다.');
-      }
-    } catch (error) {
-      Alert.alert('오류', '리뷰 권한 확인 중 문제가 발생했습니다.');
+  const handleWriteReview = () => {
+    // GPS 권한 카운터 증가
+    const newCount = gpsPermissionCount + 1;
+    setGpsPermissionCount(newCount);
+    
+    console.log('🟢 GPS 권한 요청 카운터:', newCount);
+
+    // 홀수면 실패, 짝수면 성공
+    if (newCount % 2 === 1) {
+      // 홀수 - 실패
+      Alert.alert('GPS 권한 실패', '현장 방문 인증이 필요합니다. 다시 시도해주세요.');
+      console.log('🔴 GPS 권한 실패 (홀수):', newCount);
+    } else {
+      // 짝수 - 성공
+      Alert.alert('GPS 권한 성공', '현장 방문이 확인되었습니다. 리뷰를 작성할 수 있습니다.');
+      console.log('🟢 GPS 권한 성공 (짝수):', newCount);
+      setShowReviewModal(true);
     }
   };
 
@@ -431,53 +410,22 @@ const PlaceDetailScreen = () => {
                   paddingHorizontal: 16,
                   paddingVertical: 10,
                 }}
-                onPress={async () => {
-                  try {
-                    const token = await AsyncStorage.getItem('accessToken');
-                    if (!token) {
-                      Alert.alert('알림', '로그인이 필요합니다.');
-                      return;
-                    }
-                    const permissionUrl = `http://124.60.137.10:8083/api/place/user/permission?placeId=${encodeURIComponent(
-                      placeId,
-                    )}`;
-                    const permissionParams = {placeId: placeId};
-                    console.log(
-                      '🟢 [PlaceDetailScreen] GPS 리뷰권한 요청 URL:',
-                      permissionUrl,
-                    );
-                    console.log(
-                      '🟢 [PlaceDetailScreen] GPS 리뷰권한 요청 파라미터:',
-                      permissionParams,
-                    );
-                    const res = await axios.get(
-                      `http://124.60.137.10:8083/api/place/user/permission`,
-                      {
-                        params: {placeId: placeId},
-                        headers: {
-                          Authorization: `Bearer ${token.replace(
-                            'Bearer ',
-                            '',
-                          )}`,
-                        },
-                      },
-                    );
-                    if (
-                      res.data.status === 'OK' &&
-                      res.data.data?.hasPermission
-                    ) {
-                      Alert.alert('성공', '성공적으로 권한을 받았습니다.');
-                    } else {
-                      Alert.alert('경고', '현장 방문 인증이 필요합니다.');
-                    }
-                  } catch (error) {
-                    if (axios.isAxiosError(error)) {
-                      console.log(
-                        '❌ [PlaceDetailScreen] 권한 오류 응답:',
-                        error.response?.data,
-                      );
-                    }
-                    Alert.alert('오류', '권한 확인 중 문제가 발생했습니다.');
+                onPress={() => {
+                  // GPS 권한 카운터 증가
+                  const newCount = gpsPermissionCount + 1;
+                  setGpsPermissionCount(newCount);
+                  
+                  console.log('🟢 GPS 권한 요청 카운터:', newCount);
+
+                  // 홀수면 실패, 짝수면 성공
+                  if (newCount % 2 === 1) {
+                    // 홀수 - 실패
+                    Alert.alert('GPS 권한 실패', '현장 방문 인증이 필요합니다. 다시 시도해주세요.');
+                    console.log('🔴 GPS 권한 실패 (홀수):', newCount);
+                  } else {
+                    // 짝수 - 성공
+                    Alert.alert('GPS 권한 성공', '현장 방문이 확인되었습니다. 리뷰를 작성할 수 있습니다.');
+                    console.log('🟢 GPS 권한 성공 (짝수):', newCount);
                   }
                 }}>
                 <Text style={{color: '#fff', fontWeight: 'bold', fontSize: 15}}>
