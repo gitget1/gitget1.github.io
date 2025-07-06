@@ -13,6 +13,7 @@ import {useNavigation, useRoute} from '@react-navigation/native';
 import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import type {AppStackParamList} from '../../navigations/AppNavigator';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import axios from 'axios';
 
 const refundTable = Array.from({length: 11}, (_, i) => ({
   day: 10 - i,
@@ -26,6 +27,8 @@ const PaymentScreen = () => {
 
   // route params에서 투어 데이터 받아오기
   const tourData = route.params?.tourData as any;
+  const tourProgramId = route.params?.tourProgramId as number;
+  const unlockSchedule = route.params?.unlockSchedule as boolean;
   const resultParam = route.params?.result as 'success' | 'fail' | undefined;
 
   console.log('🎯 PaymentScreen - route.params:', route.params);
@@ -37,13 +40,21 @@ const PaymentScreen = () => {
   const [people, setPeople] = useState(1);
   const [appliedPeople, setAppliedPeople] = useState<number | null>(null);
   const [userId, setUserId] = useState<number | null>(null);
+  const [localTourData, setLocalTourData] = useState<any>(tourData);
 
-  const totalPrice =
-    appliedPeople && tourData ? tourData.guidePrice * appliedPeople : 0;
+  // guidePrice가 0인 경우 기본값 설정
+  const effectiveGuidePrice = localTourData?.guidePrice > 0 ? localTourData.guidePrice : 50000;
+  
+  // appliedPeople이 null인 경우 기본값 설정
+  const effectiveAppliedPeople = appliedPeople || 1;
+
+  const totalPrice = effectiveGuidePrice * effectiveAppliedPeople;
 
   console.log('💰 totalPrice 계산:', {
     appliedPeople,
-    guidePrice: tourData?.guidePrice,
+    effectiveAppliedPeople,
+    guidePrice: localTourData?.guidePrice,
+    effectiveGuidePrice,
     totalPrice,
   });
 
@@ -59,15 +70,68 @@ const PaymentScreen = () => {
 
   // tourData가 없을 경우 처리
   useEffect(() => {
-    if (!tourData && !resultParam) {
-      Alert.alert('오류', '투어 정보를 불러올 수 없습니다.', [
+    if (!localTourData && !resultParam) {
+      if (tourProgramId) {
+        // tourProgramId가 있으면 투어 데이터를 가져오기
+        fetchTourData();
+      } else {
+        Alert.alert('오류', '투어 정보를 불러올 수 없습니다.', [
+          {
+            text: '확인',
+            onPress: () => navigation.goBack(),
+          },
+        ]);
+      }
+    }
+  }, [localTourData, tourProgramId, resultParam, navigation]);
+
+  // tourData가 초기에 전달된 경우 localTourData 업데이트
+  useEffect(() => {
+    if (tourData) {
+      setLocalTourData(tourData);
+    }
+  }, [tourData]);
+
+  // 투어 데이터 가져오기 함수
+  const fetchTourData = async () => {
+    try {
+      const token = await AsyncStorage.getItem('accessToken');
+      if (!token) {
+        Alert.alert('알림', '로그인이 필요합니다.');
+        navigation.goBack();
+        return;
+      }
+
+      const cleanToken = token.replace('Bearer ', '');
+      const response = await axios.get(
+        `http://124.60.137.10:8083/api/tour-program/${tourProgramId}`,
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${cleanToken}`,
+          },
+          timeout: 10000,
+        },
+      );
+
+      if (response.data.status === 'OK') {
+        const fetchedTourData = response.data.data;
+        // tourData state를 업데이트하거나 직접 사용
+        console.log('🟢 투어 데이터 가져오기 성공:', fetchedTourData);
+        setLocalTourData(fetchedTourData);
+      } else {
+        throw new Error(response.data.message || '투어 정보를 불러오는데 실패했습니다.');
+      }
+    } catch (error) {
+      console.error('❌ 투어 데이터 가져오기 실패:', error);
+      Alert.alert('오류', '투어 정보를 불러오는데 실패했습니다.', [
         {
           text: '확인',
           onPress: () => navigation.goBack(),
         },
       ]);
     }
-  }, [tourData, resultParam, navigation]);
+  };
 
   // 사용자 ID 가져오기
   useEffect(() => {
@@ -87,12 +151,7 @@ const PaymentScreen = () => {
   }, []);
 
   const handlePayment = () => {
-    if (appliedPeople === null) {
-      Alert.alert('알림', '인원 수를 설정하고 "적용" 버튼을 눌러주세요.');
-      return;
-    }
-
-    if (!tourData) {
+    if (!localTourData) {
       Alert.alert('오류', '투어 정보를 찾을 수 없습니다.');
       return;
     }
@@ -103,15 +162,15 @@ const PaymentScreen = () => {
     }
 
     console.log('🧮 최종 totalPrice:', totalPrice);
-    console.log('📌 appliedPeople:', appliedPeople);
-    console.log('🎯 tourData:', tourData);
+    console.log('📌 effectiveAppliedPeople:', effectiveAppliedPeople);
+    console.log('🎯 localTourData:', localTourData);
 
     const merchantUid = `merchant_${new Date().getTime()}`;
 
     const paymentData = {
       pg: 'html5_inicis',
       pay_method: 'card',
-      name: tourData.title,
+      name: localTourData.title,
       amount: totalPrice,
       merchant_uid: merchantUid,
       buyer_name: '홍길동', // 실제 사용자 정보로 변경 필요
@@ -123,9 +182,9 @@ const PaymentScreen = () => {
     // 서버로 전송할 예약 데이터
     const reservationData = {
       reservation: {
-        tourProgramId: tourData.tourProgramId || tourData.id,
+        tourProgramId: localTourData.tourProgramId || localTourData.id,
         userId: userId,
-        numOfPeople: appliedPeople,
+        numOfPeople: effectiveAppliedPeople,
         totalPrice: totalPrice,
         guideStartDate: `${year}-${String(month).padStart(2, '0')}-${String(
           day,
@@ -165,7 +224,7 @@ const PaymentScreen = () => {
   }
 
   // tourData가 없으면 로딩 표시
-  if (!tourData && !result) {
+  if (!localTourData && !result) {
     return (
       <View style={styles.resultContainer}>
         <Text style={styles.resultText}>투어 정보를 불러오는 중...</Text>
@@ -179,10 +238,10 @@ const PaymentScreen = () => {
         style={styles.container}
         contentContainerStyle={{paddingBottom: 120}}>
         <View style={styles.box}>
-          <Text style={styles.title}>{tourData?.title || '투어 제목'}</Text>
-          <Text style={styles.region}>{tourData?.region || '지역 정보'}</Text>
+          <Text style={styles.title}>{localTourData?.title || '투어 제목'}</Text>
+          <Text style={styles.region}>{localTourData?.region || '지역 정보'}</Text>
           <Text style={styles.price}>
-            가격: ₩{(tourData?.guidePrice || 0).toLocaleString()} /인
+            가격: ₩{effectiveGuidePrice.toLocaleString()} /인
           </Text>
         </View>
 
@@ -236,16 +295,16 @@ const PaymentScreen = () => {
               <Text>적용</Text>
             </TouchableOpacity>
           </View>
-          {appliedPeople !== null && (
+          {effectiveAppliedPeople > 0 && (
             <View style={styles.totalPeopleBox}>
               <Text style={styles.totalPeopleText}>
-                총 인원: {appliedPeople}명
+                총 인원: {effectiveAppliedPeople}명
               </Text>
             </View>
           )}
         </View>
 
-        {appliedPeople !== null && (
+        {effectiveAppliedPeople > 0 && (
           <View style={styles.box}>
             <Text style={styles.label}>총 금액</Text>
             <Text style={styles.totalPrice}>

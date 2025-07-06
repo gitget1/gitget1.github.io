@@ -27,7 +27,7 @@ interface WishlistItem {
   hashtags: string[];
 }
 
-const WISHLIST_API_URL = 'http://124.60.137.10:80/api/wishlist';
+const WISHLIST_API_URL = 'http://124.60.137.10:8083/api/tour-program/wishlist';
 
 const WishlistScreen = () => {
   const {t} = useTranslation();

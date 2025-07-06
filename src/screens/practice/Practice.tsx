@@ -57,7 +57,6 @@ export default function ReviewScreen() {
   const {t} = useTranslation();
   const route = useRoute<RouteProp<AppStackParamList, 'Practice'>>();
   const tourProgramId = route.params?.tourProgramId;
-  const placeId = route.params?.placeId;
 
   console.log('🟢 Practice 화면 - route.params:', route.params);
   console.log('🟢 Practice 화면 - 받은 tourProgramId:', tourProgramId);
@@ -146,7 +145,7 @@ export default function ReviewScreen() {
         const token = await AsyncStorage.getItem('accessToken');
         
         const response = await axios.get(
-          `http://124.60.137.10/api/tour-program/${tourProgramId}`,
+          `http://124.60.137.10:8083/api/tour-program/${tourProgramId}`,
           {
             headers: token ? {
               'Content-Type': 'application/json',
@@ -171,52 +170,34 @@ export default function ReviewScreen() {
 
   useEffect(() => {
     const fetchReviews = async () => {
-      if (!tourProgramId && !placeId) {
-        console.log('tourProgramId/placeId가 없습니다. 리뷰를 로드하지 않습니다.');
+      if (!tourProgramId) {
+        console.log('tourProgramId가 없습니다. 리뷰를 로드하지 않습니다.');
         setLoading(false);
         return;
       }
 
       try {
         setLoading(true);
+        console.log('리뷰 요청 tourProgramId:', tourProgramId);
+
         // 로컬 스토리지에서 토큰 가져오기
         const token = await AsyncStorage.getItem('accessToken');
-        let res;
-        if (placeId) {
-          // 장소 리뷰 API 호출
-          res = await axios.get(
-            `http://124.60.137.10:8083/api/place/review/${placeId}`,
-            {
-              params: {
-                page: 0,
-                size: 10,
-                sortOption: sortMap[sortOrder],
-              },
-              headers: token
-                ? {
-                    Authorization: `Bearer ${token}`,
-                  }
-                : undefined,
+
+        const res = await axios.get(
+          `http://124.60.137.10:8083/api/tour-program/review/${tourProgramId}`,
+          {
+            params: {
+              page: 0,
+              size: 10,
+              sortOption: sortMap[sortOrder],
             },
-          );
-        } else {
-          // 기존 투어 리뷰 API 호출
-          res = await axios.get(
-            `http://124.60.137.10/api/review/${tourProgramId}`,
-            {
-              params: {
-                page: 0,
-                size: 10,
-                sortOption: sortMap[sortOrder],
-              },
-              headers: token
-                ? {
-                    Authorization: `Bearer ${token}`,
-                  }
-                : undefined,
-            },
-          );
-        }
+            headers: token
+              ? {
+                  Authorization: `Bearer ${token}`,
+                }
+              : undefined,
+          },
+        );
         if (
           res.data.status === '100 CONTINUE' ||
           res.data.status === 'Success' ||
@@ -339,7 +320,7 @@ export default function ReviewScreen() {
     };
 
     fetchReviews();
-  }, [sortOrder, sortMap, tourProgramId, placeId, currentUserId]);
+  }, [sortOrder, sortMap, tourProgramId, currentUserId]);
 
   if (loading) {
     return <ActivityIndicator size="large" style={{marginTop: 50}} />;
@@ -410,7 +391,7 @@ export default function ReviewScreen() {
       });
 
       const response = await axios.post(
-        `http://124.60.137.10/api/review`,
+        `http://124.60.137.10:8083/api/tour-program/review`,
         {
           tourProgramId: tourProgramId,
           rating: ratingString,
@@ -529,7 +510,7 @@ export default function ReviewScreen() {
             });
 
             // tourProgramId를 리뷰 ID 대신 사용
-            const deleteUrl = `http://124.60.137.10/api/review/${tourProgramId}`;
+            const deleteUrl = `http://124.60.137.10:8083/api/tour-program/review/${tourProgramId}`;
             console.log('🟢 tourProgramId로 삭제 요청:', deleteUrl);
             console.log(
               '🟢 전체 리뷰 목록:',
@@ -555,7 +536,7 @@ export default function ReviewScreen() {
               try {
                 const token = await AsyncStorage.getItem('accessToken');
                 const refreshRes = await axios.get(
-                  `http://124.60.137.10/api/review/${tourProgramId}`,
+                  `http://124.60.137.10:8083/api/tour-program/review/${tourProgramId}`,
                   {
                     params: {
                       page: 0,
@@ -753,90 +734,80 @@ export default function ReviewScreen() {
       </View>
 
       {/* 💬 리뷰 카드들 */}
-      {reviews.map((review, i) => {
-        // 인코딩된 값이면 '익명'으로 대체
-        let displayName = review.name || '';
-        if (
-          /^naver_|^kakao_|^google_/i.test(displayName) ||
-          displayName.length > 15
-        ) {
-          displayName = '익명';
-        }
-        return (
-          <View key={i} style={styles.reviewCard}>
-            <View style={styles.profileRow}>
-              <Image
-                source={{
-                  uri:
-                    review.user?.avatar ||
-                    `https://via.placeholder.com/36x36.png?text=${encodeURIComponent(
-                      (displayName || '익명').charAt(0),
-                    )}`,
-                }}
-                style={styles.avatar}
-              />
-              <View style={styles.flex1}>
-                <Text style={styles.nickname}>
-                  {displayName}
+      {reviews.map((review, i) => (
+        <View key={i} style={styles.reviewCard}>
+          <View style={styles.profileRow}>
+            <Image
+              source={{
+                uri:
+                  review.user?.avatar ||
+                  `https://via.placeholder.com/36x36.png?text=${encodeURIComponent(
+                    (review.name || '익명').charAt(0),
+                  )}`,
+              }}
+              style={styles.avatar}
+            />
+            <View style={styles.flex1}>
+              <Text style={styles.nickname}>
+                {review.name || t('anonymousReview')}
+              </Text>
+              <View style={styles.metaRow}>
+                <Text style={styles.smallText}>
+                  {renderStars(review.rating || 0)}
                 </Text>
-                <View style={styles.metaRow}>
-                  <Text style={styles.smallText}>
-                    {renderStars(review.rating || 0)}
-                  </Text>
-                  <Text style={styles.date}>
-                    {new Date(review.createdAt).toLocaleDateString()}
-                  </Text>
-                </View>
+                <Text style={styles.date}>
+                  {new Date(review.createdAt).toLocaleDateString()}
+                </Text>
               </View>
-              {/* 본인이 작성한 리뷰인 경우만 삭제 버튼 표시 */}
-              {(() => {
-                // 디버깅을 위한 로그
-                console.log(`🔍 리뷰 ${i} 삭제 버튼 조건 확인:`, {
-                  reviewUserId: review.user_id,
-                  currentUserId: currentUserId,
-                  reviewName: review.name,
-                  reviewUserName: review.user?.name,
-                  reviewId: review.id,
-                  reviewContent: review.content?.substring(0, 20),
-                });
-
-                // 임시로 모든 리뷰에 삭제 버튼 표시 (테스트용)
-                const isMyReview = true;
-
-                console.log(`🔍 리뷰 ${i} 삭제 버튼 표시 여부:`, isMyReview);
-
-                return isMyReview ? (
-                  <TouchableOpacity
-                    style={styles.tempDeleteButton}
-                    onPress={() => handleDeleteReview(review.id, i)}>
-                    <Text style={styles.tempDeleteButtonText}>삭제</Text>
-                  </TouchableOpacity>
-                ) : null;
-              })()}
             </View>
-            <Text style={styles.content}>{review.content}</Text>
-            {review.imageUrls && review.imageUrls.length > 0 && (
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                style={{marginTop: 10}}>
-                {review.imageUrls.map((img: string, idx: number) => (
-                  <Image
-                    key={idx}
-                    source={{uri: img}}
-                    style={{
-                      width: 120,
-                      height: 120,
-                      borderRadius: 8,
-                      marginRight: 10,
-                    }}
-                  />
-                ))}
-              </ScrollView>
-            )}
+            {/* 본인이 작성한 리뷰인 경우만 삭제 버튼 표시 */}
+            {(() => {
+              // 디버깅을 위한 로그
+              console.log(`🔍 리뷰 ${i} 삭제 버튼 조건 확인:`, {
+                reviewUserId: review.user_id,
+                currentUserId: currentUserId,
+                reviewName: review.name,
+                reviewUserName: review.user?.name,
+                reviewId: review.id,
+                reviewContent: review.content?.substring(0, 20),
+              });
+
+              // 임시로 모든 리뷰에 삭제 버튼 표시 (테스트용)
+              const isMyReview = true;
+
+              console.log(`🔍 리뷰 ${i} 삭제 버튼 표시 여부:`, isMyReview);
+
+              return isMyReview ? (
+                <TouchableOpacity
+                  style={styles.tempDeleteButton}
+                  onPress={() => handleDeleteReview(review.id, i)}>
+                  <Text style={styles.tempDeleteButtonText}>삭제</Text>
+                </TouchableOpacity>
+              ) : null;
+            })()}
           </View>
-        );
-      })}
+          <Text style={styles.content}>{review.content}</Text>
+          {review.imageUrls && review.imageUrls.length > 0 && (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={{marginTop: 10}}>
+              {review.imageUrls.map((img: string, idx: number) => (
+                <Image
+                  key={idx}
+                  source={{uri: img}}
+                  style={{
+                    width: 120,
+                    height: 120,
+                    borderRadius: 8,
+                    marginRight: 10,
+                  }}
+                />
+              ))}
+            </ScrollView>
+          )}
+        </View>
+      ))}
     </ScrollView>
   );
 }

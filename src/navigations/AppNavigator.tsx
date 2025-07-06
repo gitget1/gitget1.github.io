@@ -10,6 +10,7 @@ import Make_program from '../screens/program/Make_program';
 import TraitSelection from '../screens/Select_mbti/Trait_Selection';
 import ResultScreen from '../screens/mbti/ResultScreen';
 import Practice from '../screens/practice/Practice';
+import PlaceReview from '../screens/practice/place_review';
 import Practice1 from '../screens/practice/Practice_detail page';
 import PlaceDetailScreen from '../screens/practice/PlaceDetailScreen';
 import MyReviewList from '../screens/mypage/MyReviewList';
@@ -59,9 +60,10 @@ export type AppStackParamList = {
   Result: {
     result: any;
   };
-  Practice: {tourProgramId: number};
+  Practice: { tourProgramId?: number; placeId?: string };
+  PlaceReview: { placeId: string; placeName?: string };
   PracticeDetail: {tourProgramId: number; refresh?: boolean; selectedLanguage?: string};
-  PlaceDetail: {placeName: string; placeDescription: string; lat: number; lon: number; placeId?: string; language?: string};
+  PlaceDetail: {placeName: string; placeDescription: string; lat: number; lon: number; placeId?: string; language?: string; tourProgramId?: number};
   IamportPayment: {
     userCode: string;
     data: {
@@ -79,7 +81,11 @@ export type AppStackParamList = {
   ChatMain: undefined;
   ChatRoom: {roomId: string; userId?: number};
   MyReviewList: undefined;
-  PaymentScreen: undefined;
+  PaymentScreen: {
+    tourData?: any;
+    tourProgramId?: number;
+    unlockSchedule?: boolean;
+  };
   PaymentComplete: undefined;
   WishlistScreen: undefined;
   Translator: undefined;
@@ -162,6 +168,17 @@ const AppNavigator = () => {
         options={{
           headerShown: true,
           title: t('myReview'),
+          headerTitleStyle: {
+            fontSize: 20,
+          },
+        }}
+      />
+      <Stack.Screen
+        name="PlaceReview"
+        component={PlaceReview}
+        options={{
+          headerShown: true,
+          title: '장소 리뷰',
           headerTitleStyle: {
             fontSize: 20,
           },

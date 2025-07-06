@@ -69,8 +69,7 @@ const PlaceDetailScreen = () => {
   const {t} = useTranslation();
   const navigation = useNavigation<StackNavigationProp<AppStackParamList>>();
   const route = useRoute<PlaceDetailRouteProp>();
-  const {placeName, placeDescription, lat, lon, placeId, language} =
-    route.params;
+  const {placeName, placeDescription, lat, lon, placeId, language, tourProgramId} = route.params;
 
   const [placeDetail, setPlaceDetail] = useState<PlaceDetailData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -422,7 +421,7 @@ const PlaceDetailScreen = () => {
                   ));
                 })()}
               </View>
-              {/* GPS로 리뷰권한 받기 버튼 */}
+              {/* GPS로 리뷰권한 받기 버튼 */} 
               <TouchableOpacity
                 style={{
                   marginTop: 12,
@@ -858,29 +857,13 @@ const PlaceDetailScreen = () => {
                       </Text>
                     )}
                     <TouchableOpacity
-                      style={{
-                        alignSelf: 'center',
-                        backgroundColor: '#1976D2',
-                        borderRadius: 20,
-                        paddingHorizontal: 18,
-                        paddingVertical: 6,
-                        marginTop: 4,
-                      }}
-                      onPress={() =>
-                        navigation.navigate('Practice', {
-                          placeId:
-                            route.params?.placeId ||
-                            route.params?.tourProgramId,
-                        })
-                      }>
-                      <Text
-                        style={{
-                          color: '#fff',
-                          fontWeight: 'bold',
-                          fontSize: 18,
-                        }}>
-                        +
-                      </Text>
+                      style={{alignSelf: 'center', backgroundColor: '#1976D2', borderRadius: 20, paddingHorizontal: 18, paddingVertical: 6, marginTop: 4}}
+                      onPress={() => navigation.navigate('PlaceReview', { 
+                        placeId, 
+                        placeName: placeDetail?.tourApiResponse?.name || placeName 
+                      })}
+                    >
+                      <Text style={{color: '#fff', fontWeight: 'bold', fontSize: 18}}>+</Text>
                     </TouchableOpacity>
                   </View>
                 </>

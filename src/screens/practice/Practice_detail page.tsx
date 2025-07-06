@@ -71,8 +71,8 @@ const Practice = () => {
   // 모자이크 처리 관련 state 추가
   const [isScheduleMasked, setIsScheduleMasked] = useState(true);
   const [showUnlockModal, setShowUnlockModal] = useState(false);
-  const [userPoints, setUserPoints] = useState(100); // 사용자 포인트 (실제로는 API에서 가져와야 함)
-  const [scheduleUnlockCost] = useState(50); // 일정 해제 비용
+  const [userPoints, setUserPoints] = useState(5000); // 사용자 포인트 (더미 5000)
+  const [scheduleUnlockCost] = useState(100); // 일정 해제 비용(100)
   const [maskType, setMaskType] = useState<'dots' | 'stars' | 'squares' | 'blur'>('dots'); // 모자이크 타입
 
   console.log('🟢 PracticeDetail 화면 - tourProgramId:', tourProgramId);
@@ -775,7 +775,7 @@ const Practice = () => {
 
       const cleanToken = token.replace('Bearer ', '');
       const response = await axios.post(
-        `http://124.60.137.10:8083/api/wishlist/${tourProgramId}`,
+        `http://124.60.137.10:8083/api/tour-program/wishlist/${tourProgramId}`,
         {},
         {
           headers: {
@@ -934,7 +934,7 @@ const Practice = () => {
 
       const cleanToken = token.replace('Bearer ', '');
       const response = await axios.post(
-        'http://124.60.137.10:8083/api/reservation/create',
+        'http://124.60.137.10:80/api/reservation',
         {
           tourProgramId: tourProgramId,
         },
@@ -952,16 +952,19 @@ const Practice = () => {
         handleGoToPayment();
       } else {
         console.error('❌ 예약 생성 실패:', response.data);
-        Alert.alert(getTranslatedUIText('오류', selectedLanguage), getTranslatedUIText('예약을 생성할 수 없습니다.', selectedLanguage));
+        // 예약 생성 실패 시에도 결제 페이지로 이동 (임시 처리)
+        console.log('⚠️ 예약 생성 실패했지만 결제 페이지로 이동합니다.');
+        handleGoToPayment();
       }
     } catch (error) {
-      console.error('❌ 예약 생성 오류:', error);
-      Alert.alert(getTranslatedUIText('오류', selectedLanguage), getTranslatedUIText('예약 중 오류가 발생했습니다.', selectedLanguage));
+      
+      handleGoToPayment();
     }
   };
 
   const handleGoToPayment = () => {
     navigation.navigate('PaymentScreen', {
+      tourData: data,
       tourProgramId: tourProgramId,
     });
   };
@@ -992,6 +995,7 @@ const Practice = () => {
       lon: item.lon,
       placeId: placeId,
       language: 'kor',
+      tourProgramId: tourProgramId,
     });
   };
 
@@ -1084,22 +1088,24 @@ const Practice = () => {
       return;
     }
 
+    const before = userPoints;
+    const after = userPoints - scheduleUnlockCost;
+
     Alert.alert(
-      getTranslatedUIText('일정 해제', selectedLanguage),
-      getTranslatedUIText('포인트로 일정을 해제하시겠습니까?', selectedLanguage),
+      '포인트 결제',
+      `현재 포인트: ${before}\n결제 금액: ${scheduleUnlockCost}\n잔여 포인트: ${after}`,
       [
         {text: getTranslatedUIText('취소', selectedLanguage), style: 'cancel'},
         {
           text: getTranslatedUIText('해제', selectedLanguage),
           onPress: () => {
-            // 포인트 차감 및 일정 해제
-            setUserPoints(prev => prev - scheduleUnlockCost);
+            setUserPoints(after);
             setIsScheduleMasked(false);
             setShowUnlockModal(false);
             Alert.alert(
               getTranslatedUIText('성공', selectedLanguage),
               getTranslatedUIText('일정이 해제되었습니다', selectedLanguage) + '\n' +
-              getTranslatedUIText('포인트가 차감되었습니다', selectedLanguage)
+              `잔여 포인트: ${after}`
             );
           }
         }
@@ -1118,6 +1124,7 @@ const Practice = () => {
           onPress: () => {
             // 결제 페이지로 이동
             navigation.navigate('PaymentScreen', {
+              tourData: data,
               tourProgramId: tourProgramId,
               unlockSchedule: true,
             });
