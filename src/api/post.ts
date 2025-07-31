@@ -1,25 +1,31 @@
-// import axiosInstance from "./axios";
+import axiosInstance from './axios';
 
-// type CalendarPost = {
-//   id: number;
-//   title:string;
-//   address:string;
-// }
+// 예약 상태 변경 API
+export const updateReservationStatus = async (
+  reservationId: number,
+  status: 'ACCEPTED' | 'PENDING' | 'REJECTED',
+) => {
+  try {
+    const response = await axiosInstance.patch(
+      `/reservations/${reservationId}/status`,
+      {status},
+    );
+    return response.data;
+  } catch (error) {
+    console.error('예약 상태 변경 실패:', error);
+    throw error;
+  }
+};
 
-
-// type ResponseCalendarPost = Record<number, CalendarPost[]>
-
-
-// const getCalendarPosts = async(year:number, month:number):Promise<ResponseCalendarPost> => {
-//   const {data} = await axiosInstance.get(`/post?year=${year}&month=${month}`);
-
-//   return data;
-// }
-// export {
-//   getCalendarPosts,
-// };
-
-// export type {
-//   ResponseCalendarPost,
-//   CalendarPost,
-// }
+// 예약 목록 조회 API
+export const getReservations = async (startDate: string, endDate: string) => {
+  try {
+    const response = await axiosInstance.get(
+      `/reservations?startDate=${startDate}&endDate=${endDate}`,
+    );
+    return response.data;
+  } catch (error) {
+    console.error('예약 목록 조회 실패:', error);
+    throw error;
+  }
+};

@@ -27,8 +27,10 @@ import TranslatorScreen from '../screens/function/TranslatorScreen';
 import TranslatorHistoryScreen from '../screens/function/TranslatorHistoryScreen';
 import {useTranslation} from 'react-i18next';
 import TraitSelection1 from '../screens/Select_mbti/Trait_Selection1';
+import SplashScreen from '../screens/SplashScreen';
 
 export type AppStackParamList = {
+  Splash: undefined;
   AuthStack: undefined;
   Main: undefined;
   FunctionStack: {
@@ -103,8 +105,9 @@ const AppNavigator = () => {
 
   return (
     <Stack.Navigator
-      initialRouteName="AuthStack"
+      initialRouteName="Splash"
       screenOptions={{headerShown: false}}>
+      <Stack.Screen name="Splash" component={SplashScreen} />
       <Stack.Screen
         name="AuthStack"
         children={({navigation}) => (
