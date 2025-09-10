@@ -760,7 +760,8 @@ export default function ReviewScreen() {
                 </Text>
               </View>
             </View>
-            {/* 본인이 작성한 리뷰인 경우만 삭제 버튼 표시 */}
+            {/* 삭제 버튼 일시 비활성화 */}
+            {/* 
             {(() => {
               // 디버깅을 위한 로그
               console.log(`🔍 리뷰 ${i} 삭제 버튼 조건 확인:`, {
@@ -785,6 +786,7 @@ export default function ReviewScreen() {
                 </TouchableOpacity>
               ) : null;
             })()}
+            */}
           </View>
           <Text style={styles.content}>{review.content}</Text>
           {review.imageUrls && review.imageUrls.length > 0 && (

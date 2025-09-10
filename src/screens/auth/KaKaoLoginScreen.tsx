@@ -1,65 +1,145 @@
-import React, {useState} from 'react';
-import {SafeAreaView, StyleSheet, Platform} from 'react-native';
-import {WebView} from 'react-native-webview';
-import Config from 'react-native-config';
+
+import React, {useEffect, useState, useCallback} from 'react';
+import {
+  View,
+  StyleSheet,
+  Alert,
+  Modal,
+  Linking,
+} from 'react-native';
 import axios from 'axios';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import WebView from 'react-native-webview';
+import {useNavigation} from '@react-navigation/native';
 
-const REDIRECT_URI =
-  Platform.OS === 'android'
-    ? 'http://10.0.2.2:3030/auth/oauth/kakao'
-    : 'http://localhost:3030/auth/oauth/kakao';
+const backendUrl = 'http://124.60.137.10:8083';
 
-function KaKaoLoginScreen() {
-  const [state] = useState(() => Math.random().toString(36).substring(2, 15));
+const KaKaoLoginScreen = () => {
+  const [isWebViewVisible, setIsWebViewVisible] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const navigation = useNavigation();
 
-  const handleOnNavigationStateChange = (navState: any) => {
-    if (navState.url.includes(`${REDIRECT_URI}?code=`)) {
-      const url = navState.url;
-      const code = url.split('code=')[1]?.split('&')[0];
-      const returnedState = url.split('state=')[1];
+  // ✅ 코드로 accessToken 받기
+  const getTokenByCode = useCallback(
+    async (code) => {
+      // 카카오는 속도 제한이 엄격하므로 중복 방지 필요
+      if (isProcessing) {
+        console.log('⚠️ 이미 처리 중입니다. 중복 요청을 무시합니다.');
+        return;
+      }
 
-      if (code && returnedState === state) {
-        requestToken(code);
-      } else {
-        console.error('Invalid state parameter');
+      setIsProcessing(true);
+      
+      try {
+        const response = await axios.get(
+          `${backendUrl}/auth/token?code=${code}`,
+          { withCredentials: true }
+        );
+
+        const accessToken = response.headers.authorization?.replace('Bearer ', '');
+        if (accessToken) {
+          await AsyncStorage.setItem('accessToken', accessToken);
+          navigation.replace('Main');
+        }
+      } catch (error) {
+        Alert.alert('로그인 실패', '토큰을 받을 수 없습니다.');
+      } finally {
+        setIsProcessing(false);
+      }
+    },
+    [navigation, isProcessing]
+  );
+
+  const extractCodeFromUrl = (url) => {
+    const queryString = url.split('?')[1];
+    if (!queryString) return null;
+    const params = queryString.split('&');
+    for (let param of params) {
+      const [key, value] = param.split('=');
+      if (key === 'code') {
+        return decodeURIComponent(value);
       }
     }
+    return null;
   };
 
-  const requestToken = async (code: string) => {
+  const handleOAuthCallback = useCallback(
+    (url) => {
+      const code = extractCodeFromUrl(url);
+      if (code) {
+        getTokenByCode(code);
+      }
+      setIsWebViewVisible(false);
+    },
+    [getTokenByCode]
+  );
+
+  useEffect(() => {
+    // ✅ 화면 진입 시 바로 WebView 띄움
+    setIsWebViewVisible(true);
+    
+    // ✅ 처리 상태 초기화
+    setIsProcessing(false);
+
+    const getInitialLink = async () => {
+      const initialUrl = await Linking.getInitialURL();
+      if (initialUrl && initialUrl.startsWith('travellocal://login/callback')) {
+        handleOAuthCallback(initialUrl);
+      } else {
+        checkAndRefreshToken();
+      }
+    };
+
+    getInitialLink();
+
+    const subscription = Linking.addEventListener('url', ({ url }) => {
+      if (url && url.startsWith('travellocal://login/callback')) {
+        handleOAuthCallback(url);
+      }
+    });
+
+    return () => subscription.remove();
+  }, [handleOAuthCallback]);
+
+  const checkAndRefreshToken = useCallback(async () => {
     try {
-      const response = await axios({
-        method: 'post',
-        url: 'https://kauth.kakao.com/oauth/token',
-        params: {
-          grant_type: 'authorization_code',
-          client_id: Config.KAKAO_REST_API_KEY,
-          redirect_uri: REDIRECT_URI,
-          code,
-        },
-      });
-      console.log('response', response.data);
+      const accessToken = await AsyncStorage.getItem('accessToken');
+      if (!accessToken) {
+        const response = await axios.post(
+          `${backendUrl}/reissue`,
+          {},
+          { withCredentials: true }
+        );
+        const newAccessToken = response.headers.authorization;
+        if (newAccessToken) {
+          await AsyncStorage.setItem('accessToken', newAccessToken);
+        }
+      }
     } catch (error) {
-      console.error('카카오 토큰 요청 실패:', error);
+      console.error('reissue 실패:', error);
     }
-  };
+  }, []);
 
   return (
-    <SafeAreaView style={styles.container}>
-      <WebView
-        source={{
-          uri: `https://kauth.kakao.com/oauth/authorize?response_type=code&client_id=${Config.KAKAO_REST_API_KEY}&redirect_uri=${REDIRECT_URI}&state=${state}`,
-        }}
-        onNavigationStateChange={handleOnNavigationStateChange}
-      />
-    </SafeAreaView>
+    <View style={styles.container}>
+      <Modal
+        visible={isWebViewVisible}
+        onRequestClose={() => setIsWebViewVisible(false)}>
+        <View style={styles.webViewContainer}>
+          <WebView
+            source={{ uri: `${backendUrl}/oauth2/authorization/kakao` }}
+            style={styles.webView}
+          />
+        </View>
+      </Modal>
+    </View>
   );
-}
+};
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
+  container: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  webViewContainer: { flex: 1 },
+  webView: { flex: 1 },
 });
 
 export default KaKaoLoginScreen;

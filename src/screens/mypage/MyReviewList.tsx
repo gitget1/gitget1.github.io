@@ -187,10 +187,13 @@ const MyReviewList = () => {
                 <TouchableOpacity onPress={() => handleEdit(item)}>
                   <Text style={styles.actionText}>수정</Text>
                 </TouchableOpacity>
+                {/* 삭제 버튼 일시 비활성화 */}
+                {/*
                 <TouchableOpacity
                   onPress={() => handleDelete(item.tourProgramId)}>
                   <Text style={[styles.actionText, {color: 'red'}]}>삭제</Text>
                 </TouchableOpacity>
+                */}
               </View>
             </View>
             <Text style={styles.content}>{item.content}</Text>

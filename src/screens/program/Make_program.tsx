@@ -33,7 +33,7 @@ interface DayPlan {
     latitude: number;
     longitude: number;
   };
-  placeId?: string;
+  googlePlaceId?: string;
 }
 
 interface DaySchedule {
@@ -69,6 +69,7 @@ function Make_program() {
   const route = useRoute<RouteProp<AppStackParamList, 'Make_program'>>();
   const editData = route.params?.editData;
   const tourProgramId = route.params?.tourProgramId;
+  const isEdit = route.params?.isEdit || false;
 
   const [thumbnail, setThumbnail] = useState<string | null>(null);
   const [title, setTitle] = useState('');
@@ -103,6 +104,10 @@ function Make_program() {
     latitude: number;
     longitude: number;
   } | null>(null);
+  const [editingPlan, setEditingPlan] = useState<{
+    dayIdx: number;
+    planIdx: number;
+  } | null>(null);
 
   useEffect(() => {
     if (editData) {
@@ -128,7 +133,7 @@ function Make_program() {
               latitude: schedule.lat,
               longitude: schedule.lon,
             },
-            placeId: schedule.placeId,
+            googlePlaceId: schedule.googlePlaceId || schedule.placeId, // googlePlaceId 우선, 없으면 placeId 사용
           });
           return acc;
         },
@@ -325,15 +330,25 @@ function Make_program() {
     setDays([...days, {plans: []}]);
   };
 
-  // Day별 일정 추가
+  // Day별 일정 추가/수정
   const addPlan = (dayIdx: number) => {
     if (!plan.place || !plan.coordinate) return;
-    if (!plan.placeId) {
-      Alert.alert('오류', '장소 고유 ID(placeId)가 없습니다. 장소를 다시 선택해 주세요.');
+    if (!plan.googlePlaceId) {
+      Alert.alert('오류', '장소 고유 ID(googlePlaceId)가 없습니다. 장소를 다시 선택해 주세요.');
       return;
     }
+    
     const newDays = [...days];
-    newDays[dayIdx].plans.push({...plan});
+    
+    if (editingPlan && editingPlan.dayIdx === dayIdx && editingPlan.planIdx !== undefined) {
+      // 수정 모드: 기존 일정 업데이트
+      newDays[dayIdx].plans[editingPlan.planIdx] = {...plan};
+      setEditingPlan(null); // 수정 모드 해제
+    } else {
+      // 추가 모드: 새 일정 추가
+      newDays[dayIdx].plans.push({...plan});
+    }
+    
     setDays(newDays);
     setPlan({place: '', memo: '', travelTime: 0});
   };
@@ -343,6 +358,25 @@ function Make_program() {
     const newDays = [...days];
     newDays[dayIdx].plans.splice(planIdx, 1);
     setDays(newDays);
+  };
+
+  // Day별 일정 수정
+  const editPlan = (dayIdx: number, planIdx: number) => {
+    const planToEdit = days[dayIdx].plans[planIdx];
+    setSelectedDay(dayIdx);
+    setPlan({
+      place: planToEdit.place,
+      memo: planToEdit.memo,
+      travelTime: planToEdit.travelTime || 0,
+      coordinate: planToEdit.coordinate,
+      googlePlaceId: planToEdit.googlePlaceId,
+    });
+    
+    // 수정 모드 활성화
+    setEditingPlan({ dayIdx, planIdx });
+    
+    // 장소 검색 모달 열기
+    setPlaceModalVisible(true);
   };
 
   // 거리 계산 (명시적 타입 캐스팅 추가)
@@ -411,71 +445,195 @@ function Make_program() {
         Alert.alert('오류', '로그인이 필요합니다.');
         return;
       }
+      
+      const cleanToken = token.replace('Bearer ', '');
+      console.log('🔍 토큰 정보:', {
+        originalToken: token.substring(0, 20) + '...',
+        cleanToken: cleanToken.substring(0, 20) + '...',
+      });
 
-      // 데이터 구성
+      // 데이터 검증 및 구성
+      if (!title.trim()) {
+        Alert.alert('오류', '제목을 입력해주세요.');
+        return;
+      }
+      
+      if (!description.trim()) {
+        Alert.alert('오류', '설명을 입력해주세요.');
+        return;
+      }
+      
+      if (!regionInput.trim()) {
+        Alert.alert('오류', '지역을 입력해주세요.');
+        return;
+      }
+      
+      if (!guidePrice || Number(guidePrice) <= 0) {
+        Alert.alert('오류', '올바른 가격을 입력해주세요.');
+        return;
+      }
+      
+      // schedules 데이터 검증 및 정제
+      const validSchedules = days.flatMap((day, dayIdx) =>
+        day.plans.map((plan, seq) => {
+          if (!plan.place || !plan.coordinate) {
+            console.warn(`⚠️ Day ${dayIdx + 1}의 ${seq + 1}번째 일정에 좌표 정보가 없습니다.`);
+            return null;
+          }
+          
+          // placeDescription 길이 제한 (100자로 더 엄격하게)
+          let cleanDescription = plan.memo || '';
+          if (cleanDescription.length > 100) {
+            cleanDescription = cleanDescription.substring(0, 100) + '...';
+            console.warn(`⚠️ Day ${dayIdx + 1}의 ${seq + 1}번째 일정 설명이 100자를 초과하여 잘렸습니다.`);
+          }
+          
+          // googlePlaceId 정제 (Google Places ID가 너무 길면 간단한 ID로 대체)
+          let cleanGooglePlaceId = plan.googlePlaceId || '';
+          if (cleanGooglePlaceId.length > 50) {
+            cleanGooglePlaceId = `place_${dayIdx + 1}_${seq + 1}_${Date.now()}`;
+            console.warn(`⚠️ Day ${dayIdx + 1}의 ${seq + 1}번째 일정 googlePlaceId가 너무 길어 새로 생성했습니다.`);
+          }
+          
+          // 좌표 유효성 검사
+          if (isNaN(plan.coordinate.latitude) || isNaN(plan.coordinate.longitude)) {
+            console.warn(`⚠️ Day ${dayIdx + 1}의 ${seq + 1}번째 일정에 유효하지 않은 좌표가 있습니다.`);
+            return null;
+          }
+          
+          return {
+            day: dayIdx + 1,
+            scheduleSequence: seq,
+            googlePlaceId: cleanGooglePlaceId, // googlePlaceId로 통일
+            placeName: plan.place.substring(0, 100), // 장소명도 100자 제한
+            lat: Number(plan.coordinate.latitude.toFixed(6)), // 소수점 6자리로 제한
+            lon: Number(plan.coordinate.longitude.toFixed(6)),
+            placeDescription: cleanDescription,
+            travelTime: Math.min(plan.travelTime || 0, 1440), // 최대 24시간(1440분) 제한
+          };
+        }).filter(Boolean) // null 값 제거
+      );
+      
+      if (validSchedules.length === 0) {
+        Alert.alert('오류', '최소 하나의 일정을 추가해주세요.');
+        return;
+      }
+      
       const data = {
-        title,
-        description,
+        title: title.trim(),
+        description: description.trim(),
         guidePrice: Number(guidePrice),
-        region: regionInput,
+        region: regionInput.trim(),
         thumbnailUrl: thumbnail || '',
         hashtags: hashtags
           ? hashtags
               .split(',')
               .map(tag => tag.trim())
               .filter(tag => tag.length > 0)
+              .slice(0, 10) // 최대 10개 해시태그
           : [],
-        schedules: days.flatMap((day, dayIdx) =>
-          day.plans.map((plan, seq) => ({
-            day: dayIdx + 1, // 1부터 시작
-            scheduleSequence: seq,
-            placeId: plan.placeId || '', // 반드시 구글 고유 id만 저장
-            placeName: plan.place, // 장소명만 저장
-            lat: plan.coordinate?.latitude ?? 0,
-            lon: plan.coordinate?.longitude ?? 0,
-            placeDescription: plan.memo,
-            travelTime: plan.travelTime ?? 0,
-          })),
-        ),
+        schedules: validSchedules,
       };
+      
+      // 최종 데이터 검증
+      console.log('🔍 데이터 검증 결과:', {
+        titleLength: data.title.length,
+        descriptionLength: data.description.length,
+        schedulesCount: data.schedules.length,
+        totalSchedulesDataSize: JSON.stringify(data.schedules).length,
+      });
+      
+      // 데이터 크기 제한 확인
+      const totalDataSize = JSON.stringify(data).length;
+      if (totalDataSize > 100000) { // 100KB 제한
+        Alert.alert('오류', '데이터가 너무 큽니다. 일정 설명을 줄이거나 일정 수를 줄여주세요.');
+        return;
+      }
+      
+      // 각 일정의 설명 길이 확인
+      const longDescriptions = data.schedules.filter(s => s.placeDescription.length > 100);
+      if (longDescriptions.length > 0) {
+        console.warn('⚠️ 긴 설명이 있는 일정들:', longDescriptions.map(s => ({
+          placeName: s.placeName,
+          descriptionLength: s.placeDescription.length
+        })));
+      }
 
-      console.log('전송할 데이터:', JSON.stringify(data, null, 2));
-      console.log('tourProgramId:', tourProgramId);
+      console.log('📤 전송할 데이터 요약:', {
+        title: data.title,
+        description: data.description.substring(0, 50) + '...',
+        guidePrice: data.guidePrice,
+        region: data.region,
+        hashtagsCount: data.hashtags.length,
+        schedulesCount: data.schedules.length,
+        tourProgramId: tourProgramId,
+      });
+      
+      console.log('📤 전체 데이터:', JSON.stringify(data, null, 2));
 
       let response;
       if (tourProgramId) {
         try {
           // 먼저 프로그램 존재 여부 확인
+          const cleanToken = token.replace('Bearer ', '');
+          console.log('🔍 프로그램 확인 요청:', {
+            tourProgramId,
+            token: cleanToken.substring(0, 10) + '...',
+          });
+          
           const checkResponse = await axios.get(
             `http://124.60.137.10:8083/api/tour-program/${tourProgramId}`,
             {
               headers: {
-                Authorization: `Bearer ${token.replace('Bearer ', '')}`,
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${cleanToken}`,
               },
+              timeout: 10000,
             },
           );
 
           if (checkResponse.data) {
             // 수정 요청
-            console.log('수정 요청 시작');
+            console.log('🟢 수정 요청 시작:', {
+              url: `http://124.60.137.10:8083/api/tour-program/${tourProgramId}`,
+              data: data,
+              token: cleanToken.substring(0, 10) + '...',
+            });
+            
             response = await axios.put(
               `http://124.60.137.10:8083/api/tour-program/${tourProgramId}`,
               data,
               {
                 headers: {
                   'Content-Type': 'application/json',
-                  Authorization: `Bearer ${token.replace('Bearer ', '')}`,
+                  Authorization: `Bearer ${cleanToken}`,
                 },
+                timeout: 15000,
               },
             );
-            console.log('수정 응답:', response.data);
+            console.log('✅ 수정 응답:', response.data);
           }
         } catch (checkError) {
+          console.error('❌ 프로그램 확인 중 오류:', checkError);
           if (axios.isAxiosError(checkError)) {
-            console.error('프로그램 확인 중 오류:', checkError.response?.data);
-          } else {
-            console.error('프로그램 확인 중 알 수 없는 오류:', checkError);
+            console.error('❌ Axios 에러 상세:', {
+              status: checkError.response?.status,
+              data: checkError.response?.data,
+              message: checkError.message,
+            });
+            
+            if (checkError.response?.status === 403) {
+              Alert.alert(
+                '권한 오류',
+                '해당 프로그램을 수정할 권한이 없습니다. 본인이 작성한 프로그램만 수정할 수 있습니다.',
+                [
+                  {text: '확인', style: 'default'},
+                ]
+              );
+              return;
+            }
           }
+          
           Alert.alert(
             '오류',
             '해당 프로그램을 찾을 수 없습니다. 새로운 프로그램으로 등록하시겠습니까?',
@@ -488,17 +646,21 @@ function Make_program() {
                 text: '새로 등록',
                 onPress: async () => {
                   try {
+                    console.log('🟢 새로 등록 요청:', {
+                      url: 'http://124.60.137.10:8083/api/tour-program',
+                      data: data,
+                      token: cleanToken.substring(0, 10) + '...',
+                    });
+                    
                     response = await axios.post(
                       'http://124.60.137.10:8083/api/tour-program',
                       data,
                       {
                         headers: {
                           'Content-Type': 'application/json',
-                          Authorization: `Bearer ${token.replace(
-                            'Bearer ',
-                            '',
-                          )}`,
+                          Authorization: `Bearer ${cleanToken}`,
                         },
+                        timeout: 15000,
                       },
                     );
                     if (response.data.status === 'OK') {
@@ -532,18 +694,24 @@ function Make_program() {
         }
       } else {
         // 새로 등록
-        console.log('새로 등록 요청 시작');
+        console.log('🟢 새로 등록 요청 시작:', {
+          url: 'http://124.60.137.10:8083/api/tour-program',
+          data: data,
+          token: cleanToken.substring(0, 10) + '...',
+        });
+        
         response = await axios.post(
           'http://124.60.137.10:8083/api/tour-program',
           data,
           {
             headers: {
               'Content-Type': 'application/json',
-              Authorization: `Bearer ${token.replace('Bearer ', '')}`,
+              Authorization: `Bearer ${cleanToken}`,
             },
+            timeout: 15000,
           },
         );
-        console.log('등록 응답:', response.data);
+        console.log('✅ 등록 응답:', response.data);
       }
 
       if (response?.data.status === 'OK') {
@@ -591,14 +759,45 @@ function Make_program() {
         }
       }
     } catch (error: any) {
-      console.error('에러 상세:', error.response?.data || error);
-      console.error('요청 데이터:', error.config?.data);
-      Alert.alert(
-        '오류',
-        `등록 중 오류가 발생했습니다.\n${
-          error.response?.data?.message || error.message
-        }`,
-      );
+      console.error('❌ 에러 상세:', error.response?.data || error);
+      console.error('❌ 요청 데이터:', error.config?.data);
+      
+      let errorMessage = '등록 중 오류가 발생했습니다.';
+      
+      if (axios.isAxiosError(error)) {
+        if (error.response?.status === 500) {
+          errorMessage = '서버 내부 오류가 발생했습니다. 잠시 후 다시 시도해주세요.';
+          
+          // 500 오류 시 재시도 옵션 제공
+          Alert.alert(
+            '서버 오류',
+            errorMessage,
+            [
+              {text: '취소', style: 'cancel'},
+              {
+                text: '다시 시도',
+                onPress: () => {
+                  console.log('🔄 500 오류 재시도 중...');
+                  setTimeout(() => handleSubmit(), 2000); // 2초 후 재시도
+                }
+              }
+            ]
+          );
+          return;
+        } else if (error.response?.status === 400) {
+          errorMessage = '입력 데이터에 문제가 있습니다. 모든 필수 항목을 확인해주세요.';
+        } else if (error.response?.status === 401) {
+          errorMessage = '로그인이 만료되었습니다. 다시 로그인해주세요.';
+        } else if (error.response?.status === 403) {
+          errorMessage = '권한이 없습니다. 본인이 작성한 프로그램만 수정할 수 있습니다.';
+        } else if (error.response?.data?.message) {
+          errorMessage = error.response.data.message;
+        }
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      Alert.alert('오류', errorMessage);
     }
   };
 
@@ -637,7 +836,7 @@ function Make_program() {
                     ...p,
                     place: onlyPlaceName, // 장소명만 저장
                     coordinate: {latitude: lat, longitude: lng},
-                    placeId: data.place_id, // 구글 고유 id만 저장
+                    googlePlaceId: data.place_id, // 구글 고유 id만 저장
                   }));
                   setPlaceModalVisible(false);
                 } else {
@@ -894,9 +1093,18 @@ function Make_program() {
                     <Text style={{flex: 1}}>
                       {p.place} {p.memo ? `- ${p.memo}` : ''}
                     </Text>
-                    <TouchableOpacity onPress={() => removePlan(idx, pIdx)}>
-                      <Text style={{color: 'red'}}>삭제</Text>
-                    </TouchableOpacity>
+                    <View style={styles.planActions}>
+                      <TouchableOpacity 
+                        style={styles.editButton}
+                        onPress={() => editPlan(idx, pIdx)}>
+                        <Text style={styles.editButtonText}>수정</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity 
+                        style={styles.deleteButton}
+                        onPress={() => removePlan(idx, pIdx)}>
+                        <Text style={styles.deleteButtonText}>삭제</Text>
+                      </TouchableOpacity>
+                    </View>
                   </View>
                   {/* 다음 장소가 있다면 거리와 세로선 표시 */}
                   {pIdx < day.plans.length - 1 &&
@@ -998,7 +1206,10 @@ function Make_program() {
                   }}
                   keyboardType="numeric"
                 />
-                <Button title="추가" onPress={() => addPlan(idx)} />
+                <Button 
+                  title={editingPlan && editingPlan.dayIdx === idx ? "수정" : "추가"} 
+                  onPress={() => addPlan(idx)} 
+                />
               </View>
             </View>
           ))}
@@ -1205,6 +1416,32 @@ const styles = StyleSheet.create({
   },
   currentLocationText: {
     fontSize: 18,
+  },
+  planActions: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  editButton: {
+    backgroundColor: '#007AFF',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+  },
+  editButtonText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  deleteButton: {
+    backgroundColor: '#FF3B30',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+  },
+  deleteButtonText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: '600',
   },
 });
 

@@ -1,6 +1,7 @@
 import { Favorite } from 'src/favorite/favorite.entity';
 import { MarkerColor } from 'src/post/marker-color.enum';
 import { Post } from 'src/post/post.entity';
+import { TourProgram } from 'src/tour-program/entities/tour-program.entity';
 import {
   BaseEntity,
   Column,
@@ -69,4 +70,7 @@ export class User extends BaseEntity {
 
   @OneToMany(() => Favorite, (favorite) => favorite.user)
   favorites: Favorite[];
+
+  @OneToMany(() => TourProgram, (tourProgram) => tourProgram.user)
+  tourPrograms: TourProgram[];
 }

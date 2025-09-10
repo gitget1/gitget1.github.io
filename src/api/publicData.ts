@@ -306,6 +306,210 @@ export const searchPlacesByArea = async (areaCode: string) => {
   }
 };
 
+// 카카오 플레이스 리뷰 검색 (카카오맵 API)
+export const getKakaoPlaceReviews = async (
+  placeName: string,
+  lat: number,
+  lng: number,
+) => {
+  try {
+    console.log('🔍 카카오 플레이스 리뷰 검색:', placeName);
+
+    // 카카오맵 API를 통한 장소 검색
+    const searchResponse = await apiClient.get(
+      'https://dapi.kakao.com/v2/local/search/keyword.json',
+      {
+        headers: {
+          Authorization: 'KakaoAK YOUR_KAKAO_API_KEY', // 실제 API 키로 교체 필요
+        },
+        params: {
+          query: placeName,
+          x: lng,
+          y: lat,
+          radius: 20000, // 20km 반경
+          size: 5,
+        },
+      },
+    );
+
+    if (
+      !searchResponse.data.documents ||
+      searchResponse.data.documents.length === 0
+    ) {
+      console.log('❌ 카카오에서 해당 장소를 찾을 수 없음');
+      return [];
+    }
+
+    const place = searchResponse.data.documents[0];
+
+    // 카카오 플레이스 상세 정보 (리뷰 포함)
+    const detailResponse = await apiClient.get(
+      `https://dapi.kakao.com/v2/local/place/detail.json`,
+      {
+        headers: {
+          Authorization: 'KakaoAK YOUR_KAKAO_API_KEY', // 실제 API 키로 교체 필요
+        },
+        params: {
+          cid: place.id,
+        },
+      },
+    );
+
+    const reviews = detailResponse.data.reviews || [];
+    console.log('📝 카카오 리뷰 개수:', reviews.length);
+
+    return reviews.map((review: any) => ({
+      platform: 'kakao',
+      author: review.author_name || '익명',
+      rating: review.rating || 0,
+      content: review.content || '',
+      date: review.created_at || new Date().toISOString(),
+      profile_image: review.author_profile_image_url || null,
+    }));
+  } catch (error) {
+    console.error('❌ 카카오 리뷰 조회 실패:', error);
+    return [];
+  }
+};
+
+// 네이버 플레이스 리뷰 검색 (네이버 지도 API)
+export const getNaverPlaceReviews = async (
+  placeName: string,
+  lat: number,
+  lng: number,
+) => {
+  try {
+    console.log('🔍 네이버 플레이스 리뷰 검색:', placeName);
+
+    // 네이버 지도 API를 통한 장소 검색
+    const searchResponse = await apiClient.get(
+      'https://openapi.naver.com/v1/search/local.json',
+      {
+        headers: {
+          'X-Naver-Client-Id': 'YOUR_NAVER_CLIENT_ID', // 실제 클라이언트 ID로 교체 필요
+          'X-Naver-Client-Secret': 'YOUR_NAVER_CLIENT_SECRET', // 실제 클라이언트 시크릿으로 교체 필요
+        },
+        params: {
+          query: placeName,
+          display: 5,
+          sort: 'comment',
+        },
+      },
+    );
+
+    if (!searchResponse.data.items || searchResponse.data.items.length === 0) {
+      console.log('❌ 네이버에서 해당 장소를 찾을 수 없음');
+      return [];
+    }
+
+    // 네이버는 직접적인 리뷰 API가 제한적이므로 기본 정보만 반환
+    const place = searchResponse.data.items[0];
+
+    console.log('📝 네이버 장소 정보:', place.title);
+
+    // 네이버 리뷰는 별도 API가 필요하므로 모의 데이터 반환
+    return [
+      {
+        platform: 'naver',
+        author: '네이버 사용자',
+        rating: 4.2,
+        content: `${placeName}에 대한 네이버 리뷰입니다.`,
+        date: new Date().toISOString(),
+        profile_image: null,
+      },
+    ];
+  } catch (error) {
+    console.error('❌ 네이버 리뷰 조회 실패:', error);
+    return [];
+  }
+};
+
+// 3사 리뷰 비교 함수 (우리 앱 + 카카오 + 네이버)
+export const getMultiPlatformReviews = async (
+  placeName: string,
+  lat: number,
+  lng: number,
+  ourAppReviews: any[] = [],
+) => {
+  try {
+    console.log('🔄 3사 리뷰 비교 시작:', placeName);
+
+    // 병렬로 각 플랫폼의 리뷰 가져오기
+    const [kakaoReviews, naverReviews] = await Promise.all([
+      getKakaoPlaceReviews(placeName, lat, lng),
+      getNaverPlaceReviews(placeName, lat, lng),
+    ]);
+
+    // 우리 앱 리뷰에 플랫폼 정보 추가
+    const ourReviews = ourAppReviews.map(review => ({
+      ...review,
+      platform: 'travelLocal',
+    }));
+
+    // 모든 리뷰 통합
+    const allReviews = [...ourReviews, ...kakaoReviews, ...naverReviews];
+
+    // 플랫폼별 통계 계산
+    const platformStats = {
+      travelLocal: {
+        count: ourReviews.length,
+        averageRating:
+          ourReviews.length > 0
+            ? ourReviews.reduce(
+                (sum, review) => sum + (review.rating || 0),
+                0,
+              ) / ourReviews.length
+            : 0,
+      },
+      kakao: {
+        count: kakaoReviews.length,
+        averageRating:
+          kakaoReviews.length > 0
+            ? kakaoReviews.reduce(
+                (sum, review) => sum + (review.rating || 0),
+                0,
+              ) / kakaoReviews.length
+            : 0,
+      },
+      naver: {
+        count: naverReviews.length,
+        averageRating:
+          naverReviews.length > 0
+            ? naverReviews.reduce(
+                (sum, review) => sum + (review.rating || 0),
+                0,
+              ) / naverReviews.length
+            : 0,
+      },
+    };
+
+    console.log('📊 플랫폼별 통계:', platformStats);
+
+    return {
+      reviews: allReviews,
+      platformStats,
+      totalCount: allReviews.length,
+      overallAverageRating:
+        allReviews.length > 0
+          ? allReviews.reduce((sum, review) => sum + (review.rating || 0), 0) /
+            allReviews.length
+          : 0,
+    };
+  } catch (error) {
+    console.error('❌ 3사 리뷰 비교 실패:', error);
+    return {
+      reviews: [],
+      platformStats: {
+        travelLocal: {count: 0, averageRating: 0},
+        kakao: {count: 0, averageRating: 0},
+        naver: {count: 0, averageRating: 0},
+      },
+      totalCount: 0,
+      overallAverageRating: 0,
+    };
+  }
+};
+
 // API 연결 테스트 함수
 export const testApiConnection = async () => {
   try {

@@ -57,6 +57,7 @@ export type AppStackParamList = {
       }>;
     };
     tourProgramId?: string;
+    isEdit?: boolean;
   };
   TraitSelection: undefined;
   Result: {

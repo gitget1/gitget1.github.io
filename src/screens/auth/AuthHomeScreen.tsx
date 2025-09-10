@@ -1,13 +1,13 @@
 import {StackScreenProps} from '@react-navigation/stack';
-import React from 'react';
+import React, {useState} from 'react';
 import {
   StyleSheet,
   View,
   Image,
   Dimensions,
-  ImageBackground,
   Pressable,
 } from 'react-native';
+import Video from 'react-native-video';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {authNavigations, colors} from '../../constants';
@@ -25,17 +25,44 @@ type AuthHomeScreenProps = Props & {
 };
 
 function AuthHomeScreen({navigation, navigationOverride}: AuthHomeScreenProps) {
+  const [videoError, setVideoError] = useState(false);
+
+  const onVideoError = (error: any) => {
+    console.log('Video error:', error);
+    setVideoError(true);
+  };
+
+  const onVideoLoad = () => {
+    console.log('Video loaded successfully');
+  };
+
   return (
-    <ImageBackground
-      source={require('../../assets/가로수길.jpg')}
-      style={styles.background}
-      resizeMode="cover">
-      <SafeAreaView style={styles.container}>
+    <View style={styles.container}>
+      {/* 동영상 배경 */}
+      <Video
+        source={require('../../assets/videos/login_background.mp4')}
+        style={styles.videoBackground}
+        muted={true}
+        repeat={true}
+        resizeMode="cover"
+        onError={onVideoError}
+        onLoad={onVideoLoad}
+      />
+      
+      {/* 동영상 로드 실패 시 대체 배경 */}
+      {videoError && (
+        <View style={styles.fallbackBackground} />
+      )}
+      
+      {/* 반투명 오버레이 */}
+      <View style={styles.overlay} />
+      
+      <SafeAreaView style={styles.contentContainer}>
         <View style={styles.imageContainer}>
           <Image
             resizeMode="contain"
             style={styles.image}
-            source={require('../../assets/감사합니다.jpg')}
+            source={require('../../assets/294a0d52-c4d4-4588-b752-0c2f2727f1bd.png')}
           />
         </View>
         <View style={styles.buttonContainer}>
@@ -82,17 +109,45 @@ function AuthHomeScreen({navigation, navigationOverride}: AuthHomeScreenProps) {
           </Pressable>
         </View>
       </SafeAreaView>
-    </ImageBackground>
+    </View>
   );
 }
 
+const { width, height } = Dimensions.get('window');
+
 const styles = StyleSheet.create({
   container: {
+    flex: 1,
+  },
+  videoBackground: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    width: width,
+    height: height,
+  },
+  overlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    width: width,
+    height: height,
+    backgroundColor: 'rgba(0, 0, 0, 0.3)', // 반투명 오버레이
+  },
+  contentContainer: {
     flex: 1,
     margin: 30,
     alignItems: 'center',
     marginHorizontal: 30,
     marginVertical: 30,
+  },
+  fallbackBackground: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    width: width,
+    height: height,
+    backgroundColor: '#1a1a2e', // 동영상과 비슷한 어두운 배경
   },
   imageContainer: {
     flex: 1,
@@ -105,11 +160,6 @@ const styles = StyleSheet.create({
   buttonContainer: {
     flex: 1,
     gap: 20,
-  },
-  background: {
-    flex: 1,
-    width: '100%',
-    height: '100%',
   },
   kakaoButtonContainer: {
     backgroundColor: '#FEE503',

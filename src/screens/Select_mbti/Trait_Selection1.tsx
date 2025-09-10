@@ -93,6 +93,8 @@ const TraitSelection1 = () => {
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
+      {/* MBTI 선택 비활성화 */}
+      {/*
       <Text style={styles.title}>MBTI</Text>
       <View style={styles.buttonRow}>
         {mbtiList.map(mbti => (
@@ -104,6 +106,8 @@ const TraitSelection1 = () => {
           </TouchableOpacity>
         ))}
       </View>
+      */}
+      
       <Text style={styles.title}>해시태그</Text>
       <View style={styles.buttonRow}>
         {hashtagList.map(tag => (
@@ -115,6 +119,7 @@ const TraitSelection1 = () => {
           </TouchableOpacity>
         ))}
       </View>
+      
       <Text style={styles.title}>지역</Text>
       <View style={styles.buttonRow}>
         {regionList.map(region => (
@@ -137,7 +142,14 @@ const TraitSelection1 = () => {
             onPress={() => navigation.navigate('PracticeDetail', { tourProgramId: program.id })}
             activeOpacity={0.8}
           >
-            <Text style={styles.programTitle}>{program.title}</Text>
+            <View style={styles.programHeader}>
+              <Text style={styles.programTitle}>{program.title}</Text>
+              {program.title !== '아산 여행' && (
+                <View style={styles.verifiedBadge}>
+                  <Text style={styles.verifiedText}>✓ 인증됨</Text>
+                </View>
+              )}
+            </View>
             <Text style={styles.programDesc}>{program.description}</Text>
             <Text style={styles.programMeta}>지역: {program.region} / MBTI: {program.mbti}</Text>
           </TouchableOpacity>
@@ -169,7 +181,25 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#ddd',
   },
-  programTitle: { fontSize: 16, fontWeight: 'bold', marginBottom: 4 },
+  programHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  programTitle: { fontSize: 16, fontWeight: 'bold', flex: 1 },
+  verifiedBadge: {
+    backgroundColor: '#4CAF50',
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    marginLeft: 8,
+  },
+  verifiedText: { 
+    color: '#fff', 
+    fontSize: 11, 
+    fontWeight: 'bold' 
+  },
   programDesc: { fontSize: 14, color: '#555', marginBottom: 4 },
   programMeta: { fontSize: 13, color: '#888' },
   noResult: { color: '#888', textAlign: 'center', marginVertical: 20 },

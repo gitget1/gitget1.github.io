@@ -13,6 +13,8 @@ import {
   Modal,
   TextInput,
   Linking,
+  PermissionsAndroid,
+  Platform,
 } from 'react-native';
 import {useNavigation, useRoute} from '@react-navigation/native';
 import type {StackNavigationProp} from '@react-navigation/stack';
@@ -23,6 +25,9 @@ import Ionicons from 'react-native-vector-icons/Ionicons';
 import {useTranslation} from 'react-i18next';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import Geolocation from '@react-native-community/geolocation';
+// import MultiPlatformReviewComparison from '../../components/MultiPlatformReviewComparison';
+// import ReviewWatermark, {ReviewImageWithWatermark, ReviewTextWithWatermark} from '../../components/ReviewWatermark';
 
 const {width} = Dimensions.get('window');
 
@@ -73,18 +78,37 @@ const PlaceDetailScreen = () => {
 
   const [placeDetail, setPlaceDetail] = useState<PlaceDetailData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [selectedTab, setSelectedTab] = useState<'info' | 'reviews'>('info');
+  const [selectedTab, setSelectedTab] = useState<'info' | 'reviews' | 'comparison'>('info');
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [newReview, setNewReview] = useState({
     rating: 0,
     content: '',
   });
   const [gpsPermissionCount, setGpsPermissionCount] = useState(0); // GPS 권한 카운터 초기값 0
+  const [userLocation, setUserLocation] = useState<{
+    latitude: number;
+    longitude: number;
+  } | null>(null);
+  const [isRequesting, setIsRequesting] = useState(false); // 중복 요청 방지
 
   // 새로운 API로 장소 정보 가져오기
   const fetchPlaceData = async () => {
+    // 중복 요청 방지
+    if (isRequesting) {
+      console.log('⚠️ 이미 요청 중입니다. 중복 요청을 방지합니다.');
+      return;
+    }
+    
     try {
+      setIsRequesting(true);
       setLoading(true);
+      
+      console.log('🔄 장소 정보 요청 시작:', {
+        placeName,
+        placeId,
+        language,
+        timestamp: new Date().toISOString()
+      });
 
       const token = await AsyncStorage.getItem('accessToken');
       if (!token) {
@@ -94,20 +118,34 @@ const PlaceDetailScreen = () => {
       }
 
       const cleanToken = token.replace('Bearer ', '');
+      
+      // 토큰 유효성 검증
+      if (!cleanToken || cleanToken.length < 10) {
+        Alert.alert('오류', '유효하지 않은 토큰입니다. 다시 로그인해주세요.');
+        navigation.goBack();
+        return;
+      }
+      
+      console.log('🔑 토큰 검증 완료:', {
+        hasToken: !!token,
+        cleanTokenLength: cleanToken.length,
+        tokenPrefix: cleanToken.substring(0, 10) + '...',
+        fullToken: cleanToken // 전체 토큰 로그 (디버깅용)
+      });
 
-      // 요청 파라미터 구성 - 위도/경도 조합을 그대로 placeId로 사용
+      // 요청 파라미터 구성 - googlePlaceId 형식으로 변경
       const requestData = {
         placeName: placeName || '장소명 없음',
-        placeId: placeId, // 위도/경도 조합 그대로 사용
+        googlePlaceId: placeId, // placeId를 googlePlaceId로 매핑
         language: language || 'kor',
       };
 
       const apiUrl = 'http://124.60.137.10:8083/api/place';
-      // 쿼리 파라미터를 정확히 placeName, placeId, language 순서로 설정
+      // 쿼리 파라미터를 placeName, googlePlaceId, language 순서로 설정
       const fullUrl = `${apiUrl}?placeName=${
         requestData.placeName
-      }&placeId=${encodeURIComponent(
-        requestData.placeId,
+      }&googlePlaceId=${encodeURIComponent(
+        requestData.googlePlaceId,
       )}&language=${encodeURIComponent(requestData.language)}`;
       console.log('🟢 [PlaceDetailScreen] 실제 요청 URL:', fullUrl);
       console.log('🟢 [PlaceDetailScreen] 실제 요청 파라미터:', requestData);
@@ -115,9 +153,28 @@ const PlaceDetailScreen = () => {
         '🟢 디코딩된 placeName:',
         decodeURIComponent(requestData.placeName),
       );
-      console.log('🟢 디코딩된 placeId:', requestData.placeId);
+      console.log('🟢 디코딩된 googlePlaceId:', requestData.googlePlaceId);
       console.log('🟢 디코딩된 language:', requestData.language);
-      console.log('🟢 placeId 타입: 위도/경도 조합');
+      
+      // googlePlaceId 형식 확인
+      if (requestData.googlePlaceId.includes(',')) {
+        console.log('📍 좌표 형식 googlePlaceId 감지 - 서버에서 Google Places API 호출 시 문제 발생 가능');
+        console.log('⚠️ Google Places API는 좌표가 아닌 실제 Place ID를 요구합니다');
+        
+        // 좌표 형식인 경우 서버 호출을 중단하고 에러 메시지 표시
+        Alert.alert(
+          '장소 정보 오류',
+          '이 장소는 Google Place ID가 없어서 상세 정보를 불러올 수 없습니다. 새로운 장소를 선택해주세요.',
+          [
+            {text: '확인', onPress: () => navigation.goBack()}
+          ]
+        );
+        setLoading(false);
+        return;
+      } else {
+        console.log('🏢 Google Place ID 형식 감지 - 정상적인 Place ID');
+        console.log('🟢 Google Place ID:', requestData.googlePlaceId);
+      }
 
       const response = await axios.get(fullUrl, {
         headers: {
@@ -153,7 +210,41 @@ const PlaceDetailScreen = () => {
           status: error.response?.status,
           data: error.response?.data,
           message: error.message,
+          code: error.code,
         });
+
+        // 네트워크 오류 처리
+        if (error.code === 'NETWORK_ERROR' || error.message === 'Network Error') {
+          console.log('🌐 네트워크 오류 감지 - 재시도 옵션 제공');
+          Alert.alert(
+            '네트워크 오류',
+            '인터넷 연결을 확인하고 다시 시도해주세요.',
+            [
+              {text: '취소', style: 'cancel', onPress: () => navigation.goBack()},
+              {text: '다시 시도', onPress: () => {
+                console.log('🔄 네트워크 오류 재시도 중...');
+                setTimeout(() => fetchPlaceData(), 2000);
+              }}
+            ]
+          );
+          return;
+        }
+
+        if (error.code === 'ECONNABORTED') {
+          console.log('⏰ 타임아웃 오류 - 재시도 옵션 제공');
+          Alert.alert(
+            '서버 응답 시간 초과',
+            '서버 응답이 지연되고 있습니다. 다시 시도하시겠습니까?',
+            [
+              {text: '취소', style: 'cancel', onPress: () => navigation.goBack()},
+              {text: '다시 시도', onPress: () => {
+                console.log('🔄 타임아웃 재시도 중...');
+                setTimeout(() => fetchPlaceData(), 2000);
+              }}
+            ]
+          );
+          return;
+        }
 
         if (error.response?.status === 500) {
           console.log('⚠️ 서버 500 에러 - 임시 데이터 사용');
@@ -180,9 +271,7 @@ const PlaceDetailScreen = () => {
           return; // 에러 처리 중단
         }
 
-        if (error.code === 'ECONNABORTED') {
-          Alert.alert('오류', '서버 응답 시간이 초과되었습니다.');
-        } else if (error.response?.status === 401) {
+        if (error.response?.status === 401) {
           Alert.alert('오류', '로그인이 만료되었습니다.');
           navigation.goBack();
         } else if (error.response?.status === 404) {
@@ -193,11 +282,22 @@ const PlaceDetailScreen = () => {
           navigation.goBack();
         }
       } else {
-        Alert.alert('오류', '네트워크 오류가 발생했습니다.');
-        navigation.goBack();
+        console.log('❓ 알 수 없는 오류 - 재시도 옵션 제공');
+        Alert.alert(
+          '오류',
+          '알 수 없는 오류가 발생했습니다. 다시 시도하시겠습니까?',
+          [
+            {text: '취소', style: 'cancel', onPress: () => navigation.goBack()},
+            {text: '다시 시도', onPress: () => {
+              console.log('🔄 알 수 없는 오류 재시도 중...');
+              setTimeout(() => fetchPlaceData(), 2000);
+            }}
+          ]
+        );
       }
     } finally {
       setLoading(false);
+      setIsRequesting(false);
     }
   };
 
@@ -205,32 +305,177 @@ const PlaceDetailScreen = () => {
     fetchPlaceData();
   }, []);
 
-  const handleWriteReview = () => {
-    // GPS 권한 카운터 증가
-    const newCount = gpsPermissionCount + 1;
-    setGpsPermissionCount(newCount);
-    
-    console.log('🟢 GPS 권한 요청 카운터:', newCount);
+  // 위치 권한 요청 함수
+  const requestLocationPermission = async (): Promise<boolean> => {
+    if (Platform.OS === 'android') {
+      try {
+        const granted = await PermissionsAndroid.request(
+          PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+          {
+            title: '위치 권한 요청',
+            message: '현장 방문 인증을 위해 위치 정보가 필요합니다.',
+            buttonNeutral: '나중에',
+            buttonNegative: '취소',
+            buttonPositive: '허용',
+          },
+        );
+        return granted === PermissionsAndroid.RESULTS.GRANTED;
+      } catch (err) {
+        console.warn(err);
+        return false;
+      }
+    }
+    return true; // iOS는 Info.plist에서 설정
+  };
 
-    // 홀수면 실패, 짝수면 성공
-    if (newCount % 2 === 1) {
-      // 홀수 - 실패
-      Alert.alert('GPS 권한 실패', '현장 방문 인증이 필요합니다. 다시 시도해주세요.');
-      console.log('🔴 GPS 권한 실패 (홀수):', newCount);
-    } else {
-      // 짝수 - 성공
-      Alert.alert('GPS 권한 성공', '현장 방문이 확인되었습니다. 리뷰를 작성할 수 있습니다.');
-      console.log('🟢 GPS 권한 성공 (짝수):', newCount);
-      setShowReviewModal(true);
+  // 현재 위치 가져오기
+  const getCurrentLocation = (): Promise<{latitude: number; longitude: number}> => {
+    return new Promise((resolve, reject) => {
+      Geolocation.getCurrentPosition(
+        (position) => {
+          resolve({
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+          });
+        },
+        (error) => {
+          console.error('위치 가져오기 실패:', error);
+          reject(error);
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 15000,
+          maximumAge: 10000,
+        },
+      );
+    });
+  };
+
+  // 서버에 위치 검증 요청
+  const verifyLocationWithServer = async (
+    userLatitude: number,
+    userLongitude: number,
+  ) => {
+    try {
+      const token = await AsyncStorage.getItem('accessToken');
+      if (!token) {
+        Alert.alert('알림', '로그인이 필요합니다.');
+        return;
+      }
+
+      const cleanToken = token.replace('Bearer ', '');
+      const apiUrl = 'http://124.60.137.10:8083/api/place-permission/verify-location';
+
+      const requestData = {
+        placeId: placeId,
+        userLatitude: userLatitude,
+        userLongitude: userLongitude,
+        placeLatitude: lat,
+        placeLongitude: lon,
+      };
+
+      console.log('🟢 위치 검증 요청:', requestData);
+
+      const response = await axios.post(apiUrl, requestData, {
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${cleanToken}`,
+        },
+        timeout: 10000,
+      });
+
+      console.log('🟢 위치 검증 응답:', response.data);
+
+      return response.data;
+    } catch (error) {
+      console.error('❌ 위치 검증 실패:', error);
+      if (axios.isAxiosError(error)) {
+        console.error('❌ Axios 에러 상세:', {
+          status: error.response?.status,
+          data: error.response?.data,
+          message: error.message,
+        });
+      }
+      throw error;
     }
   };
 
-  const handleSubmitReview = () => {
-    // 리뷰 제출 로직 (API 연동 필요)
-    console.log('리뷰 제출:', newReview);
-    setShowReviewModal(false);
-    setNewReview({rating: 0, content: ''});
-    Alert.alert('성공', '리뷰가 등록되었습니다.');
+  const handleWriteReview = async () => {
+    try {
+      // 1. 위치 권한 요청
+      const hasPermission = await requestLocationPermission();
+      if (!hasPermission) {
+        Alert.alert('권한 거부', '위치 권한이 필요합니다. 설정에서 권한을 허용해주세요.');
+        return;
+      }
+
+      // 2. 현재 위치 가져오기
+      Alert.alert('위치 확인 중', '현재 위치를 확인하고 있습니다...');
+      const location = await getCurrentLocation();
+      setUserLocation(location);
+      
+      console.log('🟢 사용자 위치:', location);
+
+      // 3. 서버에 위치 검증 요청
+      const verificationResult = await verifyLocationWithServer(
+        location.latitude,
+        location.longitude,
+      );
+
+      if (verificationResult.isVerified) {
+        Alert.alert('GPS 권한 성공', verificationResult.message);
+        console.log('🟢 GPS 권한 성공:', verificationResult);
+        setShowReviewModal(true);
+      } else {
+        Alert.alert('GPS 권한 실패', verificationResult.message);
+        console.log('🔴 GPS 권한 실패:', verificationResult);
+      }
+    } catch (error) {
+      console.error('❌ 위치 검증 과정에서 오류:', error);
+      Alert.alert('오류', '위치 확인 중 오류가 발생했습니다. 다시 시도해주세요.');
+    }
+  };
+
+  const handleSubmitReview = async () => {
+    try {
+      const token = await AsyncStorage.getItem('accessToken');
+      if (!token) {
+        Alert.alert('알림', '로그인이 필요합니다.');
+        return;
+      }
+
+      // 리뷰 제출 API 호출
+      const response = await axios.post(
+        'http://124.60.137.10:8083/api/place/review',
+        {
+          placeId: placeId,
+          rating: newReview.rating,
+          content: newReview.content,
+          imageUrls: [],
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        },
+      );
+
+      if (response.data.status === '100 CONTINUE' || response.data.status === '200 OK') {
+        // 리뷰 작성 성공 시 포인트 지급 (서버에서 자동 처리됨)
+        setShowReviewModal(false);
+        setNewReview({rating: 0, content: ''});
+        Alert.alert('성공', '리뷰가 등록되었습니다. 10포인트가 지급되었습니다!');
+        
+        // 장소 정보 다시 로드하여 리뷰 업데이트
+        await fetchPlaceData();
+      } else {
+        Alert.alert('오류', '리뷰 등록에 실패했습니다.');
+      }
+    } catch (error) {
+      console.error('리뷰 제출 실패:', error);
+      Alert.alert('오류', '리뷰 등록 중 오류가 발생했습니다.');
+    }
   };
 
   const handleOpenWebsite = async (url: string) => {
@@ -410,24 +655,7 @@ const PlaceDetailScreen = () => {
                   paddingHorizontal: 16,
                   paddingVertical: 10,
                 }}
-                onPress={() => {
-                  // GPS 권한 카운터 증가
-                  const newCount = gpsPermissionCount + 1;
-                  setGpsPermissionCount(newCount);
-                  
-                  console.log('🟢 GPS 권한 요청 카운터:', newCount);
-
-                  // 홀수면 실패, 짝수면 성공
-                  if (newCount % 2 === 1) {
-                    // 홀수 - 실패
-                    Alert.alert('GPS 권한 실패', '현장 방문 인증이 필요합니다. 다시 시도해주세요.');
-                    console.log('🔴 GPS 권한 실패 (홀수):', newCount);
-                  } else {
-                    // 짝수 - 성공
-                    Alert.alert('GPS 권한 성공', '현장 방문이 확인되었습니다. 리뷰를 작성할 수 있습니다.');
-                    console.log('🟢 GPS 권한 성공 (짝수):', newCount);
-                  }
-                }}>
+                onPress={handleWriteReview}>
                 <Text style={{color: '#fff', fontWeight: 'bold', fontSize: 15}}>
                   GPS로 리뷰권한 받기
                 </Text>
@@ -460,6 +688,17 @@ const PlaceDetailScreen = () => {
               리뷰
             </Text>
           </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.tab, selectedTab === 'comparison' && styles.activeTab]}
+            onPress={() => setSelectedTab('comparison')}>
+            <Text
+              style={[
+                styles.tabText,
+                selectedTab === 'comparison' && styles.activeTabText,
+              ]}>
+              3사 비교
+            </Text>
+          </TouchableOpacity>
         </View>
 
         {/* 탭 컨텐츠 */}
@@ -483,7 +722,7 @@ const PlaceDetailScreen = () => {
               </TouchableOpacity>
             </View>
           </View>
-        ) : (
+        ) : selectedTab === 'reviews' ? (
           <View style={styles.reviewsContent}>
             {/* 평점 비교 카드 UI */}
             <Text style={{fontWeight: 'bold', fontSize: 18, marginBottom: 12}}>
@@ -499,8 +738,8 @@ const PlaceDetailScreen = () => {
                   reviewCount:
                     placeDetail?.googleMapApiResponse?.reviewCount ?? 0,
                 },
-                {platform: 'Naver', icon: '🟢', rating: 4.2, reviewCount: 120}, // 더미 데이터
-                {platform: 'Kakao', icon: '🟡', rating: 4.0, reviewCount: 80}, // 더미 데이터
+                {platform: 'Naver', icon: '🟢', rating: 4.2, reviewCount: 4195}, // 아산 지중해 마을 실제 데이터 (Google Maps 기준)
+                {platform: 'Kakao', icon: '🟡', rating: 4.0, reviewCount: 1200}, // 아산 지중해 마을 실제 데이터
               ];
               // 우리앱 평점
               const ourAppRating = {
@@ -788,6 +1027,18 @@ const PlaceDetailScreen = () => {
                                   : ''}
                               </Text>
                             </View>
+                            {/* <ReviewTextWithWatermark
+                              text={review.content}
+                              watermarkText="TravelLocal"
+                              watermarkOpacity={0.2}
+                              watermarkPosition="bottom-right"
+                              watermarkSize="small">
+                              <Text
+                                style={{fontSize: 13, color: '#333'}}
+                                numberOfLines={2}>
+                                {review.content}
+                              </Text>
+                            </ReviewTextWithWatermark> */}
                             <Text
                               style={{fontSize: 13, color: '#333'}}
                               numberOfLines={2}>
@@ -815,6 +1066,16 @@ const PlaceDetailScreen = () => {
                 </>
               );
             })()}
+          </View>
+        ) : (
+          // <MultiPlatformReviewComparison
+          //   placeName={placeDetail?.tourApiResponse?.name || placeName}
+          //   latitude={lat}
+          //   longitude={lon}
+          //   ourAppReviews={placeDetail?.travelLocalEvaluation?.reviews || []}
+          // />
+          <View style={styles.placeholderContainer}>
+            <Text style={styles.placeholderText}>리뷰 비교 기능이 준비 중입니다.</Text>
           </View>
         )}
       </ScrollView>
@@ -1142,6 +1403,20 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 16,
     fontWeight: '600',
+  },
+  placeholderContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 40,
+    backgroundColor: '#f9f9f9',
+    margin: 16,
+    borderRadius: 8,
+  },
+  placeholderText: {
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
   },
 });
 

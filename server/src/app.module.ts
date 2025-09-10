@@ -7,6 +7,9 @@ import { ImageModule } from './image/image.module';
 import { ServeStaticModule } from '@nestjs/serve-static';
 import { join } from 'path';
 import { FavoriteModule } from './favorite/favorite.module';
+import { PlaceUserPermissionModule } from './place-user-permission/place-user-permission.module';
+import { PointModule } from './point/point.module';
+import { TourProgramModule } from './tour-program/tour-program.module';
 
 @Module({
   imports: [
@@ -28,6 +31,9 @@ import { FavoriteModule } from './favorite/favorite.module';
     AuthModule,
     ImageModule,
     FavoriteModule,
+    PlaceUserPermissionModule,
+    PointModule,
+    TourProgramModule,
   ],
   providers: [ConfigService],
 })

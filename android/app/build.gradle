@@ -84,6 +84,16 @@ android {
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
         versionName "1.0"
+        multiDexEnabled true
+    }
+    
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+    
+    kotlinOptions {
+        jvmTarget = "17"
     }
     signingConfigs {
         debug {
@@ -116,6 +126,21 @@ dependencies {
     } else {
         implementation jscFlavor
     }
+    
+    // MultiDex support
+    implementation("androidx.multidex:multidex:2.0.1")
+    
+    // WebView support
+    implementation("androidx.webkit:webkit:1.8.0")
 }
 
 apply from: "../../node_modules/react-native-vector-icons/fonts.gradle"
+
+// Fix for React Native Vector Icons dependency issue
+afterEvaluate {
+    tasks.configureEach { task ->
+        if (task.name.contains("LintReportModel") || task.name.contains("Lint")) {
+            task.dependsOn("copyReactNativeVectorIconFonts")
+        }
+    }
+}

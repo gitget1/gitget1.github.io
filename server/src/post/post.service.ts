@@ -112,6 +112,7 @@ export class PostService {
       score,
       imageUris,
     } = createPostDto;
+    
 
     const post = this.postRepository.create({
       latitude,

@@ -311,4 +311,73 @@ export class AuthService {
       );
     }
   }
+
+  async getTokenByCode(code: string) {
+    // 카카오 OAuth code를 받아서 토큰 발급
+    try {
+      // 카카오 API로 액세스 토큰 요청
+      const tokenResponse = await axios.post(
+        'https://kauth.kakao.com/oauth/token',
+        {
+          grant_type: 'authorization_code',
+          client_id: this.configService.get('KAKAO_CLIENT_ID'),
+          redirect_uri: this.configService.get('KAKAO_REDIRECT_URI'),
+          code: code,
+        },
+        {
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+        },
+      );
+
+      const { access_token } = tokenResponse.data;
+
+      // 카카오 API로 사용자 정보 요청
+      const userResponse = await axios.get(
+        'https://kapi.kakao.com/v2/user/me',
+        {
+          headers: {
+            Authorization: `Bearer ${access_token}`,
+          },
+        },
+      );
+
+      const { id: kakaoId, kakao_account } = userResponse.data;
+      const nickname = kakao_account?.profile?.nickname || '카카오사용자';
+      const imageUri = kakao_account?.profile?.thumbnail_image_url?.replace(
+        /^http:/,
+        'https:',
+      );
+
+      // 기존 사용자 확인 또는 새 사용자 생성
+      let user = await this.userRepository.findOneBy({ email: kakaoId });
+
+      if (!user) {
+        user = this.userRepository.create({
+          email: kakaoId,
+          password: nickname,
+          nickname,
+          kakaoImageUri: imageUri ?? null,
+          loginType: 'kakao',
+        });
+        await this.userRepository.save(user);
+      }
+
+      // JWT 토큰 생성
+      const { accessToken, refreshToken } = await this.getTokens({
+        email: user.email,
+      });
+      await this.updateHashedRefreshToken(user.id, refreshToken);
+
+      return {
+        accessToken,
+        refreshToken,
+        message: '카카오 로그인 성공',
+      };
+    } catch (error) {
+      console.error('카카오 OAuth 토큰 교환 에러:', error);
+      throw new BadRequestException('카카오 로그인에 실패했습니다.');
+    }
+  }
 }

@@ -34,6 +34,7 @@ type Schedule = {
   placeDescription: string;
   travelTime: number;
   placeId: string;
+  googlePlaceId?: string; // googlePlaceId 추가 (선택적)
 };
 
 type TourData = {
@@ -869,8 +870,30 @@ const Practice = () => {
   };
 
   const handleEdit = () => {
-    navigation.navigate('MakeProgram', {
+    if (!data) return;
+    
+    // 기존 투어 데이터를 editData로 전달
+    const editData = {
+      title: data.title || '',
+      description: data.description || '',
+      guidePrice: data.guidePrice || 0,
+      region: data.region || '',
+      thumbnailUrl: data.thumbnailUrl || '',
+      hashtags: data.hashtags || [],
+      schedules: (data.schedules || []).map(schedule => ({
+        day: schedule.day,
+        scheduleSequence: schedule.day, // day를 sequence로 사용
+        placeName: schedule.placeName || '',
+        lat: schedule.lat,
+        lon: schedule.lon,
+        placeDescription: schedule.placeDescription || '',
+        travelTime: schedule.travelTime || 0,
+      })),
+    };
+
+    navigation.navigate('Make_program', {
       tourProgramId: tourProgramId,
+      editData: editData,
       isEdit: true,
     });
   };
@@ -975,16 +998,26 @@ const Practice = () => {
     if (onlyPlaceName && onlyPlaceName.includes(',')) {
       onlyPlaceName = onlyPlaceName.split(',')[0].trim();
     }
-    // placeId가 없으면 lat/lon 조합으로 대체
-    let placeId = item.placeId;
-    if (!placeId || placeId === 'null' || placeId === 'undefined') {
-      placeId = `${item.lat},${item.lon}`;
+    
+    // googlePlaceId 처리 - Google Place ID인지 좌표인지 확인
+    let googlePlaceId = item.googlePlaceId || item.placeId; // googlePlaceId 우선, 없으면 placeId 사용
+    if (!googlePlaceId || googlePlaceId === 'null' || googlePlaceId === 'undefined') {
+      // googlePlaceId가 없으면 좌표 조합으로 대체
+      googlePlaceId = `${item.lat},${item.lon}`;
+      console.log('⚠️ googlePlaceId가 없어서 좌표로 대체:', googlePlaceId);
+    } else if (googlePlaceId.includes(',')) {
+      // 좌표 형식인 경우 (이미 좌표로 저장된 경우)
+      console.log('📍 좌표 형식 googlePlaceId 사용:', googlePlaceId);
+    } else {
+      // Google Place ID인 경우
+      console.log('🏢 Google Place ID 사용:', googlePlaceId);
     }
+    
     // placeName을 encodeURIComponent로 인코딩
     const encodedPlaceName = encodeURIComponent(onlyPlaceName);
     const logObj = {
       placeName: encodedPlaceName,
-      placeId: placeId,
+      googlePlaceId: googlePlaceId,
       language: 'kor',
     };
     console.log('장소 상세 요청 파라미터:', JSON.stringify(logObj, null, 2));
@@ -993,7 +1026,7 @@ const Practice = () => {
       placeDescription: item.placeDescription,
       lat: item.lat,
       lon: item.lon,
-      placeId: placeId,
+      placeId: googlePlaceId, // googlePlaceId를 placeId로 전달
       language: 'kor',
       tourProgramId: tourProgramId,
     });
@@ -1223,20 +1256,21 @@ const Practice = () => {
             </Text>
 
             <View style={styles.editDeleteRow}>
-              {currentUserId && data.user?.id && currentUserId === data.user.id ? (
-                <>
-                  <TouchableOpacity
-                    style={styles.editButton}
-                    onPress={handleEdit}>
-                    <Text style={styles.editButtonText}>{getTranslatedUIText('수정', selectedLanguage)}</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={styles.deleteButton}
-                    onPress={handleDelete}>
-                    <Text style={styles.deleteButtonText}>{getTranslatedUIText('삭제', selectedLanguage)}</Text>
-                  </TouchableOpacity>
-                </>
-              ) : null}
+              {/* 수정 버튼 임시로 항상 표시 */}
+              <TouchableOpacity
+                style={styles.editButton}
+                onPress={handleEdit}>
+                <Text style={styles.editButtonText}>{getTranslatedUIText('수정', selectedLanguage)}</Text>
+              </TouchableOpacity>
+              
+              {/* 삭제 버튼 일시 비활성화 */}
+              {/*
+              <TouchableOpacity
+                style={styles.deleteButton}
+                onPress={handleDelete}>
+                <Text style={styles.deleteButtonText}>{getTranslatedUIText('삭제', selectedLanguage)}</Text>
+              </TouchableOpacity>
+              */}
             </View>
 
             <View style={styles.rightAlignRow}>

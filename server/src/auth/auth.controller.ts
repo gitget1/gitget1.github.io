@@ -1,10 +1,12 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
   Get,
   Patch,
   Post,
+  Query,
   UseGuards,
   ValidationPipe,
 } from '@nestjs/common';
@@ -28,6 +30,14 @@ export class AuthController {
   @Post('/signin')
   signin(@Body(ValidationPipe) authDto: AuthDto) {
     return this.authService.signin(authDto);
+  }
+
+  @Get('/token')
+  async getTokenByCode(@Query('code') code: string) {
+    if (!code) {
+      throw new BadRequestException('인증 코드가 필요합니다.');
+    }
+    return this.authService.getTokenByCode(code);
   }
 
   @Get('/refresh')

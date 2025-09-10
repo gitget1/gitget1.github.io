@@ -9,7 +9,7 @@ import { TextInput } from 'react-native-gesture-handler';
 
 function LoginScreen() {
 const  passwordRef = useRef<TextInput | null>(null);
-const {loginMutation} = useAuth()
+// const {loginMutation} = useAuth()
 const login = useForm({
   initialValue:{
   email: '',
@@ -20,7 +20,8 @@ const login = useForm({
 
 
   const handleSubmit = () => {
-    loginMutation.mutate(login.values);
+    // loginMutation.mutate(login.values);
+    console.log('Login attempt:', login.values);
 };
 
 
