@@ -12,9 +12,15 @@ import {
   SafeAreaView,
   Modal,
   Platform,
+  FlatList,
 } from 'react-native';
 import {launchImageLibrary} from 'react-native-image-picker';
-import MapView, {Marker, Polyline, PROVIDER_GOOGLE} from 'react-native-maps';
+import MapView, {
+  Marker,
+  Polyline,
+  PROVIDER_GOOGLE,
+  Region,
+} from 'react-native-maps';
 import Geolocation from '@react-native-community/geolocation';
 import {GooglePlacesAutocomplete} from 'react-native-google-places-autocomplete';
 import haversine from 'haversine-distance';
@@ -65,6 +71,83 @@ const dayColors = [
   '#00897b', // Day 8 - 청록
 ];
 
+/** 충청남도 시·군 좌표 (대략 중심) */
+const CHUNGNAM_REGIONS: Array<{
+  name: string;
+  latitude: number;
+  longitude: number;
+}> = [
+  {name: '천안시', latitude: 36.8151, longitude: 127.1139},
+  {name: '아산시', latitude: 36.7899, longitude: 127.0019},
+  {name: '공주시', latitude: 36.4468, longitude: 127.119},
+  {name: '보령시', latitude: 36.3335, longitude: 126.6129},
+  {name: '서산시', latitude: 36.7845, longitude: 126.45},
+  {name: '논산시', latitude: 36.1872, longitude: 127.098},
+  {name: '당진시', latitude: 36.8925, longitude: 126.629},
+  {name: '계룡시', latitude: 36.2746, longitude: 127.2486},
+  {name: '금산군', latitude: 36.1086, longitude: 127.4889},
+  {name: '부여군', latitude: 36.2753, longitude: 126.9097},
+  {name: '서천군', latitude: 36.0808, longitude: 126.6912},
+  {name: '청양군', latitude: 36.4591, longitude: 126.8022},
+  {name: '홍성군', latitude: 36.6011, longitude: 126.6608},
+  {name: '예산군', latitude: 36.682, longitude: 126.8486},
+  {name: '태안군', latitude: 36.7457, longitude: 126.2987},
+];
+
+/** 선택형 해시태그('#' 제거) */
+const HASHTAG_OPTIONS = [
+  '혼자여행',
+  '커플여행',
+  '가족여행',
+  '우정여행',
+  '여행버디',
+  '즉흥여행',
+  '계획여행',
+  '자연여행',
+  '도시탐방',
+  '문화유산',
+  '힐링여행',
+  '액티비티',
+  '맛집투어',
+  '야경명소',
+  '해수욕장',
+  '산정상뷰',
+  '계곡여행',
+  '한옥마을',
+  '전통시장',
+  '한강산책',
+  '감성숙소',
+  '가성비숙소',
+  '한적한여행',
+  '혼산',
+  '혼캠',
+  '감성사진',
+  '카페투어',
+  '야경촬영',
+  '자연과함께',
+  '힐링산책',
+  '산림욕',
+  '한적한바닷가',
+  '로컬푸드',
+  '재충전',
+  '계획없이떠나기',
+  '사진맛집',
+  '편한여행',
+  '감성여행',
+  '조용한여행',
+  '감성가득',
+  '쉼표여행',
+  '마음정리',
+  '트레킹',
+  '일상탈출',
+  '소확행',
+  '걷기좋은길',
+  '하늘풍경',
+  '초록자연',
+  '일몰명소',
+  '바람쐬기',
+];
+
 function Make_program() {
   const route = useRoute<RouteProp<AppStackParamList, 'Make_program'>>();
   const editData = route.params?.editData;
@@ -83,8 +166,8 @@ function Make_program() {
   });
   const [regionInput, setRegionInput] = useState('');
   const [guidePrice, setGuidePrice] = useState('');
-  const [hashtags, setHashtags] = useState('');
-  const [region, setRegion] = useState({
+  const [selectedHashtags, setSelectedHashtags] = useState<string[]>([]); // ✅ 해시태그 다중 선택 상태
+  const [region, setRegion] = useState<Region>({
     latitude: 36.7994, // 순천향대학교 위도
     longitude: 126.9306, // 순천향대학교 경도
     latitudeDelta: 0.0922,
@@ -92,6 +175,8 @@ function Make_program() {
   });
   const mapRef = useRef<MapView>(null);
   const [placeModalVisible, setPlaceModalVisible] = useState(false);
+  const [regionSelectVisible, setRegionSelectVisible] = useState(false);
+  const [hashtagModalVisible, setHashtagModalVisible] = useState(false);
   const [locationLoading, setLocationLoading] = useState(false);
   const navigation = useNavigation();
   const [routes, setRoutes] = useState<{
@@ -116,7 +201,11 @@ function Make_program() {
       setDescription(editData.description);
       setRegionInput(editData.region);
       setGuidePrice(editData.guidePrice.toString());
-      setHashtags(editData.hashtags.join(', '));
+      // ✅ 해시태그 초기화 ('#' 제거)
+      const initialTags: string[] = Array.isArray(editData.hashtags)
+        ? editData.hashtags.map((t: string) => t.replace(/^#/, ''))
+        : [];
+      setSelectedHashtags(initialTags);
 
       // 일정 데이터 변환 - day별로 그룹화
       const schedulesByDay: DayPlan[][] = editData.schedules.reduce(
@@ -379,6 +468,39 @@ function Make_program() {
     setPlaceModalVisible(true);
   };
 
+  /** 지역 선택 처리 */
+  const handleSelectRegion = (
+    name: string,
+    latitude: number,
+    longitude: number,
+  ) => {
+    setRegionInput(name);
+    const newRegion: Region = {
+      latitude,
+      longitude,
+      latitudeDelta: 0.0922,
+      longitudeDelta: 0.0421,
+    };
+    setRegion(newRegion);
+    mapRef.current?.animateToRegion(newRegion, 600);
+    setRegionSelectVisible(false);
+  };
+
+  /** 해시태그 토글 */
+  const toggleHashtag = (tag: string) => {
+    setSelectedHashtags(prev => {
+      const exists = prev.includes(tag);
+      if (exists) {
+        return prev.filter(t => t !== tag);
+      }
+      if (prev.length >= 10) {
+        Alert.alert('알림', '해시태그는 최대 10개까지 선택 가능합니다.');
+        return prev;
+      }
+      return [...prev, tag];
+    });
+  };
+
   // 거리 계산 (명시적 타입 캐스팅 추가)
   const getDayDistance = (plans: DayPlan[]) => {
     let total = 0;
@@ -473,6 +595,25 @@ function Make_program() {
         return;
       }
       
+      // 해시태그가 없으면 기본 해시태그 추가
+      console.log('🔍 해시태그 상태 확인:', {
+        selectedHashtags,
+        selectedHashtagsLength: selectedHashtags.length
+      });
+      
+      // 강제로 해시태그 설정 (임시 해결책)
+      const finalHashtags = selectedHashtags.length > 0 
+        ? selectedHashtags 
+        : ['여행', '투어프로그램']; // 기본 해시태그
+      
+      // 추가 안전장치: 빈 배열이면 강제로 기본 해시태그 설정
+      if (finalHashtags.length === 0) {
+        finalHashtags.push('여행', '투어프로그램');
+        console.log('⚠️ 빈 배열 감지! 강제로 기본 해시태그 추가:', finalHashtags);
+      }
+      
+      console.log('🔍 최종 해시태그:', finalHashtags);
+      
       // schedules 데이터 검증 및 정제
       const validSchedules = days.flatMap((day, dayIdx) =>
         day.plans.map((plan, seq) => {
@@ -488,12 +629,12 @@ function Make_program() {
             console.warn(`⚠️ Day ${dayIdx + 1}의 ${seq + 1}번째 일정 설명이 100자를 초과하여 잘렸습니다.`);
           }
           
-          // googlePlaceId 정제 (Google Places ID가 너무 길면 간단한 ID로 대체)
-          let cleanGooglePlaceId = plan.googlePlaceId || '';
-          if (cleanGooglePlaceId.length > 50) {
-            cleanGooglePlaceId = `place_${dayIdx + 1}_${seq + 1}_${Date.now()}`;
-            console.warn(`⚠️ Day ${dayIdx + 1}의 ${seq + 1}번째 일정 googlePlaceId가 너무 길어 새로 생성했습니다.`);
-          }
+            // googlePlaceId 정제 (Google Places ID가 너무 길면 간단한 ID로 대체)
+            let cleanGooglePlaceId = plan.googlePlaceId || '';
+            if (cleanGooglePlaceId.length > 50) { // 50자로 원래대로 복원
+              cleanGooglePlaceId = `place_${dayIdx + 1}_${seq + 1}_${Date.now()}`;
+              console.warn(`⚠️ Day ${dayIdx + 1}의 ${seq + 1}번째 일정 googlePlaceId가 너무 길어 새로 생성했습니다.`);
+            }
           
           // 좌표 유효성 검사
           if (isNaN(plan.coordinate.latitude) || isNaN(plan.coordinate.longitude)) {
@@ -505,7 +646,7 @@ function Make_program() {
             day: dayIdx + 1,
             scheduleSequence: seq,
             googlePlaceId: cleanGooglePlaceId, // googlePlaceId로 통일
-            placeName: plan.place.substring(0, 100), // 장소명도 100자 제한
+            placeName: plan.place.substring(0, 100), // 장소명도 100자로 원래대로 복원
             lat: Number(plan.coordinate.latitude.toFixed(6)), // 소수점 6자리로 제한
             lon: Number(plan.coordinate.longitude.toFixed(6)),
             placeDescription: cleanDescription,
@@ -525,13 +666,7 @@ function Make_program() {
         guidePrice: Number(guidePrice),
         region: regionInput.trim(),
         thumbnailUrl: thumbnail || '',
-        hashtags: hashtags
-          ? hashtags
-              .split(',')
-              .map(tag => tag.trim())
-              .filter(tag => tag.length > 0)
-              .slice(0, 10) // 최대 10개 해시태그
-          : [],
+        hashtags: finalHashtags.slice(0, 10), // ✅ 최종 해시태그 사용
         schedules: validSchedules,
       };
       
@@ -540,7 +675,14 @@ function Make_program() {
         titleLength: data.title.length,
         descriptionLength: data.description.length,
         schedulesCount: data.schedules.length,
+        hashtagsCount: data.hashtags.length,
+        hashtags: data.hashtags,
         totalSchedulesDataSize: JSON.stringify(data.schedules).length,
+        sampleSchedule: data.schedules[0] ? {
+          googlePlaceId: data.schedules[0].googlePlaceId,
+          placeName: data.schedules[0].placeName,
+          googlePlaceIdLength: data.schedules[0].googlePlaceId?.length || 0
+        } : null
       });
       
       // 데이터 크기 제한 확인
@@ -766,7 +908,15 @@ function Make_program() {
       
       if (axios.isAxiosError(error)) {
         if (error.response?.status === 500) {
-          errorMessage = '서버 내부 오류가 발생했습니다. 잠시 후 다시 시도해주세요.';
+          const serverError = error.response.data;
+          console.error('🔍 서버 에러 상세:', serverError);
+          
+          // 서버 에러 메시지에 따라 다른 처리
+          if (serverError?.code === 'S001') {
+            errorMessage = '서버 내부 오류가 발생했습니다. 데이터를 확인하고 다시 시도해주세요.';
+          } else {
+            errorMessage = '서버 내부 오류가 발생했습니다. 잠시 후 다시 시도해주세요.';
+          }
           
           // 500 오류 시 재시도 옵션 제공
           Alert.alert(
@@ -867,6 +1017,73 @@ function Make_program() {
           <Button title="닫기" onPress={() => setPlaceModalVisible(false)} />
         </View>
       </Modal>
+
+      {/* 지역 선택 모달 */}
+      <Modal visible={regionSelectVisible} animationType="slide" transparent>
+        <View style={styles.regionModalOverlay}>
+          <View style={styles.regionModalCard}>
+            <Text style={styles.regionModalTitle}>충청남도 지역 선택</Text>
+            <FlatList
+              data={CHUNGNAM_REGIONS}
+              keyExtractor={item => item.name}
+              renderItem={({item}) => (
+                <TouchableOpacity
+                  style={styles.regionItem}
+                  onPress={() =>
+                    handleSelectRegion(item.name, item.latitude, item.longitude)
+                  }>
+                  <Text style={styles.regionItemText}>{item.name}</Text>
+                </TouchableOpacity>
+              )}
+              ItemSeparatorComponent={() => (
+                <View style={styles.regionDivider} />
+              )}
+            />
+            <View style={{height: 8}} />
+            <Button
+              title="닫기"
+              onPress={() => setRegionSelectVisible(false)}
+            />
+          </View>
+        </View>
+      </Modal>
+
+      {/* 해시태그 선택 모달 */}
+      <Modal visible={hashtagModalVisible} animationType="slide" transparent>
+        <View style={styles.hashtagModalOverlay}>
+          <View style={styles.hashtagModalCard}>
+            <Text style={styles.hashtagTitle}>해시태그 선택 (최대 10개)</Text>
+            <ScrollView contentContainerStyle={styles.hashtagGrid}>
+              {HASHTAG_OPTIONS.map(tag => {
+                const active = selectedHashtags.includes(tag);
+                return (
+                  <TouchableOpacity
+                    key={tag}
+                    onPress={() => toggleHashtag(tag)}
+                    style={[styles.tagChip, active && styles.tagChipActive]}>
+                    <Text
+                      style={[
+                        styles.tagChipText,
+                        active && styles.tagChipTextActive,
+                      ]}>
+                      {tag}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+            <View style={styles.hashtagFooter}>
+              <Text style={styles.selectedCount}>
+                선택 {selectedHashtags.length}/10
+              </Text>
+              <Button
+                title="완료"
+                onPress={() => setHashtagModalVisible(false)}
+              />
+            </View>
+          </View>
+        </View>
+      </Modal>
       {!placeModalVisible && (
         <ScrollView
           contentContainerStyle={styles.container}
@@ -897,12 +1114,18 @@ function Make_program() {
                 value={title}
                 onChangeText={setTitle}
               />
-              <TextInput
-                style={styles.input}
-                placeholder="지역"
-                value={regionInput}
-                onChangeText={setRegionInput}
-              />
+              {/* 지역 선택 */}
+              <TouchableOpacity onPress={() => setRegionSelectVisible(true)}>
+                <View pointerEvents="none">
+                  <TextInput
+                    style={[styles.input, {color: regionInput ? '#000' : '#888'}]}
+                    placeholder="지역 선택 (터치)"
+                    value={regionInput}
+                    editable={false}
+                  />
+                </View>
+              </TouchableOpacity>
+
               <TextInput
                 style={styles.input}
                 placeholder="가이드 가격"
@@ -910,12 +1133,32 @@ function Make_program() {
                 onChangeText={setGuidePrice}
                 keyboardType="numeric"
               />
-              <TextInput
-                style={styles.input}
-                placeholder="해시태그 (쉼표로 구분)"
-                value={hashtags}
-                onChangeText={setHashtags}
-              />
+
+              {/* 해시태그 선택 */}
+              <View style={{gap: 6}}>
+                <TouchableOpacity
+                  style={styles.hashtagSelectBtn}
+                  onPress={() => setHashtagModalVisible(true)}>
+                  <Text style={styles.hashtagSelectBtnText}>해시태그 선택</Text>
+                </TouchableOpacity>
+                {/* 선택 결과 미리보기 (칩) */}
+                {selectedHashtags.length > 0 ? (
+                  <View style={styles.selectedTagsWrap}>
+                    {selectedHashtags.map(tag => (
+                      <View key={tag} style={styles.selectedTagChip}>
+                        <Text style={styles.selectedTagText}>{tag}</Text>
+                        <TouchableOpacity
+                          onPress={() => toggleHashtag(tag)}
+                          style={styles.removeTagBtn}>
+                          <Text style={styles.removeTagX}>×</Text>
+                        </TouchableOpacity>
+                      </View>
+                    ))}
+                  </View>
+                ) : (
+                  <Text style={{color: '#888'}}>선택된 해시태그 없음</Text>
+                )}
+              </View>
             </View>
           </View>
 
@@ -927,7 +1170,7 @@ function Make_program() {
               style={styles.map}
               region={region}
               onRegionChangeComplete={setRegion}
-              showsUserLocation={true}
+              showsUserLocation={false}
               showsMyLocationButton={false}>
               {/* 현재 위치 마커 */}
               {currentLocation && (
@@ -1443,6 +1686,105 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
   },
+
+  // 지역 모달
+  regionModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  regionModalCard: {
+    width: '88%',
+    maxHeight: '75%',
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 4},
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  regionModalTitle: {fontSize: 18, fontWeight: 'bold', marginBottom: 12},
+  regionItem: {paddingVertical: 12, paddingHorizontal: 8, borderRadius: 8},
+  regionItemText: {fontSize: 16},
+  regionDivider: {height: 1, backgroundColor: '#eee'},
+
+  // 해시태그 모달/칩
+  hashtagModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  hashtagModalCard: {
+    width: '92%',
+    maxHeight: '80%',
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 4},
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  hashtagTitle: {fontSize: 18, fontWeight: 'bold', marginBottom: 12},
+  hashtagGrid: {flexDirection: 'row', flexWrap: 'wrap', gap: 8},
+  tagChip: {
+    borderWidth: 1,
+    borderColor: '#ccc',
+    borderRadius: 20,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    backgroundColor: '#fff',
+  },
+  tagChipActive: {
+    borderColor: '#0288d1',
+    backgroundColor: '#e1f5fe',
+  },
+  tagChipText: {fontSize: 14, color: '#333'},
+  tagChipTextActive: {color: '#0288d1', fontWeight: '700'},
+  hashtagFooter: {
+    marginTop: 12,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  selectedCount: {color: '#0288d1', fontWeight: '700'},
+
+  // 선택된 해시태그 미리보기
+  hashtagSelectBtn: {
+    backgroundColor: '#0288d1',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    alignSelf: 'flex-start',
+  },
+  hashtagSelectBtnText: {color: '#fff', fontWeight: '700'},
+  selectedTagsWrap: {flexDirection: 'row', flexWrap: 'wrap', gap: 6},
+  selectedTagChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 16,
+    backgroundColor: '#e1f5fe',
+    borderWidth: 1,
+    borderColor: '#0288d1',
+  },
+  selectedTagText: {color: '#0288d1', fontWeight: '700'},
+  removeTagBtn: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: '#0288d1',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  removeTagX: {color: '#fff', fontWeight: '900', lineHeight: 18},
 });
 
 export default Make_program;

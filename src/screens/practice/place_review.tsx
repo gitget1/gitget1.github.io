@@ -104,6 +104,7 @@ export default function ReviewScreen() {
   const [newImageUrl, setNewImageUrl] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [currentUserName, setCurrentUserName] = useState<string | null>(null);
 
   const sortMap = React.useMemo(
     () => ({
@@ -114,18 +115,103 @@ export default function ReviewScreen() {
     [],
   );
 
-  // 현재 사용자 정보 가져오기 (JWT 토큰에서 추출)
+  // 현재 사용자 정보 가져오기 (MyPage와 동일한 로직)
   useEffect(() => {
     const getCurrentUser = async () => {
       try {
+        // 먼저 AsyncStorage에서 저장된 사용자 정보 확인
+        const savedUserName = await AsyncStorage.getItem('currentUserName');
+        const savedUserId = await AsyncStorage.getItem('currentUserId');
+        
+        if (savedUserName && savedUserId) {
+          console.log('✅ AsyncStorage에서 사용자 정보 발견:', { savedUserName, savedUserId });
+          setCurrentUserName(savedUserName);
+          setCurrentUserId(savedUserId);
+          // 저장된 정보가 있으면 바로 사용하고 API 호출 생략
+          return;
+        }
+        
         const token = await AsyncStorage.getItem('accessToken');
+        console.log('🔍 저장된 토큰:', token ? token.substring(0, 50) + '...' : '토큰 없음');
+        
         if (token) {
-          // JWT 토큰에서 사용자 ID 추출
+          const cleanToken = token.replace('Bearer ', '');
+          console.log('🔍 정리된 토큰:', cleanToken.substring(0, 50) + '...');
+          
+          // 서버 API로 사용자 정보 조회 시도
+          try {
+            console.log('🔍 place_review에서 사용자 상세 정보 API 호출 시도');
+            const response = await axios.get('http://124.60.137.10:8083/api/user', {
+              headers: {
+                Authorization: `Bearer ${cleanToken}`,
+                'Content-Type': 'application/json',
+              },
+            });
+            
+            console.log('🔍 place_review 사용자 상세 정보 API 응답:', response.data);
+            
+            if (response.data.status === 'OK' || response.data.status === '100 CONTINUE') {
+              const userData = response.data.data;
+              console.log('🔍 place_review 사용자 데이터 상세:', userData);
+              const userName = userData.name || userData.username;
+              console.log('🟢 place_review에서 가져온 사용자 이름:', userName);
+              
+              if (userName) {
+                setCurrentUserName(userName);
+                console.log('✅ place_review에서 currentUserName 설정됨:', userName);
+                // AsyncStorage에 저장
+                await AsyncStorage.setItem('currentUserName', userName);
+                console.log('✅ place_review에서 AsyncStorage에 사용자 이름 저장됨:', userName);
+                
+                // 서버의 내부 ID 저장 (리뷰에서 사용)
+                if (userData.id) {
+                  setCurrentUserId(userData.id.toString());
+                  await AsyncStorage.setItem('currentUserId', userData.id.toString());
+                  console.log('✅ place_review에서 서버 내부 ID 저장됨:', userData.id);
+                }
+                return;
+              } else {
+                console.log('⚠️ place_review에서 서버에서 사용자 이름을 가져올 수 없음');
+              }
+            } else {
+              console.log('⚠️ place_review에서 서버 응답 상태가 올바르지 않음:', response.data.status);
+            }
+          } catch (apiError) {
+            console.log('⚠️ place_review에서 사용자 상세 정보 API 호출 실패:', apiError);
+            if (axios.isAxiosError(apiError)) {
+              console.log('🔍 place_review API 에러 상세:', {
+                status: apiError.response?.status,
+                data: apiError.response?.data,
+                message: apiError.message
+              });
+            }
+          }
+          
+          // API 호출이 실패하면 JWT에서 추출
           const decoded = decodeJWT(token);
+          console.log('🔍 JWT 토큰 전체 내용:', decoded);
+          
           if (decoded && decoded.sub) {
             console.log('🟢 JWT에서 추출한 사용자 ID:', decoded.sub);
-            setCurrentUserId(decoded.sub); // naver_YgO-xSMXKaCip8Z-7vMrGxhYgZiVE06qJ6_7lPJS6hg 형태
+            
+            // JWT에서 사용자 이름 추출 시도
+            const userName = decoded.name || decoded.username || decoded.nickname;
+            console.log('🟢 JWT에서 추출된 사용자 이름:', userName);
+            console.log('🔍 JWT name:', decoded.name);
+            console.log('🔍 JWT username:', decoded.username);
+            console.log('🔍 JWT nickname:', decoded.nickname);
+            
+            setCurrentUserId(decoded.sub);
+            setCurrentUserName(userName);
+            console.log('✅ JWT에서 currentUserName 설정됨:', userName);
+            // AsyncStorage에도 저장
+            await AsyncStorage.setItem('currentUserName', userName);
+            console.log('✅ AsyncStorage에 JWT 사용자 이름 저장됨:', userName);
+          } else {
+            console.log('⚠️ JWT에서 사용자 정보를 추출할 수 없음');
           }
+        } else {
+          console.log('⚠️ 토큰이 없습니다');
         }
       } catch (error) {
         console.error('사용자 정보 가져오기 실패:', error);
@@ -145,7 +231,7 @@ export default function ReviewScreen() {
       try {
         setTourLoading(true);
         const token = await AsyncStorage.getItem('accessToken');
-        
+
         // place 정보는 별도로 가져올 필요가 없으므로 로딩만 완료
         setTourLoading(false);
       } catch (error) {
@@ -171,6 +257,7 @@ export default function ReviewScreen() {
 
         // 로컬 스토리지에서 토큰 가져오기
         const token = await AsyncStorage.getItem('accessToken');
+        const cleanToken = token ? token.replace('Bearer ', '') : null;
 
         const requestUrl = `http://124.60.137.10:8083/api/place/review/${placeId}`;
         const requestParams = {
@@ -182,14 +269,14 @@ export default function ReviewScreen() {
         console.log('🟢 Place 리뷰 조회 요청 URL:', requestUrl);
         console.log('🟢 Place 리뷰 조회 요청 파라미터:', requestParams);
         console.log('🟢 Place 리뷰 조회 요청 헤더:', {
-          Authorization: token ? `Bearer ${token}` : 'No token'
+          Authorization: cleanToken ? `Bearer ${cleanToken}` : 'No token',
         });
 
         const res = await axios.get(requestUrl, {
           params: requestParams,
-          headers: token
+          headers: cleanToken
             ? {
-                Authorization: `Bearer ${token}`,
+                Authorization: `Bearer ${cleanToken}`,
               }
             : undefined,
         });
@@ -198,106 +285,90 @@ export default function ReviewScreen() {
           res.data.status === 'Success' ||
           res.data.status === 'OK'
         ) {
-          // 원본 서버 응답 데이터 확인
           console.log('🔍 원본 서버 응답:', res.data);
-          console.log('🔍 원본 데이터 배열:', res.data.data);
-
-          // 각 원본 리뷰 데이터 확인
-          res.data.data.forEach((review: any, index: number) => {
-            console.log(`🔍 원본 리뷰 ${index} 전체:`, review);
-            console.log(`🔍 원본 리뷰 ${index} 필드들:`, {
-              id: review.id,
-              reviewId: review.reviewId,
-              review_id: review.review_id,
-              Id: review.Id,
-              ID: review.ID,
-              user_id: review.user_id,
-              userId: review.userId,
-              name: review.name,
-              rating: review.rating,
-              content: review.content,
-              모든키: Object.keys(review),
+          console.log('🔍 리뷰 데이터 상세:', res.data.data);
+          if (res.data.data && res.data.data.length > 0) {
+            console.log('🔍 첫 번째 리뷰 상세 정보:', res.data.data[0]);
+            console.log('🔍 사용자 이름 필드들:', {
+              name: res.data.data[0].name,
+              username: res.data.data[0].username,
+              user: res.data.data[0].user,
+              userId: res.data.data[0].userId
             });
+          }
 
-            // 모든 필드 중 숫자인 것들을 찾기
-            const numericFields = Object.keys(review).filter(
-              key => typeof review[key] === 'number' && review[key] > 0,
-            );
-            console.log(
-              `🔍 숫자 필드들 (ID 후보):`,
-              numericFields.map(key => `${key}: ${review[key]}`),
-            );
-
-            // ID 관련 필드들만 따로 출력
-            const idRelatedFields = Object.entries(review).filter(
-              ([key, _value]) =>
-                key.toLowerCase().includes('id') ||
-                key.toLowerCase().includes('review') ||
-                key.toLowerCase().includes('program'),
-            );
-            console.log('🆔 ID 관련 필드들:', idRelatedFields);
-          });
-
+          // ======================== [수정된 부분 1] ========================
+          // API 응답 데이터를 프론트엔드 모델에 맞게 가공합니다.
+          // name과 verificationBadge 필드를 추가로 처리합니다.
+          // ===============================================================
           const processedReviews = res.data.data.map(
             (review: any, index: number) => {
-              // 실제 서버의 리뷰 ID 사용 (서버에서 받은 원본 ID)
-              const actualId = review.id || review.reviewId || index + 1000;
-
-              console.log(`🔍 리뷰 ${index} ID 매핑:`, {
-                원본id: review.id,
-                reviewId: review.reviewId,
-                review_id: review.review_id,
-                선택된ID: actualId,
-                임시ID여부: !actualId,
-                모든숫자필드: Object.entries(review)
-                  .filter(
-                    ([_key, value]) => typeof value === 'number' && value > 0,
-                  )
-                  .map(([key, value]) => `${key}: ${value}`),
-                ID가능필드들: Object.entries(review)
-                  .filter(
-                    ([_key, value]) =>
-                      typeof value === 'number' &&
-                      value > 0 &&
-                      value < 1000 &&
-                      !_key.toLowerCase().includes('user') &&
-                      !_key.toLowerCase().includes('rating'),
-                  )
-                  .map(([key, value]) => `${key}: ${value}`),
-              });
-
+              const reviewId = review.reviewId || index + 1000;
+              console.log(`🔍 리뷰 ID: ${reviewId}, 원본 reviewId: ${review.reviewId}, 인덱스: ${index}`);
+              
               return {
                 ...review,
-                id: actualId || index + 1000, // 임시 ID로 인덱스 + 1000 사용
-                imageUrls: Array.isArray(review.imageUrls) 
-                  ? review.imageUrls 
-                  : Array.isArray(review.imagesUrls) 
-                    ? review.imagesUrls 
-                    : (review.imageUrls ? [review.imageUrls] : []),
+                // API 응답의 reviewId를 id로 사용하고, 없으면 임시 ID를 부여합니다.
+                id: reviewId,
+                // API 응답의 imagesUrls를 imageUrls로 통일하고 항상 배열 형태로 유지합니다.
+                imageUrls: Array.isArray(review.imagesUrls)
+                  ? review.imagesUrls
+                  : review.imagesUrls
+                  ? [review.imagesUrls]
+                  : [],
                 rating: typeof review.rating === 'number' ? review.rating : 0,
                 content: review.content || '',
-                name: '익명',
-                user_id: review.user_id || review.userId, // 사용자 ID 추가
-                createdAt:
-                  review.createdAt ||
-                  review.created_at ||
-                  new Date().toISOString(),
+                // [요구사항 3] 실제 사용자 이름을 표시합니다.
+                // 현재 사용자의 리뷰면 확실히 실제 이름을 사용
+                name: (() => {
+                  // 현재 사용자의 리뷰인지 확인 (문자열 비교로 정확히 매칭)
+                  const isCurrentUserReview = 
+                    review.userId?.toString() === currentUserId?.toString() || 
+                    review.user_id?.toString() === currentUserId?.toString();
+                  
+                  console.log(`🔍 리뷰 ${review.reviewId} 이름 처리:`, {
+                    reviewUserId: review.userId,
+                    reviewUserId2: review.user_id,
+                    currentUserId,
+                    currentUserName,
+                    isCurrentUserReview,
+                    serverName: review.name,
+                    userIdMatch: review.userId?.toString() === currentUserId?.toString(),
+                    user_idMatch: review.user_id?.toString() === currentUserId?.toString()
+                  });
+                  
+                  // 현재 사용자의 리뷰면 무조건 실제 이름 사용
+                  if (isCurrentUserReview) {
+                    if (currentUserName) {
+                      console.log(`✅ 현재 사용자 리뷰 - ${currentUserName} 사용`);
+                      return currentUserName;
+                    } else {
+                      console.log(`⚠️ 현재 사용자 리뷰지만 currentUserName이 없음`);
+                    }
+                  }
+                  
+                  // 서버에서 받은 name 필드 사용
+                  const serverName = review.name || '';
+                  
+                  // 서버에서 받은 이름이 있고 개인 ID가 아닌 경우
+                  if (serverName && !/^(kakao_|naver_|google_)/.test(serverName) && serverName.length < 20) {
+                    console.log(`✅ 서버 이름 사용 - ${serverName}`);
+                    return serverName;
+                  }
+                  
+                  // 개인 ID이거나 이름이 없는 경우 익명으로 표시
+                  console.log(`⚠️ 익명으로 표시 - 서버이름: ${serverName}, 현재사용자: ${currentUserName}`);
+                  return t('anonymousReview');
+                })(),
+                // [요구사항 1] API에서 받은 verificationBadge 값을 저장합니다. 없으면 false로 기본값 처리합니다.
+                verificationBadge: review.verificationBadge || false,
+                user_id: review.userId,
+                createdAt: review.createdAt || new Date().toISOString(),
               };
             },
           );
           setReviews(processedReviews);
           console.log('🟢 처리된 리뷰 데이터:', processedReviews);
-          console.log('🟢 현재 사용자 ID:', currentUserId);
-
-          // 각 리뷰의 ID와 user_id 확인
-          processedReviews.forEach((review, index) => {
-            console.log(`🟢 처리된 리뷰 ${index}:`, {
-              id: review.id,
-              user_id: review.user_id,
-              name: review.name,
-              content: review.content?.substring(0, 20) + '...',
-            });
-          });
         } else {
           console.error('API 응답 상태:', res.data.status);
           throw new Error(
@@ -306,81 +377,47 @@ export default function ReviewScreen() {
         }
       } catch (error) {
         console.error('리뷰 불러오기 실패:', error);
-        
-        // 더 자세한 에러 정보 출력
+
         if (axios.isAxiosError(error)) {
           console.error('🔴 Axios 에러 상세 정보:', {
             status: error.response?.status,
-            statusText: error.response?.statusText,
             data: error.response?.data,
-            url: error.config?.url,
-            method: error.config?.method,
-            params: error.config?.params,
-            headers: error.config?.headers,
           });
-          
-          if (error.response?.status === 401) {
-            Alert.alert('알림', '로그인이 필요한 서비스입니다.');
-          } else if (error.response?.status === 500) {
-            console.error('🔴 서버 내부 오류 (500):', error.response?.data);
+          if (error.response?.status === 500) {
             console.log('⚠️ 서버 500 에러 - 더미 리뷰 데이터 사용');
-            
-            // 더미 리뷰 데이터 생성
             const dummyReviews = [
               {
                 id: 1,
                 rating: 4.5,
-                content: '이 장소는 정말 멋집니다! 방문해보시길 추천합니다.',
-                name: '익명',
+                content:
+                  '이 장소는 정말 멋집니다! 방문해보시길 추천합니다.',
+                name: '방문 인증 유저', // 더미 데이터에도 이름과 뱃지 추가
                 user_id: 'dummy_user_1',
                 createdAt: new Date().toISOString(),
                 imageUrls: [],
+                verificationBadge: true, // 더미 데이터 뱃지
               },
               {
                 id: 2,
                 rating: 4.0,
                 content: '좋은 경험이었습니다. 다음에 또 방문하고 싶어요.',
-                name: '익명',
+                name: '일반 유저',
                 user_id: 'dummy_user_2',
-                createdAt: new Date(Date.now() - 86400000).toISOString(), // 1일 전
+                createdAt: new Date(Date.now() - 86400000).toISOString(),
                 imageUrls: [],
-              }
+                verificationBadge: false,
+              },
             ];
-            
             setReviews(dummyReviews);
-            Alert.alert('알림', '서버 연결에 문제가 있어 임시 데이터를 표시합니다.');
+            Alert.alert(
+              '알림',
+              '서버 연결에 문제가 있어 임시 데이터를 표시합니다.',
+            );
           } else {
             Alert.alert('오류', '리뷰를 불러오는데 실패했습니다.');
           }
         } else {
           console.error('🔴 일반 에러:', error);
-          
-          // Network Error나 기타 에러 시에도 더미 데이터 사용
-          console.log('⚠️ 네트워크 에러 - 더미 리뷰 데이터 사용');
-          
-          const dummyReviews = [
-            {
-              id: 1,
-              rating: 4.5,
-              content: '이 장소는 정말 멋집니다! 방문해보시길 추천합니다.',
-              name: '익명',
-              user_id: 'dummy_user_1',
-              createdAt: new Date().toISOString(),
-              imageUrls: [],
-            },
-            {
-              id: 2,
-              rating: 4.0,
-              content: '좋은 경험이었습니다. 다음에 또 방문하고 싶어요.',
-              name: '익명',
-              user_id: 'dummy_user_2',
-              createdAt: new Date(Date.now() - 86400000).toISOString(),
-              imageUrls: [],
-            }
-          ];
-          
-          setReviews(dummyReviews);
-          Alert.alert('알림', '네트워크 연결에 문제가 있어 임시 데이터를 표시합니다.');
         }
       } finally {
         setLoading(false);
@@ -388,7 +425,7 @@ export default function ReviewScreen() {
     };
 
     fetchReviews();
-  }, [sortOrder, sortMap, placeId, currentUserId]);
+  }, [sortOrder, sortMap, placeId, currentUserId, t]);
 
   if (loading) {
     return <ActivityIndicator size="large" style={{marginTop: 50}} />;
@@ -398,7 +435,6 @@ export default function ReviewScreen() {
   const renderStarInput = () => {
     const stars: JSX.Element[] = [];
     for (let i = 1; i <= 5; i++) {
-      // 0.5 단위로 두 개의 Pressable
       const leftValue = i - 0.5;
       const rightValue = i;
       stars.push(
@@ -424,12 +460,6 @@ export default function ReviewScreen() {
 
   // 리뷰 작성 핸들러
   const handleSubmit = async () => {
-    console.log('🟢 리뷰 작성 시도 - placeId:', placeId);
-    console.log(
-      '🟢 리뷰 작성 시도 - placeId 타입:',
-      typeof placeId,
-    );
-
     if (!placeId) {
       Alert.alert('알림', 'placeId가 없습니다. 다시 시도해주세요.');
       return;
@@ -440,41 +470,40 @@ export default function ReviewScreen() {
       return;
     }
 
-    // 로그인 상태 확인
     const token = await AsyncStorage.getItem('accessToken');
     if (!token) {
       Alert.alert(t('alert'), t('loginRequiredTour'));
       return;
     }
 
+    // 토큰에서 Bearer 접두사 제거
+    const cleanToken = token.replace('Bearer ', '');
+    console.log('🔍 리뷰 작성 요청 토큰:', cleanToken.substring(0, 20) + '...');
+
     setIsSubmitting(true);
     try {
-      const ratingString = newRating.toFixed(1); // 5.0 형식으로 변환
-
-      console.log('🟢 리뷰 등록 요청 데이터:', {
-        placeId: placeId,
-        rating: ratingString,
-        content: newContent,
-        imageUrls: newImageUrl ? [newImageUrl] : [],
-      });
+      const ratingString = newRating.toFixed(1);
 
       const requestUrl = `http://124.60.137.10:8083/api/place/review`;
       const requestBody = {
-        placeId: placeId,
+        googlePlaceId: placeId, // placeId를 googlePlaceId로 변경
         rating: ratingString,
         content: newContent,
         imageUrls: newImageUrl ? [newImageUrl] : [],
+        userName: currentUserName || '익명', // 사용자 이름 추가
       };
 
-      console.log('🟢 Place 리뷰 등록 요청 URL:', requestUrl);
-      console.log('🟢 Place 리뷰 등록 요청 Body:', requestBody);
-      console.log('🟢 Place 리뷰 등록 요청 헤더:', {
-        Authorization: `Bearer ${token}`
+      console.log('🔍 리뷰 작성 요청 데이터:', requestBody);
+      console.log('🔍 현재 사용자 이름:', currentUserName);
+      console.log('🔍 현재 사용자 ID:', currentUserId);
+      console.log('🔍 사용자 이름이 없어서 익명으로 설정됨:', !currentUserName);
+      console.log('🔍 리뷰 작성 요청 헤더:', {
+        Authorization: `Bearer ${cleanToken}`,
       });
 
       const response = await axios.post(requestUrl, requestBody, {
         headers: {
-          Authorization: `Bearer ${token}`,
+          Authorization: `Bearer ${cleanToken}`,
         },
       });
 
@@ -483,47 +512,13 @@ export default function ReviewScreen() {
         response.data.status === 'Success' ||
         response.data.status === 'OK'
       ) {
-        console.log('🟢 리뷰 작성 성공 응답:', response.data);
-
-        // 성공 시 서버에서 반환된 리뷰 ID와 사용자 정보 확인
-        const createdReview = response.data.data || {};
-        console.log('🟢 생성된 리뷰 정보:', createdReview);
-
-        // 실제 사용자 ID 업데이트 (서버 응답에서 확인)
-        if (createdReview.user_id) {
-          console.log('🟢 실제 사용자 ID:', createdReview.user_id);
-          setCurrentUserId(createdReview.user_id);
-        }
-
-        // 성공 시 프론트에 추가
-        const newReview = {
-          id: createdReview.id || Date.now(), // 임시 ID
-          rating: newRating,
-          content: newContent,
-          createdAt: new Date().toISOString(),
-          imageUrls: newImageUrl ? [newImageUrl] : [],
-          name: '익명', // 서버에서 받은 이름이 있으면 사용, 없으면 익명
-          user: {name: '익명'},
-          user_id: currentUserId, // 현재 사용자 ID를 명시적으로 설정
-        };
-        
-        console.log('🟢 새로 추가되는 리뷰 정보:', newReview);
-        console.log('🟢 현재 사용자 ID:', currentUserId);
-        
         // 리뷰 등록 성공 후 서버에서 실제 데이터 새로고침
         try {
-          console.log('🟢 리뷰 등록 성공 - 서버에서 실제 데이터 새로고침 시작');
-          
           const refreshRes = await axios.get(
             `http://124.60.137.10:8083/api/place/review/${placeId}`,
             {
-              params: {
-                page: 0,
-                size: 10,
-              },
-              headers: {
-                Authorization: `Bearer ${token}`,
-              },
+              params: {page: 0, size: 10},
+              headers: {Authorization: `Bearer ${cleanToken}`},
             },
           );
 
@@ -532,30 +527,52 @@ export default function ReviewScreen() {
             refreshRes.data.status === 'Success' ||
             refreshRes.data.status === 'OK'
           ) {
+            // [수정된 부분 2] 새로고침 로직에도 동일하게 name, verificationBadge 처리 추가
             const processedReviews = refreshRes.data.data.map(
-              (review: any, index: number) => ({
-                ...review,
-                id: review.id || review.reviewId || index + 1000,
-                imageUrls: Array.isArray(review.imageUrls) ? review.imageUrls : (review.imageUrls ? [review.imageUrls] : []),
-                rating: typeof review.rating === 'number' ? review.rating : 0,
-                content: review.content || '',
-                name: '익명',
-                user_id: review.user_id || review.userId,
-                createdAt:
-                  review.createdAt ||
-                  review.created_at ||
-                  new Date().toISOString(),
-              }),
+              (review: any, index: number) => {
+                const reviewId = review.reviewId || index + 1000;
+                console.log(`🔄 새로고침 리뷰 ID: ${reviewId}, 원본 reviewId: ${review.reviewId}, 인덱스: ${index}`);
+                
+                return {
+                  ...review,
+                  id: reviewId,
+                  imageUrls: Array.isArray(review.imagesUrls)
+                    ? review.imagesUrls
+                    : [],
+                  name: (() => {
+                    // 현재 사용자의 리뷰인지 확인 (문자열 비교로 정확히 매칭)
+                    const isCurrentUserReview = 
+                      review.userId?.toString() === currentUserId?.toString() || 
+                      review.user_id?.toString() === currentUserId?.toString();
+                    
+                    // 현재 사용자의 리뷰면 무조건 실제 이름 사용
+                    if (isCurrentUserReview && currentUserName) {
+                      return currentUserName;
+                    }
+                    
+                    // 서버에서 받은 name 필드 사용
+                    const serverName = review.name || '';
+                    
+                    // 서버에서 받은 이름이 있고 개인 ID가 아닌 경우
+                    if (serverName && !/^(kakao_|naver_|google_)/.test(serverName) && serverName.length < 20) {
+                      return serverName;
+                    }
+                    
+                    // 개인 ID이거나 이름이 없는 경우 익명으로 표시
+                    return t('anonymousReview');
+                  })(),
+                  verificationBadge: review.verificationBadge || false,
+                  user_id: review.userId,
+                  createdAt: review.createdAt || new Date().toISOString(),
+                };
+              },
             );
             setReviews(processedReviews);
-            console.log('🟢 리뷰 등록 후 새로고침 완료 - 실제 서버 데이터 사용');
           }
         } catch (refreshError) {
           console.error('🔴 리뷰 등록 후 새로고침 실패:', refreshError);
-          // 새로고침 실패 시 기존 방식으로 추가
-          setReviews([newReview, ...reviews]);
         }
-        
+
         setNewContent('');
         setNewImageUrl('');
         setNewRating(5);
@@ -564,144 +581,8 @@ export default function ReviewScreen() {
         throw new Error(response.data.message || '리뷰 등록에 실패했습니다.');
       }
     } catch (error) {
-      if (axios.isAxiosError(error)) {
-        if (error.response?.status === 401) {
-          Alert.alert(t('alert'), t('loginRequiredTour'));
-        } else if (error.response?.status === 500) {
-          console.error('🔴 리뷰 등록 서버 오류 (500):', error.response?.data);
-          console.log('⚠️ 서버 500 에러 - 리뷰 등록 성공으로 처리');
-          
-          // 서버 오류 시에도 새로고침 시도
-          try {
-            console.log('🟢 서버 500 오류 - 새로고침 시도');
-            
-            const refreshRes = await axios.get(
-              `http://124.60.137.10:8083/api/place/review/${placeId}`,
-              {
-                params: {
-                  page: 0,
-                  size: 10,
-                },
-                headers: {
-                  Authorization: `Bearer ${token}`,
-                },
-              },
-            );
-
-            if (
-              refreshRes.data.status === '100 CONTINUE' ||
-              refreshRes.data.status === 'Success' ||
-              refreshRes.data.status === 'OK'
-            ) {
-              const processedReviews = refreshRes.data.data.map(
-                (review: any, index: number) => ({
-                  ...review,
-                  id: review.id || review.reviewId || index + 1000,
-                  imageUrls: Array.isArray(review.imageUrls) ? review.imageUrls : (review.imageUrls ? [review.imageUrls] : []),
-                  rating: typeof review.rating === 'number' ? review.rating : 0,
-                  content: review.content || '',
-                  name: '익명',
-                  user_id: review.user_id || review.userId,
-                  createdAt:
-                    review.createdAt ||
-                    review.created_at ||
-                    new Date().toISOString(),
-                }),
-              );
-              setReviews(processedReviews);
-              console.log('🟢 서버 500 오류 후 새로고침 성공');
-            }
-          } catch (refreshError) {
-            console.error('🔴 서버 500 오류 후 새로고침 실패:', refreshError);
-            // 새로고침 실패 시 임시 데이터 추가
-            const newReview = {
-              id: Date.now(),
-              rating: newRating,
-              content: newContent,
-              createdAt: new Date().toISOString(),
-              imageUrls: newImageUrl ? [newImageUrl] : [],
-              name: '익명',
-              user: {name: '익명'},
-              user_id: currentUserId,
-            };
-            setReviews([newReview, ...reviews]);
-          }
-          
-          setNewContent('');
-          setNewImageUrl('');
-          setNewRating(5);
-          Alert.alert(t('successTour'), '리뷰가 등록되었습니다.');
-        } else {
-          Alert.alert(
-            t('errorTour'),
-            error.response?.data?.message || '알 수 없는 오류가 발생했습니다.',
-          );
-        }
-      } else {
-        console.error('🔴 리뷰 등록 일반 에러:', error);
-        console.log('⚠️ 네트워크 에러 - 리뷰 등록 성공으로 처리');
-        
-        // 네트워크 에러 시에도 새로고침 시도
-        try {
-          console.log('🟢 네트워크 오류 - 새로고침 시도');
-          
-          const refreshRes = await axios.get(
-            `http://124.60.137.10:8083/api/place/review/${placeId}`,
-            {
-              params: {
-                page: 0,
-                size: 10,
-              },
-              headers: {
-                Authorization: `Bearer ${token}`,
-              },
-            },
-          );
-
-          if (
-            refreshRes.data.status === '100 CONTINUE' ||
-            refreshRes.data.status === 'Success' ||
-            refreshRes.data.status === 'OK'
-          ) {
-            const processedReviews = refreshRes.data.data.map(
-              (review: any, index: number) => ({
-                ...review,
-                id: review.id || review.reviewId || index + 1000,
-                imageUrls: Array.isArray(review.imageUrls) ? review.imageUrls : (review.imageUrls ? [review.imageUrls] : []),
-                rating: typeof review.rating === 'number' ? review.rating : 0,
-                content: review.content || '',
-                name: '익명',
-                user_id: review.user_id || review.userId,
-                createdAt:
-                  review.createdAt ||
-                  review.created_at ||
-                  new Date().toISOString(),
-              }),
-            );
-            setReviews(processedReviews);
-            console.log('🟢 네트워크 오류 후 새로고침 성공');
-          }
-        } catch (refreshError) {
-          console.error('🔴 네트워크 오류 후 새로고침 실패:', refreshError);
-          // 새로고침 실패 시 임시 데이터 추가
-          const newReview = {
-            id: Date.now(),
-            rating: newRating,
-            content: newContent,
-            createdAt: new Date().toISOString(),
-            imageUrls: newImageUrl ? [newImageUrl] : [],
-            name: '익명',
-            user: {name: '익명'},
-            user_id: currentUserId,
-          };
-          setReviews([newReview, ...reviews]);
-        }
-        
-        setNewContent('');
-        setNewImageUrl('');
-        setNewRating(5);
-        Alert.alert(t('successTour'), '리뷰가 등록되었습니다.');
-      }
+      console.error('리뷰 등록 실패:', error);
+      Alert.alert('오류', '리뷰 등록에 실패했습니다.');
     } finally {
       setIsSubmitting(false);
     }
@@ -709,18 +590,7 @@ export default function ReviewScreen() {
 
   // 리뷰 삭제 함수
   const handleDeleteReview = async (reviewId: number, reviewIndex: number) => {
-    console.log('🟢 삭제 시도 - 전체 리뷰 정보:', reviews[reviewIndex]);
-
-    // 실제 서버의 리뷰 ID 사용
-    const actualReviewId = reviewId;
-
-    console.log('🟢 사용할 리뷰 ID:', {
-      reviewId: actualReviewId,
-      currentUserId,
-      reviewData: reviews[reviewIndex],
-      JWT사용자ID: currentUserId,
-    });
-
+    console.log(`🗑️ 리뷰 삭제 시도 - ID: ${reviewId}, 인덱스: ${reviewIndex}`);
     Alert.alert(t('deleteReview'), t('deleteReviewConfirm'), [
       {
         text: t('cancelTour'),
@@ -731,69 +601,49 @@ export default function ReviewScreen() {
         style: 'destructive',
         onPress: async () => {
           try {
-            console.log('🟢 리뷰 삭제 요청:', {
-              actualReviewId,
-              reviewIndex,
-              currentUserId,
-              reviewId타입: typeof actualReviewId,
-              리뷰객체: reviews[reviewIndex],
-            });
-
             const token = await AsyncStorage.getItem('accessToken');
             if (!token) {
               Alert.alert(t('alert'), t('loginRequiredTour'));
               return;
             }
 
-            // placeId를 리뷰 ID 대신 사용
+            // 토큰에서 Bearer 접두사 제거
+            const cleanToken = token.replace('Bearer ', '');
+            console.log('🔍 삭제 요청 토큰:', cleanToken.substring(0, 20) + '...');
+
             const deleteUrl = `http://124.60.137.10:8083/api/place/review`;
             const deleteParams = {
-              placeId: placeId,
-              reviewId: actualReviewId,
+              googlePlaceId: placeId, // placeId를 googlePlaceId로 변경
+              reviewId: reviewId,
             };
-            console.log('🟢 placeId로 삭제 요청:', deleteUrl);
-            console.log('🟢 Place 리뷰 삭제 요청 URL:', deleteUrl);
-            console.log('🟢 Place 리뷰 삭제 요청 파라미터:', deleteParams);
-            console.log('🟢 Place 리뷰 삭제 요청 헤더:', {
-              Authorization: `Bearer ${token}`
+
+            console.log('🔍 삭제 요청 파라미터:', deleteParams);
+            console.log('🔍 삭제 요청 헤더:', {
+              Authorization: `Bearer ${cleanToken}`,
             });
-            console.log(
-              '🟢 전체 리뷰 목록:',
-              reviews.map(r => ({
-                id: r.id,
-                content: r.content?.substring(0, 10),
-              })),
-            );
+            console.log('🔍 삭제 요청 URL:', deleteUrl);
 
             const response = await axios.delete(deleteUrl, {
               params: deleteParams,
               headers: {
-                Authorization: `Bearer ${token}`,
+                Authorization: `Bearer ${cleanToken}`,
               },
             });
 
+            console.log('🔍 삭제 응답:', response.data);
+
             if (
               response.data.status === 'OK' ||
-              response.data.status === 'Success'
+              response.data.status === 'Success' ||
+              response.data.status === '100 CONTINUE'
             ) {
-              console.log('🟢 리뷰 삭제 성공');
-
               // 삭제 성공 후 리뷰 목록 새로고침
               try {
-                const token = await AsyncStorage.getItem('accessToken');
                 const refreshRes = await axios.get(
                   `http://124.60.137.10:8083/api/place/review/${placeId}`,
                   {
-                    params: {
-                      page: 0,
-                      size: 10,
-                      // sortOption: sortMap[sortOrder], // 일시적으로 제거하여 테스트
-                    },
-                    headers: token
-                      ? {
-                          Authorization: `Bearer ${token}`,
-                        }
-                      : undefined,
+                    params: {page: 0, size: 10},
+                    headers: cleanToken ? {Authorization: `Bearer ${cleanToken}`} : undefined,
                   },
                 );
 
@@ -802,32 +652,50 @@ export default function ReviewScreen() {
                   refreshRes.data.status === 'Success' ||
                   refreshRes.data.status === 'OK'
                 ) {
+                  // [수정된 부분 3] 삭제 후 새로고침 로직에도 동일하게 name, verificationBadge 처리 추가
                   const processedReviews = refreshRes.data.data.map(
-                    (review: any, index: number) => ({
-                      ...review,
-                      id:
-                        review.user_id ||
-                        review.userId ||
-                        currentUserId ||
-                        index + 1000, // user_id를 리뷰 ID로 사용
-                      imageUrls: Array.isArray(review.imageUrls) ? review.imageUrls : (review.imageUrls ? [review.imageUrls] : []),
-                      rating:
-                        typeof review.rating === 'number' ? review.rating : 0,
-                      content: review.content || '',
-                      name: '익명',
-                      user_id: review.user_id || review.userId,
-                      createdAt:
-                        review.createdAt ||
-                        review.created_at ||
-                        new Date().toISOString(),
-                    }),
+                    (review: any, index: number) => {
+                      const reviewId = review.reviewId || index + 1000;
+                      console.log(`🗑️ 삭제 후 새로고침 리뷰 ID: ${reviewId}, 원본 reviewId: ${review.reviewId}, 인덱스: ${index}`);
+                      
+                      return {
+                        ...review,
+                        id: reviewId,
+                        imageUrls: Array.isArray(review.imagesUrls)
+                          ? review.imagesUrls
+                          : [],
+                        name: (() => {
+                          // 현재 사용자의 리뷰인지 확인 (문자열 비교로 정확히 매칭)
+                          const isCurrentUserReview = 
+                            review.userId?.toString() === currentUserId?.toString() || 
+                            review.user_id?.toString() === currentUserId?.toString();
+                          
+                          // 현재 사용자의 리뷰면 무조건 실제 이름 사용
+                          if (isCurrentUserReview && currentUserName) {
+                            return currentUserName;
+                          }
+                          
+                          // 서버에서 받은 name 필드 사용
+                          const serverName = review.name || '';
+                          
+                          // 서버에서 받은 이름이 있고 개인 ID가 아닌 경우
+                          if (serverName && !/^(kakao_|naver_|google_)/.test(serverName) && serverName.length < 20) {
+                            return serverName;
+                          }
+                          
+                          // 개인 ID이거나 이름이 없는 경우 익명으로 표시
+                          return t('anonymousReview');
+                        })(),
+                        verificationBadge: review.verificationBadge || false,
+                        user_id: review.userId,
+                        createdAt: review.createdAt || new Date().toISOString(),
+                      };
+                    },
                   );
                   setReviews(processedReviews);
-                  console.log('🟢 리뷰 목록 새로고침 완료');
                 }
               } catch (refreshError) {
                 console.error('🔴 리뷰 목록 새로고침 실패:', refreshError);
-                // 새로고침 실패 시 기존 방식으로 해당 리뷰만 제거
                 setReviews(prev =>
                   prev.filter((_, index) => index !== reviewIndex),
                 );
@@ -841,14 +709,7 @@ export default function ReviewScreen() {
             }
           } catch (error) {
             console.error('리뷰 삭제 실패:', error);
-            if (axios.isAxiosError(error)) {
-              Alert.alert(
-                t('errorTour'),
-                error.response?.data?.message || '리뷰 삭제에 실패했습니다.',
-              );
-            } else {
-              Alert.alert(t('errorTour'), '리뷰 삭제에 실패했습니다.');
-            }
+            Alert.alert(t('errorTour'), '리뷰 삭제에 실패했습니다.');
           }
         },
       },
@@ -858,8 +719,8 @@ export default function ReviewScreen() {
   // 번역 키 매핑
   const getTranslatedText = (key: string): string => {
     const translations: {[key: string]: string} = {
-      'wishlist': '찜',
-      'totalReviews': '리뷰',
+      wishlist: '찜',
+      totalReviews: '리뷰',
     };
     return translations[key] || key;
   };
@@ -873,9 +734,7 @@ export default function ReviewScreen() {
             <Text style={styles.tourTitle} numberOfLines={2}>
               {placeName || '장소 리뷰'}
             </Text>
-            <Text style={styles.tourRegion}>
-              📍 {placeName || '장소명 없음'}
-            </Text>
+            <Text style={styles.tourRegion}>📍 {placeName || '장소명 없음'}</Text>
           </View>
           <View style={styles.tourStats}>
             <Text style={styles.reviewCount}>
@@ -976,7 +835,7 @@ export default function ReviewScreen() {
 
       {/* 💬 리뷰 카드들 */}
       {reviews.map((review, i) => (
-        <View key={i} style={styles.reviewCard}>
+        <View key={review.id || i} style={styles.reviewCard}>
           <View style={styles.profileRow}>
             <Image
               source={{
@@ -989,9 +848,19 @@ export default function ReviewScreen() {
               style={styles.avatar}
             />
             <View style={styles.flex1}>
-              <Text style={styles.nickname}>
-                {review.name || t('anonymousReview')}
-              </Text>
+              {/* ======================== [수정된 부분 4] ======================== */}
+              {/* 이름과 인증 뱃지를 함께 보여주기 위한 UI 수정입니다. */}
+              {/* review.verificationBadge가 true일 때만 뱃지(✔️)가 표시됩니다. */}
+              {/* =============================================================== */}
+              <View style={styles.nicknameContainer}>
+                <Text style={styles.nickname}>
+                  {review.name || t('anonymousReview')}
+                </Text>
+                {/* [요구사항 2] verificationBadge가 true이면 인증 뱃지를 표시합니다. */}
+                {review.verificationBadge && (
+                  <Text style={styles.badge}>☑️</Text>
+                )}
+              </View>
               <View style={styles.metaRow}>
                 <Text style={styles.smallText}>
                   {renderStars(review.rating || 0)}
@@ -1001,33 +870,39 @@ export default function ReviewScreen() {
                 </Text>
               </View>
             </View>
-            {/* 삭제 버튼 일시 비활성화 */}
-            {/* 
+            {/* 디버깅: 현재 사용자 ID와 리뷰 사용자 ID 확인 */}
             {(() => {
-              // 디버깅을 위한 로그
-              console.log(`🔍 리뷰 ${i} 삭제 버튼 조건 확인:`, {
-                reviewUserId: review.user_id,
-                currentUserId: currentUserId,
-                reviewName: review.name,
-                reviewUserName: review.user?.name,
+              console.log('🔍 리뷰 표시 디버깅:', {
                 reviewId: review.id,
-                reviewContent: review.content?.substring(0, 20),
+                currentUserId,
+                currentUserName,
+                reviewUserId: review.userId,
+                reviewUserId2: review.user_id,
+                reviewName: review.name,
+                isCurrentUser: review.userId === currentUserId || review.user_id === currentUserId,
+                finalDisplayName: review.name || t('anonymousReview'),
+                // 추가 디버깅 정보
+                reviewData: {
+                  originalName: review.name,
+                  originalUsername: review.username,
+                  originalUser: review.user,
+                  processedName: review.name
+                }
               });
-
-              // 임시로 모든 리뷰에 삭제 버튼 표시 (테스트용)
-              const isMyReview = true;
-
-              console.log(`🔍 리뷰 ${i} 삭제 버튼 표시 여부:`, isMyReview);
-
-              return isMyReview ? (
-                <TouchableOpacity
-                  style={styles.tempDeleteButton}
-                  onPress={() => handleDeleteReview(review.id, i)}>
-                  <Text style={styles.tempDeleteButtonText}>삭제</Text>
-                </TouchableOpacity>
-              ) : null;
+              return null;
             })()}
-            */}
+            
+            {/* 임시로 모든 리뷰에 삭제 버튼 표시 (테스트용) */}
+            <TouchableOpacity
+              style={styles.tempDeleteButton}
+              onPress={() => {
+                console.log('🗑️ 삭제 버튼 클릭됨 - 리뷰 ID:', review.id, '인덱스:', i);
+                console.log('🔍 현재 사용자 ID:', currentUserId);
+                console.log('🔍 리뷰 사용자 ID:', review.userId, review.user_id);
+                handleDeleteReview(review.id, i);
+              }}>
+              <Text style={styles.tempDeleteButtonText}>삭제</Text>
+            </TouchableOpacity>
           </View>
           <Text style={styles.content}>{review.content}</Text>
           {Array.isArray(review.imageUrls) && review.imageUrls.length > 0 && (
@@ -1163,6 +1038,7 @@ const styles = StyleSheet.create({
     padding: 16,
     marginTop: 12,
     borderColor: '#eee',
+    borderBottomWidth: 1,
   },
   profileRow: {
     flexDirection: 'row',
@@ -1175,8 +1051,24 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     marginRight: 12,
   },
+  // ======================== [수정된 부분 5] ========================
+  // 닉네임과 뱃지를 가로로 나열하기 위한 컨테이너 스타일 추가
+  // ===============================================================
+  nicknameContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
   nickname: {
     fontWeight: 'bold',
+    fontSize: 15,
+  },
+  // ======================== [수정된 부분 6] ========================
+  // 인증 뱃지(✔️)에 대한 스타일 추가
+  // ===============================================================
+  badge: {
+    marginLeft: 4,
+    fontSize: 14,
+    color: '#1DA1F2', // 트위터 블루 색상과 유사하게 설정
   },
   smallText: {
     fontSize: 12,
@@ -1186,59 +1078,33 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#aaa',
     textAlign: 'right',
-    minWidth: 240,
   },
   content: {
     fontSize: 14,
     marginBottom: 8,
-  },
-  tagBox: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-  },
-  tag: {
-    backgroundColor: '#eee',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    marginRight: 6,
-    marginTop: 4,
-    fontSize: 12,
+    lineHeight: 20,
   },
   metaRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 4,
+    marginTop: 4,
   },
   flex1: {
     flex: 1,
   },
-  deleteButton: {
-    padding: 8,
-    marginLeft: 8,
-    borderRadius: 20,
-    backgroundColor: '#fff',
-    borderWidth: 1,
-    borderColor: '#ff4444',
-    minWidth: 36,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  deleteButtonText: {
-    fontSize: 16,
-    color: '#ff4444',
-  },
   tempDeleteButton: {
     backgroundColor: '#ff4444',
     paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingVertical: 8,
     borderRadius: 8,
     marginLeft: 8,
+    borderWidth: 1,
+    borderColor: '#ff0000',
   },
   tempDeleteButtonText: {
     color: '#fff',
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: 'bold',
   },
   tourHeader: {
@@ -1268,9 +1134,5 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: 'bold',
     marginRight: 16,
-  },
-  wishlistCount: {
-    fontSize: 14,
-    color: '#666',
   },
 });

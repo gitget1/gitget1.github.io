@@ -132,6 +132,11 @@ dependencies {
     
     // WebView support
     implementation("androidx.webkit:webkit:1.8.0")
+    
+    // Google Play Services for react-native-maps
+    implementation("com.google.android.gms:play-services-maps:18.2.0")
+    implementation("com.google.android.gms:play-services-location:21.0.1")
+    implementation("com.google.android.gms:play-services-base:18.2.0")
 }
 
 apply from: "../../node_modules/react-native-vector-icons/fonts.gradle"
