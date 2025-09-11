@@ -19,20 +19,17 @@ export default function ResultScreen({
 }: AppStackScreenProps<'Result'>) {
   const {t} = useTranslation();
   const {result} = route.params;
-  // const result = {
-  //   mbti: 'ENFJ',
-  //   trait: {
-  //     main_title: '사람 좋아하는 인싸 여행자',
-  //     description:
-  //       '친화력 1등! 혼자 여행가도 문제없어. 사람을 잘 챙기고 잘 어울림. 아 그거? 혹시나 해서 가져왔지~ 여행 준비성 철저한 편. 이번 휴가에 거기 가볼래!? 추진력 갑.. 부드럽게 계획 제시하는 편. 새로운 여행지 가보는 것 좋아함.',
-  //   },
-  //   recommendation:
-  //     '사람을 잘 챙기고 리더십도 있는 타입. 단체 여행을 잘 이끌며 새로운 지역을 탐험하는 걸 즐깁니다. 타인의 필요를 잘 캐치하고 계획도 잘 세우는 든든한 여행 동반자!',
-  //   tags: ['친화력', '사교성', '리더십', '계획적', '여행 준비성'],
-  //   recommended_regions: ['부산', '전주', '제주도'],
-  //   user_answer_id: 1,
-  // };
   const [selectedFeedback, setSelectedFeedback] = useState<string | null>(null);
+
+  // ✅ Authorization 헤더 유틸 (Bearer 중복 제거)
+  const getAuthHeader = async () => {
+    const raw = await AsyncStorage.getItem('accessToken');
+    if (!raw) {
+      return {};
+    }
+    const clean = raw.replace(/^Bearer\s+/i, '');
+    return {Authorization: `Bearer ${clean}`};
+  };
 
   const handleSave = async () => {
     try {
@@ -42,41 +39,71 @@ export default function ResultScreen({
         regions: result.recommended_regions,
       };
 
-      // ✅ 토큰 가져오기
-      const token = await AsyncStorage.getItem('accessToken');
-      console.log('📦 저장 요청용 Access Token:', token);
-      console.log('📤 서버로 보낼 payload:', payload);
+      const headers = {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+        ...(await getAuthHeader()),
+      };
+
+      console.log('📤 MBTI 저장 payload:', payload);
+
+      // NOTE: 필요시 여기를 API_URL 기반으로 교체하세요 (예: `${API_URL}/mbti`)
       const response = await axios.post(
         'http://124.60.137.10:8083/api/mbti',
         payload,
-        {
-          headers: {
-            'Content-Type': 'application/json',
-            ...(token && {Authorization: `Bearer ${token}`}), // 토큰이 있으면 추가
-          },
-        },
+        {headers},
       );
 
-      if (response.status === 200) {
+      if (response.status === 200 || response.data?.status === 'OK') {
         Alert.alert(t('saveSuccess'), t('saveSuccessMessage'));
       } else {
         Alert.alert(t('saveFailed'), t('serverResponseError'));
       }
     } catch (error: any) {
-      console.error('MBTI 저장 실패:', error);
-      Alert.alert(
-        t('saveError'),
-        error?.response?.data?.detail || t('serverError'),
-      );
+      if (axios.isAxiosError(error)) {
+        console.log('[MBTI SAVE][AxiosError]', {
+          status: error.response?.status,
+          data: error.response?.data,
+          message: error.message,
+          url: error.config?.url,
+        });
+        const msg =
+          error.response?.data?.detail ||
+          error.response?.data?.message ||
+          error.message ||
+          t('serverError');
+        Alert.alert(t('saveError'), msg);
+      } else {
+        console.error('[MBTI SAVE][UnknownError]', error);
+        Alert.alert(t('saveError'), t('serverError'));
+      }
     }
   };
 
+  // ⬇️ 기존 handleSubmitFeedback 전체 교체
   const handleSubmitFeedback = async () => {
     if (!selectedFeedback) {
       Alert.alert(t('notification'), t('selectSatisfaction'));
       return;
     }
 
+    // API_URL 유효성 체크
+    if (!API_URL) {
+      Alert.alert(
+        '환경설정 오류',
+        '.env의 API_URL이 비어 있습니다. 설정 후 앱을 재시작하세요.',
+      );
+      return;
+    }
+
+    // user_answer_id 검증 (숫자 변환)
+    const userAnswerId = Number(result.user_answer_id);
+    if (!Number.isFinite(userAnswerId)) {
+      Alert.alert(t('error'), 'user_answer_id가 유효하지 않습니다.');
+      return;
+    }
+
+    // 선택 맵핑
     const feedbackMap: Record<string, {isAgree: boolean; comment: string}> = {
       very_good: {isAgree: true, comment: t('veryAccurate')},
       good: {isAgree: true, comment: t('quiteAccurate')},
@@ -84,24 +111,65 @@ export default function ResultScreen({
       bad: {isAgree: false, comment: t('slightlyDifferent')},
       very_bad: {isAgree: false, comment: t('notAccurate')},
     };
-
     const selected = feedbackMap[selectedFeedback];
 
     try {
-      const response = await axios.post(`${API_URL}/feedback`, {
-        user_answer_id: result.user_answer_id,
+      // 인증 헤더 + 공통 헤더
+      const headers = {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+        ...(await getAuthHeader()), // ✅ Authorization: Bearer <token>
+      };
+
+      // URL 정규화(말단 슬래시 제거 후 /feedback 부착)
+      const url = `${API_URL.replace(/\/+$/, '')}/feedback`;
+
+      // 요청 바디
+      const body = {
+        user_answer_id: userAnswerId,
         is_agree: selected.isAgree,
         comment: selected.comment,
+      };
+
+      console.log('📤 Feedback POST:', url, body);
+
+      const response = await axios.post(url, body, {
+        headers,
+        timeout: 15000,
       });
 
-      if (response.data.message) {
+      if (
+        response.status === 200 ||
+        response.status === 201 ||
+        response.status === 204 ||
+        response.data?.message
+      ) {
         Alert.alert(t('submitComplete'), t('satisfactionSaved'));
       } else {
-        Alert.alert(t('error'), response.data.error || t('unknownError'));
+        Alert.alert(t('error'), response.data?.error || t('unknownError'));
       }
-    } catch (error) {
-      console.error(error);
-      Alert.alert(t('error'), t('feedbackError'));
+    } catch (error: any) {
+      if (axios.isAxiosError(error)) {
+        const status = error.response?.status;
+        const data = error.response?.data;
+        console.log('[FEEDBACK][AxiosError]', {
+          status,
+          data,
+          url: error.config?.url || `${API_URL}/feedback`,
+          message: error.message,
+        });
+
+        // 상태별 메시지 보완
+        let msg =
+          data?.detail ||
+          data?.message ||
+          (status === 401 ? t('loginRequired') : t('feedbackError'));
+
+        Alert.alert(t('error'), msg);
+      } else {
+        console.log('[FEEDBACK][UnknownError]', error);
+        Alert.alert(t('error'), t('feedbackError'));
+      }
     }
   };
 
@@ -116,7 +184,7 @@ export default function ResultScreen({
       </View>
 
       <View style={styles.card}>
-        {/* <Text style={styles.sectionTitle}>{t('predictedMbti')}</Text> */}
+        <Text style={styles.sectionTitle}>{t('predictedMbti')}</Text>
         <Text style={styles.mbti}>{result.mbti}</Text>
         <Text style={styles.description}>
           {result.trait?.description || t('noDescription')}

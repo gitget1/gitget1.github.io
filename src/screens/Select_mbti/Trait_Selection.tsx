@@ -1100,7 +1100,7 @@ const TraitDropdown = () => {
     };
     fetchMbtiList();
   }, []);
-
+ 
   // ✅ 게시물 목록 조회 함수
   const fetchTourPrograms = useCallback(
     async (isLoadMore = false) => {

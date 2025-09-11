@@ -1,5 +1,5 @@
 import React, {useState, useEffect} from 'react';
-import {API_URL} from '@env';
+import {API_URL, API_URL_BE, GOOGLE_MAPS_API_KEY} from '@env';
 import {
   Text,
   StyleSheet,
@@ -18,10 +18,10 @@ import {useTranslation} from 'react-i18next';
 type Question = {
   question: string;
   options: string[];
-  result: undefined;
 };
 
 type Props = NativeStackScreenProps<RootStackParamList, 'QuestionScreen'>;
+
 export default function QuestionScreen({navigation}: Props) {
   const {t, i18n} = useTranslation();
   const [questions, setQuestions] = useState<Question[]>([]);
@@ -30,39 +30,82 @@ export default function QuestionScreen({navigation}: Props) {
   const [selected, setSelected] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(false);
 
+  // ✅ 공통 axios 인스턴스(환경변수 기반)
+  const api = axios.create({
+    baseURL: API_URL || 'http://10.147.17.48:8000', // 환경변수 또는 기본값
+    timeout: 15000,
+  });
+
+  // ✅ API_URL 유효성 점검
+  const ensureApiUrl = () => {
+    const baseURL = API_URL || 'http://10.147.17.48:8000';
+    if (!baseURL) {
+      Alert.alert(
+        '환경설정 오류',
+        'API_URL이 설정되지 않았습니다. 기본값을 사용합니다.',
+      );
+      return false;
+    }
+    console.log('🔧 사용할 API_URL:', baseURL);
+    return true;
+  };
+
+  // ✅ Authorization 헤더 생성(Bearer 중복 제거)
+  const getAuthHeader = async () => {
+    const raw = await AsyncStorage.getItem('accessToken');
+    if (!raw) {
+      return {};
+    }
+    const clean = raw.replace(/^Bearer\s+/i, '');
+    return {Authorization: `Bearer ${clean}`};
+  };
+
   useEffect(() => {
     const fetchQuestions = async () => {
       try {
-        const accessToken = await AsyncStorage.getItem('accessToken');
-        if (!accessToken) {
+        if (!ensureApiUrl()) {
+          return;
+        }
+
+        const authHeader = await getAuthHeader();
+        if (!('Authorization' in authHeader)) {
           Alert.alert(t('notification'), t('loginRequired'));
           return;
         }
 
-        const res = await axios.get(
-          `http://10.147.17.48:8000/generate_question`,
-          {
-            params: {language: i18n.language},
-            withCredentials: true,
-            headers: {
-              'Content-Type': 'application/json',
-              Accept: 'application/json',
-              Authorization: `Bearer ${accessToken}`,
-            },
+        const res = await api.get('/generate_question', {
+          params: {language: i18n.language},
+          headers: {
+            'Content-Type': 'application/json',
+            Accept: 'application/json',
+            ...authHeader,
           },
-        );
+        });
 
-        setQuestions(res.data.questions);
+        if (Array.isArray(res.data?.questions)) {
+          setQuestions(res.data.questions);
+        } else {
+          console.log('[generate_question] unexpected response:', res.data);
+          Alert.alert(t('error'), t('questionLoadError'));
+        }
       } catch (error) {
-        console.error(error);        if (axios.isAxiosError(error) && error.response?.status === 401) {
+        console.error('[generate_question] error:', error);
+        if (axios.isAxiosError(error) && error.response?.status === 401) {
           Alert.alert(t('notification'), t('loginRequired'));
         } else {
           Alert.alert(t('error'), t('questionLoadError'));
         }
       }
     };
+
     fetchQuestions();
     console.log('📦 현재 언어:', i18n.language);
+    console.log('🔧 환경변수 확인:', {
+      API_URL,
+      API_URL_BE,
+      GOOGLE_MAPS_API_KEY: GOOGLE_MAPS_API_KEY ? '설정됨' : 'undefined'
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [t, i18n.language]);
 
   const handleSelectAnswer = async (option: string) => {
@@ -78,35 +121,37 @@ export default function QuestionScreen({navigation}: Props) {
       } else {
         setLoading(true);
         try {
-          const accessToken = await AsyncStorage.getItem('accessToken');
-          if (!accessToken) {
+          if (!ensureApiUrl()) {
+            return;
+          }
+
+          const authHeader = await getAuthHeader();
+          if (!('Authorization' in authHeader)) {
             Alert.alert(t('notification'), t('loginRequired'));
             return;
           }
 
-          console.log('📤 최종 제출된 답변:', updatedAnswers); // ✅ 추가
+          console.log('📤 최종 제출된 답변:', updatedAnswers);
           console.log(
             '🌐 호출 URL:',
             `${API_URL}/rag_recommend?language=${i18n.language}`,
-          ); // ✅ 추가
+          );
 
-          const res = await axios.post(
-            `${API_URL}/rag_recommend?language=${i18n.language}`,
+          // language는 params로 넘김
+          const res = await api.post(
+            '/rag_recommend',
+            {answers: updatedAnswers},
             {
-              answers: updatedAnswers,
-            },
-            {
-              withCredentials: true,
+              params: {language: i18n.language},
               headers: {
                 'Content-Type': 'application/json',
                 Accept: 'application/json',
-                Authorization: `Bearer ${accessToken}`,
+                ...authHeader,
               },
             },
           );
 
-          console.log('✅ 분석 결과 응답:', res.data); // ✅ 응답 로그 추가
-
+          console.log('✅ 분석 결과 응답:', res.data);
           navigation.navigate('Result', {result: res.data});
         } catch (error) {
           console.error('❌ 분석 중 오류 발생:', error);
