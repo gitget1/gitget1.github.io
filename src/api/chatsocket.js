@@ -6,7 +6,7 @@ let stompClient = null;
 export const connectWebSocket = (chatRoomId, onMessageReceived) => {
   stompClient = new Client({
     // 서버에 연결할 SockJS 엔드포인트 (Spring에서 설정한 WebSocket 엔드포인트)
-    webSocketFactory: () => new SockJS('http://<your-backend-server>/ws'), // 예: http://localhost:8080/ws
+    webSocketFactory: () => new SockJS('http://<your-backend-server>/ws'), // 예: http://localhost:8083/ws
 
     reconnectDelay: 5000,
 

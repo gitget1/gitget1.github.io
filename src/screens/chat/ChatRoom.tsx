@@ -52,7 +52,7 @@ const ChatRoom = () => {
   useEffect(() => {
     const fetchMessages = async (token: string): Promise<Message[]> => {
       const res = await fetch(
-        `http://124.60.137.10:8080/api/chat/rooms/${params.roomId}/messages`,
+        `http://124.60.137.10:8083/api/chat/rooms/${params.roomId}/messages`,
         {
           headers: {
             Authorization: `Bearer ${token}`,

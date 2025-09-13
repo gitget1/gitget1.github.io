@@ -1,4 +1,4 @@
-import { Category, Profile } from '../types/domain';
+import {Category, Profile} from '../types/domain';
 import {getEncryptStorage} from '../utils/encryptStorage';
 import axiosInstance from './axios';
 
@@ -33,8 +33,8 @@ const postLogin = async ({
   return data;
 };
 
-const kakaoLogin = async(token: string): Promise<ResponseToken> => {
-  const {data} = await axiosInstance.post('/auth/oauth/kakao',{token});
+const kakaoLogin = async (token: string): Promise<ResponseToken> => {
+  const {data} = await axiosInstance.post('/auth/oauth/kakao', {token});
   return data;
 };
 
@@ -61,5 +61,5 @@ const logout = async () => {
   await axiosInstance.post('/auth/logout');
 };
 
-export {postSignup, postLogin, getProfile, getAccessToken, logout,kakaoLogin};
-export type{RequestUser, ResponseToken}
+export {postSignup, postLogin, getProfile, getAccessToken, logout, kakaoLogin};
+export type {RequestUser, ResponseToken};

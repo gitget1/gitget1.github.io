@@ -28,8 +28,54 @@ const PaymentScreen = () => {
   // route params에서 투어 데이터 받아오기
   const tourData = route.params?.tourData as any;
   const tourProgramId = route.params?.tourProgramId as number;
+
+  // 사용자 정보 상태
+  const [userInfo, setUserInfo] = useState<any>(null);
   const unlockSchedule = route.params?.unlockSchedule as boolean;
   const resultParam = route.params?.result as 'success' | 'fail' | undefined;
+
+  // 사용자 정보 가져오기 (최적화된 버전)
+  const fetchUserInfo = async () => {
+    try {
+      const token = await AsyncStorage.getItem('accessToken');
+      if (!token) {
+        console.log('❌ 토큰이 없습니다');
+        // 기본값으로 즉시 설정
+        setUserInfo({
+          data: {
+            id: 1,
+            username: '사용자',
+            email: 'user@example.com',
+            mobile: '01012345678'
+          }
+        });
+        return;
+      }
+
+      console.log('🔄 사용자 정보 요청 시작...');
+      const response = await axios.get('http://124.60.137.10:8083/api/user', {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        timeout: 5000, // 타임아웃을 5초로 단축
+      });
+
+      console.log('✅ 사용자 정보 가져오기 성공');
+      setUserInfo(response.data);
+    } catch (error: any) {
+      console.error('❌ 사용자 정보 가져오기 실패:', error.message);
+      
+      // 모든 에러에 대해 기본값으로 즉시 진행
+      setUserInfo({
+        data: {
+          id: 1,
+          username: '사용자',
+          email: 'user@example.com',
+          mobile: '01012345678'
+        }
+      });
+    }
+  };
 
   console.log('🎯 PaymentScreen - route.params:', route.params);
   console.log('🎯 PaymentScreen - tourData:', tourData);
@@ -61,12 +107,30 @@ const PaymentScreen = () => {
   const [result, setResult] = useState<'success' | 'fail' | null>(null);
 
   useEffect(() => {
+    // 사용자 정보 가져오기 (비동기로 실행하여 UI 블로킹 방지)
+    fetchUserInfo();
+  }, []);
+
+  useEffect(() => {
     if (resultParam) {
       setResult(resultParam);
       // URL 파라미터를 한 번만 처리하고 제거
       navigation.setParams({result: undefined});
+      
+      // 성공/실패 시 PaymentComplete로 이동
+      if (resultParam === 'success') {
+        navigation.replace('PaymentComplete', {
+          success: true,
+          tourProgramId: tourProgramId,
+          tourData: localTourData
+        });
+      } else if (resultParam === 'fail') {
+        navigation.replace('PaymentComplete', {
+          success: false
+        });
+      }
     }
-  }, [resultParam, navigation]);
+  }, [resultParam, navigation, tourProgramId, localTourData]);
 
   // tourData가 없을 경우 처리
   useEffect(() => {
@@ -92,7 +156,7 @@ const PaymentScreen = () => {
     }
   }, [tourData]);
 
-  // 투어 데이터 가져오기 함수
+  // 투어 데이터 가져오기 함수 (최적화된 버전)
   const fetchTourData = async () => {
     try {
       const token = await AsyncStorage.getItem('accessToken');
@@ -110,14 +174,13 @@ const PaymentScreen = () => {
             'Content-Type': 'application/json',
             Authorization: `Bearer ${cleanToken}`,
           },
-          timeout: 10000,
+          timeout: 5000, // 타임아웃을 5초로 단축
         },
       );
 
       if (response.data.status === 'OK') {
         const fetchedTourData = response.data.data;
-        // tourData state를 업데이트하거나 직접 사용
-        console.log('🟢 투어 데이터 가져오기 성공:', fetchedTourData);
+        console.log('🟢 투어 데이터 가져오기 성공');
         setLocalTourData(fetchedTourData);
       } else {
         throw new Error(response.data.message || '투어 정보를 불러오는데 실패했습니다.');
@@ -133,22 +196,11 @@ const PaymentScreen = () => {
     }
   };
 
-  // 사용자 ID 가져오기
+  // 사용자 ID 즉시 설정 (최적화)
   useEffect(() => {
-    const getUserId = async () => {
-      try {
-        const token = await AsyncStorage.getItem('accessToken');
-        if (token) {
-          // JWT 토큰에서 사용자 ID 추출하는 로직 필요
-          // 임시로 1로 설정
-          setUserId(1);
-        }
-      } catch (error) {
-        console.error('사용자 ID 가져오기 실패:', error);
-      }
-    };
-    getUserId();
+    setUserId(1); // 기본값으로 즉시 설정
   }, []);
+
 
   const handlePayment = () => {
     if (!localTourData) {
@@ -173,34 +225,75 @@ const PaymentScreen = () => {
       name: localTourData.title,
       amount: totalPrice,
       merchant_uid: merchantUid,
-      buyer_name: '홍길동', // 실제 사용자 정보로 변경 필요
-      buyer_tel: '01012345678', // 실제 사용자 정보로 변경 필요
-      buyer_email: 'test@example.com', // 실제 사용자 정보로 변경 필요
+      buyer_name: userInfo?.data?.username || '홍길동',
+      buyer_tel: userInfo?.data?.mobile || '01012345678',
+      buyer_email: userInfo?.data?.email || 'test@example.com',
+      buyer_addr: '', // 주소 정보 (필요시 추가)
+      buyer_postcode: '', // 우편번호 (필요시 추가)
       app_scheme: 'tourapps',
     };
 
-    // 서버로 전송할 예약 데이터
+    // 서버로 전송할 예약 데이터 (ReservationRequestDTO 구조에 맞춤)
     const reservationData = {
-      reservation: {
-        tourProgramId: localTourData.tourProgramId || localTourData.id,
-        userId: userId,
-        numOfPeople: effectiveAppliedPeople,
-        totalPrice: totalPrice,
-        guideStartDate: `${year}-${String(month).padStart(2, '0')}-${String(
-          day,
-        ).padStart(2, '0')}T10:00:00`,
-        guideEndDate: `${year}-${String(month).padStart(2, '0')}-${String(
-          day,
-        ).padStart(2, '0')}T13:00:00`,
-        paymentMethod: 'card', // 기본값으로 카드 결제 사용
-      },
-      impUid: '', // 결제 완료 후 아임포트에서 받을 값
+      numOfPeople: effectiveAppliedPeople,
+      guideStartDate: `${year}-${String(month).padStart(2, '0')}-${String(
+        day,
+      ).padStart(2, '0')}T10:00:00`,
+      guideEndDate: `${year}-${String(month).padStart(2, '0')}-${String(
+        day,
+      ).padStart(2, '0')}T13:00:00`,
+      tourProgramId: localTourData.tourProgramId || localTourData.id,
+      paymentMethod: 'card', // 기본값으로 카드 결제 사용
+      guideId: localTourData.guideId || 1, // 가이드 ID 추가
+      totalPrice: totalPrice,
+      // 결제 완료 후 아임포트에서 받을 값들
+      impUid: '', // 결제 완료 후 채워짐
       merchantUid: merchantUid, // 가맹점 주문 번호
-      userId: userId, // 결제/예약 요청 사용자 ID
+      userId: userInfo?.data?.id || userId, // 실제 사용자 ID 사용
     };
 
-    console.log('💳 결제 데이터:', paymentData);
-    console.log('📋 예약 데이터:', reservationData);
+    // 💳 결제 데이터 상세 출력
+    console.log('💳 결제 데이터 (Payment Data) ==========================');
+    console.log('PG사:', paymentData.pg);
+    console.log('결제방법:', paymentData.pay_method);
+    console.log('상품명:', paymentData.name);
+    console.log('결제금액:', paymentData.amount.toLocaleString() + '원');
+    console.log('가맹점 주문번호:', paymentData.merchant_uid);
+    console.log('구매자명:', paymentData.buyer_name);
+    console.log('구매자 전화번호:', paymentData.buyer_tel);
+    console.log('구매자 이메일:', paymentData.buyer_email);
+    console.log('앱 스킴:', paymentData.app_scheme);
+    console.log('=====================================================');
+
+    // 📋 예약 데이터 상세 출력
+    console.log('📋 예약 데이터 (Reservation Data) ======================');
+    console.log('투어 프로그램 ID:', reservationData.tourProgramId);
+    console.log('인원수:', reservationData.numOfPeople + '명');
+    console.log('총 금액:', reservationData.totalPrice.toLocaleString() + '원');
+    console.log('가이드 시작 시간:', reservationData.guideStartDate);
+    console.log('가이드 종료 시간:', reservationData.guideEndDate);
+    console.log('결제 방법:', reservationData.paymentMethod);
+    console.log('가이드 ID:', reservationData.guideId);
+    console.log('아임포트 UID:', reservationData.impUid);
+    console.log('가맹점 주문번호:', reservationData.merchantUid);
+    console.log('외부 사용자 ID:', reservationData.userId);
+    console.log('=====================================================');
+
+    // 🔍 전체 데이터 구조 확인
+    console.log('🔍 전체 데이터 구조 확인 ==============================');
+    console.log('선택된 날짜:', `${year}년 ${month}월 ${day}일`);
+    console.log('선택된 인원:', effectiveAppliedPeople + '명');
+    console.log('투어 제목:', localTourData.title);
+    console.log('투어 지역:', localTourData.region);
+    console.log('가이드 가격:', effectiveGuidePrice.toLocaleString() + '원/인');
+    console.log('총 결제 금액:', totalPrice.toLocaleString() + '원');
+    console.log('사용자 정보:', {
+      username: userInfo?.data?.username,
+      email: userInfo?.data?.email,
+      mobile: userInfo?.data?.mobile,
+      id: userInfo?.data?.id
+    });
+    console.log('=====================================================');
 
     navigation.navigate('IamportPayment', {
       userCode: 'imp33770537',
@@ -209,25 +302,12 @@ const PaymentScreen = () => {
     });
   };
 
-  if (result === 'success') {
-    return (
-      <View style={styles.resultContainer}>
-        <Text style={styles.resultIcon}>✅</Text>
-        <Text style={styles.resultText}>결제에 성공하였습니다!</Text>
-        <TouchableOpacity
-          style={styles.resultBtn}
-          onPress={() => navigation.navigate('Main')}>
-          <Text style={styles.resultBtnText}>메인으로</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
 
-  // tourData가 없으면 로딩 표시
+  // tourData가 없으면 로딩 표시 (더 빠른 로딩)
   if (!localTourData && !result) {
     return (
       <View style={styles.resultContainer}>
-        <Text style={styles.resultText}>투어 정보를 불러오는 중...</Text>
+        <Text style={styles.resultText}>결제 페이지를 준비하는 중...</Text>
       </View>
     );
   }
@@ -335,9 +415,22 @@ const PaymentScreen = () => {
         </View>
       </ScrollView>
 
-      <TouchableOpacity style={styles.payButtonFixed} onPress={handlePayment}>
-        <Text style={styles.payButtonText}>결제하기</Text>
+      <TouchableOpacity 
+        style={styles.payButtonFixed} 
+        onPress={handlePayment}
+      >
+        <Text style={styles.payButtonText}>
+          결제하기
+        </Text>
       </TouchableOpacity>
+      
+      {userInfo && userInfo.data?.username === '사용자' && (
+        <View style={styles.networkWarning}>
+          <Text style={styles.networkWarningText}>
+            ⚠️ 네트워크 연결 문제로 기본 정보를 사용합니다
+          </Text>
+        </View>
+      )}
     </View>
   );
 };
@@ -414,26 +507,29 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 32,
   },
-  resultIcon: {
-    fontSize: 60,
-    marginBottom: 16,
-  },
   resultText: {
     fontSize: 20,
     fontWeight: 'bold',
     marginBottom: 24,
     color: '#222',
   },
-  resultBtn: {
-    backgroundColor: '#1976d2',
-    paddingHorizontal: 32,
-    paddingVertical: 12,
-    borderRadius: 8,
+  payButtonDisabled: {
+    backgroundColor: '#ccc',
+    opacity: 0.6,
   },
-  resultBtnText: {
-    color: '#fff',
-    fontWeight: 'bold',
-    fontSize: 16,
+  networkWarning: {
+    backgroundColor: '#fff3cd',
+    borderColor: '#ffeaa7',
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 10,
+    marginHorizontal: 16,
+    marginBottom: 10,
+  },
+  networkWarningText: {
+    fontSize: 12,
+    color: '#856404',
+    textAlign: 'center',
   },
 });
 

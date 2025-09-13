@@ -1,11 +1,13 @@
-import React, {useState, useMemo} from 'react';
+import React, {useState, useMemo, useEffect} from 'react';
 import {StyleSheet, Text, View, TouchableOpacity, ScrollView} from 'react-native';
 import CalendarHome from './CalendarHome';
 import {getMonthYearDetails, getNewMonthYear} from '../../utils/date';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {colors} from '../../constants';
 import EventList from './EventList';
-// import useGetCalendarReservations from './useGetCalendarReservations';
+import { 
+  useGetMyReservations
+} from './useGetCalendarReservations';
 import dayjs from 'dayjs';
 import {useTranslation} from 'react-i18next';
 
@@ -16,6 +18,14 @@ function CalendarScreen() {
   const today = new Date().getDate();
   const [selectedDate, setSelectedDate] = useState(today);
   const [selectedStatus, setSelectedStatus] = useState<'rejected' | 'success' | 'consulting' | null>(null);
+  const [selectedDateString, setSelectedDateString] = useState<string>('');
+
+  // 초기 로딩 시 오늘 날짜를 자동으로 선택
+  useEffect(() => {
+    const todayStr = `${currentMonthYear.year}-${String(currentMonthYear.month).padStart(2, '0')}-${String(today).padStart(2, '0')}`;
+    setSelectedDateString(todayStr);
+    console.log('📅 초기 날짜 설정:', todayStr);
+  }, []);
 
   const start = useMemo(
     () =>
@@ -34,10 +44,44 @@ function CalendarScreen() {
     [monthYear],
   );
 
-  // API 요청 제거하고 더미 데이터만 사용
-  const apiReservations: any[] = [];
-  const isLoading = false;
-  const isError = false;
+  // 선택된 날짜의 예약 데이터 조회
+  const selectedDateStart = useMemo(() => {
+    if (!selectedDateString) return '';
+    return dayjs(selectedDateString).startOf('day').format('YYYY-MM-DDTHH:mm:ss');
+  }, [selectedDateString]);
+
+  const selectedDateEnd = useMemo(() => {
+    if (!selectedDateString) return '';
+    return dayjs(selectedDateString).endOf('day').format('YYYY-MM-DDTHH:mm:ss');
+  }, [selectedDateString]);
+
+  // 선택된 날짜의 예약 데이터 조회 (날짜가 선택되었을 때만)
+  const { 
+    data: selectedDateReservations = [], 
+    isLoading: isSelectedDateLoading, 
+    isError: isSelectedDateError 
+  } = useGetMyReservations(selectedDateStart, selectedDateEnd);
+
+  // 디버깅을 위한 로그
+  useEffect(() => {
+    if (selectedDateString) {
+      console.log('📊 선택된 날짜 예약 데이터:', {
+        selectedDateString,
+        selectedDateStart,
+        selectedDateEnd,
+        reservations: selectedDateReservations,
+        isLoading: isSelectedDateLoading,
+        isError: isSelectedDateError
+      });
+    }
+  }, [selectedDateString, selectedDateReservations, isSelectedDateLoading, isSelectedDateError]);
+
+  // 월별 예약 데이터 조회 (캘린더 표시용)
+  const { 
+    data: monthlyReservations = [], 
+    isLoading: isMonthlyLoading, 
+    isError: isMonthlyError 
+  } = useGetMyReservations(start, end);
 
   // 7월 중간에 더미 데이터 추가
   const [dummyReservations, setDummyReservations] = useState([
@@ -70,8 +114,8 @@ function CalendarScreen() {
     },
   ]);
 
-  // API 데이터와 더미 데이터 합치기
-  const reservations = [...apiReservations, ...dummyReservations];
+  // API 데이터와 더미 데이터 합치기 (캘린더 표시용)
+  const reservations = [...monthlyReservations, ...dummyReservations];
 
   // 디버깅 로그 제거
   // console.log('📅 CalendarScreen Debug:');
@@ -83,15 +127,34 @@ function CalendarScreen() {
 
   const handlePressDate = (date: number) => {
     setSelectedDate(date);
+    // 선택된 날짜를 문자열로 변환하여 API 요청용으로 설정
+    const selectedDateStr = `${monthYear.year}-${String(monthYear.month).padStart(2, '0')}-${String(date).padStart(2, '0')}`;
+    setSelectedDateString(selectedDateStr);
+    console.log('📅 날짜 선택됨:', selectedDateStr);
+    console.log('📅 API 요청 파라미터:', {
+      start: selectedDateStart,
+      end: selectedDateEnd
+    });
   };
 
   const handleUpdateMonth = (increment: number) => {
-    setMonthYear(prev => getNewMonthYear(prev, increment));
+    setMonthYear(prev => {
+      const newMonthYear = getNewMonthYear(prev, increment);
+      // 월이 변경되면 선택된 날짜도 업데이트
+      const newSelectedDateStr = `${newMonthYear.year}-${String(newMonthYear.month).padStart(2, '0')}-${String(selectedDate).padStart(2, '0')}`;
+      setSelectedDateString(newSelectedDateStr);
+      console.log('📅 월 변경으로 인한 날짜 업데이트:', newSelectedDateStr);
+      return newMonthYear;
+    });
   };
 
   const handleSetMonthYear = (date: Date) => {
     const newMonthYear = getMonthYearDetails(date);
     setMonthYear(newMonthYear);
+    // 미니 캘린더에서 날짜 선택 시에도 업데이트
+    const newSelectedDateStr = `${newMonthYear.year}-${String(newMonthYear.month).padStart(2, '0')}-${String(selectedDate).padStart(2, '0')}`;
+    setSelectedDateString(newSelectedDateStr);
+    console.log('📅 미니 캘린더에서 날짜 업데이트:', newSelectedDateStr);
   };
 
   // 예약 상태 변경 함수 (더미 데이터만 사용)
@@ -109,20 +172,10 @@ function CalendarScreen() {
     setSelectedStatus(null);
   };
 
-  const selectedDateObj = dayjs(
-    `${monthYear.year}-${monthYear.month}-${selectedDate}`,
-  );
-
-  const selectedDateReservations = reservations.filter(item => {
-    const isDateMatch = selectedDateObj.isBetween(
-      item.guideStartDate,
-      item.guideEndDate,
-      'day',
-      '[]',
-    );
-    
+  // 선택된 날짜의 예약 데이터 필터링
+  const filteredSelectedDateReservations = selectedDateReservations.filter(item => {
     // 상태 필터링
-    if (selectedStatus === null) return isDateMatch;
+    if (selectedStatus === null) return true;
     
     const statusMap = {
       'rejected': 'REJECTED',
@@ -130,7 +183,7 @@ function CalendarScreen() {
       'consulting': 'PENDING'
     };
     
-    return isDateMatch && item.requestStatus === statusMap[selectedStatus];
+    return item.requestStatus === statusMap[selectedStatus];
   });
 
   // console.log('- selectedDate:', selectedDate);
@@ -189,22 +242,36 @@ function CalendarScreen() {
           </TouchableOpacity>
         </View>
         
-        {!isLoading && !isError && (
+        {/* 선택된 날짜 정보 */}
+        <View style={styles.selectedDateInfo}>
+          <Text style={styles.selectedDateTitle}>
+            {monthYear.year}년 {monthYear.month}월 {selectedDate}일 예약 현황
+          </Text>
+          <Text style={styles.selectedDateSubtitle}>
+            {selectedDateString ? `총 ${filteredSelectedDateReservations.length}건의 예약` : '날짜를 선택해주세요'}
+          </Text>
+        </View>
+        
+        {/* 로딩 상태 */}
+        {isSelectedDateLoading && (
+          <View style={styles.loadingContainer}>
+            <Text style={styles.loadingText}>예약 데이터를 불러오는 중...</Text>
+          </View>
+        )}
+        
+        {/* 에러 상태 */}
+        {isSelectedDateError && (
+          <View style={styles.errorContainer}>
+            <Text style={styles.errorText}>예약 데이터를 불러오는데 실패했습니다.</Text>
+          </View>
+        )}
+        
+        {/* 예약 목록 */}
+        {!isSelectedDateLoading && !isSelectedDateError && selectedDateString && (
           <>
-            {/* 선택된 날짜 정보 */}
-            <View style={styles.selectedDateInfo}>
-              <Text style={styles.selectedDateTitle}>
-                {monthYear.year}년 {monthYear.month}월 {selectedDate}일 예약 현황
-              </Text>
-              <Text style={styles.selectedDateSubtitle}>
-                총 {selectedDateReservations.length}건의 예약
-              </Text>
-            </View>
-            
-            {/* 예약 목록 */}
-            {selectedDateReservations.length > 0 ? (
+            {filteredSelectedDateReservations.length > 0 ? (
               <EventList 
-                posts={selectedDateReservations} 
+                posts={filteredSelectedDateReservations} 
                 onStatusChange={handleStatusChange}
               />
             ) : (
@@ -215,6 +282,15 @@ function CalendarScreen() {
               </View>
             )}
           </>
+        )}
+        
+        {/* 날짜 미선택 상태 */}
+        {!selectedDateString && (
+          <View style={styles.noReservationContainer}>
+            <Text style={styles.noReservationText}>
+              캘린더에서 날짜를 선택하면 해당 날짜의 예약을 확인할 수 있습니다.
+            </Text>
+          </View>
         )}
       </ScrollView>
     </SafeAreaView>
@@ -289,17 +365,25 @@ const styles = StyleSheet.create({
     color: colors.GRAY_500,
     textAlign: 'center',
   },
-  loadingText: {
+  loadingContainer: {
     padding: 20,
-    textAlign: 'center',
+    alignItems: 'center',
+    backgroundColor: colors.WHITE,
+  },
+  loadingText: {
     fontSize: 16,
     color: colors.GRAY_500,
+    textAlign: 'center',
+  },
+  errorContainer: {
+    padding: 20,
+    alignItems: 'center',
+    backgroundColor: colors.WHITE,
   },
   errorText: {
-    padding: 20,
-    textAlign: 'center',
     fontSize: 16,
     color: colors.PINK_700,
+    textAlign: 'center',
   },
 });
 

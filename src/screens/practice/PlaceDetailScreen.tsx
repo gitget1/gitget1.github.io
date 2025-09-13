@@ -140,7 +140,7 @@ const PlaceDetailScreen = () => {
         language: language || 'kor',
       };
 
-      const apiUrl = 'http://124.60.137.10:8083/api/place/test';
+      const apiUrl = 'http://124.60.137.10:8083/api/place';
       // 쿼리 파라미터를 placeName, googlePlaceId, language 순서로 설정
       const fullUrl = `${apiUrl}?placeName=${requestData.placeName
         }&googlePlaceId=${encodeURIComponent(

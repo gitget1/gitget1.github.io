@@ -9,9 +9,9 @@ import QuestionScreen from '../screens/mbti/QuestionScreen';
 import Make_program from '../screens/program/Make_program';
 import TraitSelection from '../screens/Select_mbti/Trait_Selection';
 import ResultScreen from '../screens/mbti/ResultScreen';
-import Practice from '../screens/practice/Practice';
+import Practice from '../screens/practice/Program_review';
 import PlaceReview from '../screens/practice/place_review';
-import Practice1 from '../screens/practice/Practice_detail page';
+import Practice1 from '../screens/practice/Program_detail';
 import PlaceDetailScreen from '../screens/practice/PlaceDetailScreen';
 import MyReviewList from '../screens/mypage/MyReviewList';
 import MyPage from '../screens/mypage/MyPage';
@@ -26,7 +26,7 @@ import ChatRoom from '../screens/chat/ChatRoom';
 import TranslatorScreen from '../screens/function/TranslatorScreen';
 import TranslatorHistoryScreen from '../screens/function/TranslatorHistoryScreen';
 import {useTranslation} from 'react-i18next';
-import TraitSelection1 from '../screens/Select_mbti/Trait_Selection1';
+import TraitSelection1 from '../screens/Select_mbti/mystyle';
 import SplashScreen from '../screens/SplashScreen';
 
 export type AppStackParamList = {

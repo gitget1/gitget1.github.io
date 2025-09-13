@@ -53,7 +53,7 @@ type TourData = {
   wishlisted: boolean;
 };
 
-const Practice = () => {
+const Program_detail = () => {
   const {t} = useTranslation();
   const [data, setData] = useState<TourData | null>(null);
   const [isLiked, setIsLiked] = useState(false);
@@ -62,19 +62,26 @@ const Practice = () => {
   const route = useRoute<RouteProp<AppStackParamList, 'PracticeDetail'>>();
   const tourProgramId = route.params?.tourProgramId ?? 1;
   const [currentUserId, setCurrentUserId] = useState<number | null>(null);
-  
-  // 번역 관련 state 추가
+
+  // 번역 관련 state
   const [selectedLanguage, setSelectedLanguage] = useState('ko');
   const [showLanguageModal, setShowLanguageModal] = useState(false);
   const [translatedData, setTranslatedData] = useState<TourData | null>(null);
   const [translating, setTranslating] = useState(false);
   const [translationProgress, setTranslationProgress] = useState(0);
-  // 모자이크 처리 관련 state 추가
+
+  // 모자이크 처리 관련 state
   const [isScheduleMasked, setIsScheduleMasked] = useState(true);
   const [showUnlockModal, setShowUnlockModal] = useState(false);
-  const [userPoints, setUserPoints] = useState(5000); // 사용자 포인트 (더미 5000)
-  const [scheduleUnlockCost] = useState(100); // 일정 해제 비용(100)
-  const [maskType, setMaskType] = useState<'dots' | 'stars' | 'squares' | 'blur'>('dots'); // 모자이크 타입
+  const [scheduleUnlocked, setScheduleUnlocked] = useState(false);
+
+  // ✅ [Points] 더미 제거. 실제 잔액은 GET 호출 시점에 받아와 계산만 사용
+  const [userPoints, setUserPoints] = useState<number | null>(null);
+  const [scheduleUnlockCost] = useState(100); // 일정 해제 비용(100 고정)
+
+  const [maskType, setMaskType] = useState<
+    'dots' | 'stars' | 'squares' | 'blur'
+  >('dots');
 
   console.log('🟢 PracticeDetail 화면 - tourProgramId:', tourProgramId);
 
@@ -98,6 +105,52 @@ const Practice = () => {
     getCurrentUserId();
   }, []);
 
+  // 일정 해제 상태 확인 함수
+  const checkScheduleUnlockStatus = async () => {
+    try {
+      const token = await AsyncStorage.getItem('accessToken');
+      if (!token) return false;
+
+      const cleanToken = token.replace('Bearer ', '');
+      const response = await axios.get(
+        `http://124.60.137.10:8083/api/tour-program/${tourProgramId}/unlock-status`,
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${cleanToken}`,
+          },
+        },
+      );
+
+      if (response.data.status === 'OK') {
+        const isUnlocked = response.data.data?.unlocked || false;
+        console.log('🟢 일정 해제 상태 확인:', isUnlocked);
+        
+        // 서버에서 확인된 상태를 로컬 스토리지에 저장
+        await AsyncStorage.setItem(
+          `schedule_unlocked_${tourProgramId}`,
+          isUnlocked.toString()
+        );
+        
+        return isUnlocked;
+      }
+      return false;
+    } catch (error) {
+      console.log('⚠️ 일정 해제 상태 확인 실패:', error);
+      
+      // 서버 확인 실패 시 로컬 스토리지에서 확인
+      try {
+        const localStatus = await AsyncStorage.getItem(`schedule_unlocked_${tourProgramId}`);
+        const isUnlocked = localStatus === 'true';
+        console.log('🟡 로컬 스토리지에서 일정 해제 상태 확인:', isUnlocked);
+        return isUnlocked;
+      } catch (localError) {
+        console.log('⚠️ 로컬 스토리지 확인도 실패:', localError);
+        return false;
+      }
+    }
+  };
+
   useEffect(() => {
     const fetchTourData = async () => {
       try {
@@ -114,47 +167,68 @@ const Practice = () => {
           token: cleanToken.substring(0, 10) + '...',
         });
 
-        const response = await axios.get(
-          `http://124.60.137.10:8083/api/tour-program/${tourProgramId}`,
-          {
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${cleanToken}`,
+        // 투어 데이터와 일정 해제 상태를 병렬로 가져오기
+        const [tourResponse, isUnlocked] = await Promise.all([
+          axios.get(
+            `http://124.60.137.10:8083/api/tour-program/${tourProgramId}`,
+            {
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${cleanToken}`,
+              },
+              timeout: 10000,
             },
-            timeout: 10000,
-          },
-        );
+          ),
+          checkScheduleUnlockStatus(),
+        ]);
 
-        console.log('🟢 서버 응답:', response.data);
+        console.log('🟢 서버 응답:', tourResponse.data);
 
-        if (response.data.status === 'OK') {
-          const tourData = response.data.data;
-          
+        if (tourResponse.data.status === 'OK') {
+          const tourData = tourResponse.data.data;
+
           // schedules 데이터 구조 확인
-          console.log('🟢 서버에서 받은 tourData:', JSON.stringify(tourData, null, 2));
+          console.log(
+            '🟢 서버에서 받은 tourData:',
+            JSON.stringify(tourData, null, 2),
+          );
           console.log('🟢 schedules 배열:', tourData.schedules);
           if (tourData.schedules && tourData.schedules.length > 0) {
-            console.log('🟢 첫 번째 schedule:', JSON.stringify(tourData.schedules[0], null, 2));
-            console.log('🟢 첫 번째 schedule의 placeId:', tourData.schedules[0].placeId);
-            console.log('🟢 첫 번째 schedule의 placeId 타입:', typeof tourData.schedules[0].placeId);
+            console.log(
+              '🟢 첫 번째 schedule:',
+              JSON.stringify(tourData.schedules[0], null, 2),
+            );
+            console.log(
+              '🟢 첫 번째 schedule의 placeId:',
+              tourData.schedules[0].placeId,
+            );
+            console.log(
+              '🟢 첫 번째 schedule의 placeId 타입:',
+              typeof tourData.schedules[0].placeId,
+            );
           }
-          
+
           setData({
             ...tourData,
             wishlistCount: tourData.wishlistCount,
           });
           setIsLiked(tourData.wishlisted || false);
+          
+          // 일정 해제 상태 설정
+          setScheduleUnlocked(isUnlocked);
+          setIsScheduleMasked(!isUnlocked);
 
           console.log('🟢 투어 데이터 로드 완료:', {
             tourProgramId: tourData.tourProgramId || tourData.id,
             wishlisted: tourData.wishlisted,
             wishlistCount: tourData.wishlistCount,
             schedulesCount: tourData.schedules?.length || 0,
+            scheduleUnlocked: isUnlocked,
           });
         } else {
-          console.error('❌ 서버 응답 에러:', response.data);
+          console.error('❌ 서버 응답 에러:', tourResponse.data);
           throw new Error(
-            response.data.message || '투어 정보를 불러오는데 실패했습니다.',
+            tourResponse.data.message || '투어 정보를 불러오는데 실패했습니다.',
           );
         }
       } catch (error) {
@@ -216,12 +290,15 @@ const Practice = () => {
     }
   };
 
-  // 번역 함수들 추가
-  const translateTextContent = async (text: string, targetLang: string): Promise<string> => {
+  // 번역 함수들
+  const translateTextContent = async (
+    text: string,
+    targetLang: string,
+  ): Promise<string> => {
     if (!text || text.trim() === '' || targetLang === 'ko') {
       return text;
     }
-    
+
     try {
       const result = await translateText(text, 'ko', targetLang);
       return result.translatedText || text;
@@ -234,49 +311,31 @@ const Practice = () => {
   // UI 텍스트 번역 매핑
   const getTranslatedUIText = (key: string, targetLang: string): string => {
     const translations: {[key: string]: {[key: string]: string}} = {
-      '리뷰': {
+      리뷰: {
         en: 'Review',
         ja: 'レビュー',
         zh: '评论',
         es: 'Reseña',
         fr: 'Avis',
       },
-      '찜함': {
+      찜함: {
         en: 'Liked',
         ja: 'いいね済み',
         zh: '已喜欢',
         es: 'Me Gustó',
         fr: 'Aimé',
       },
-      '찜': {
-        en: 'Like',
-        ja: 'いいね',
-        zh: '喜欢',
-        es: 'Me Gusta',
-        fr: "J'aime",
-      },
-      '장소': {
-        en: 'Place',
-        ja: '場所',
-        zh: '地点',
-        es: 'Lugar',
-        fr: 'Lieu',
-      },
-      '소요시간': {
+      찜: {en: 'Like', ja: 'いいね', zh: '喜欢', es: 'Me Gusta', fr: "J'aime"},
+      장소: {en: 'Place', ja: '場所', zh: '地点', es: 'Lugar', fr: 'Lieu'},
+      소요시간: {
         en: 'Duration',
         ja: '所要時間',
         zh: '所需时间',
         es: 'Duración',
         fr: 'Durée',
       },
-      '분': {
-        en: 'min',
-        ja: '分',
-        zh: '分钟',
-        es: 'min',
-        fr: 'min',
-      },
-      '이동시간': {
+      분: {en: 'min', ja: '分', zh: '分钟', es: 'min', fr: 'min'},
+      이동시간: {
         en: 'Travel Time',
         ja: '移動時間',
         zh: '移动时间',
@@ -287,17 +346,11 @@ const Practice = () => {
         en: 'Total Distance',
         ja: '総距離',
         zh: '总距离',
-        es: 'Distancia Total',
+        es: 'Distancia Totale',
         fr: 'Distance Totale',
       },
-      'km': {
-        en: 'km',
-        ja: 'km',
-        zh: '公里',
-        es: 'km',
-        fr: 'km',
-      },
-      '호스트': {
+      km: {en: 'km', ja: 'km', zh: '公里', es: 'km', fr: 'km'},
+      호스트: {
         en: 'Host',
         ja: 'ホスト',
         zh: '主人',
@@ -311,21 +364,21 @@ const Practice = () => {
         es: 'Descripción del Tour',
         fr: 'Description du Tour',
       },
-      '인당': {
+      인당: {
         en: 'per person',
         ja: '一人当たり',
         zh: '每人',
         es: 'por persona',
         fr: 'par personne',
       },
-      '상담하기': {
+      상담하기: {
         en: 'Consult',
         ja: '相談する',
         zh: '咨询',
         es: 'Consultar',
         fr: 'Consulter',
       },
-      '예약하기': {
+      예약하기: {
         en: 'Reserve',
         ja: '予約する',
         zh: '预订',
@@ -346,13 +399,7 @@ const Practice = () => {
         es: 'Sin Información de Región',
         fr: 'Aucune Information de Région',
       },
-      '태그': {
-        en: 'Tag',
-        ja: 'タグ',
-        zh: '标签',
-        es: 'Etiqueta',
-        fr: 'Tag',
-      },
+      태그: {en: 'Tag', ja: 'タグ', zh: '标签', es: 'Etiqueta', fr: 'Tag'},
       '장소명 없음': {
         en: 'No Place Name',
         ja: '場所名なし',
@@ -388,35 +435,23 @@ const Practice = () => {
         es: 'Sin información de tiempo de viaje',
         fr: 'Aucune information sur le temps de voyage',
       },
-      '일정': {
+      일정: {
         en: 'Schedule',
         ja: 'スケジュール',
         zh: '行程',
         es: 'Horario',
         fr: 'Horaire',
       },
-      '지도': {
-        en: 'Map',
-        ja: '地図',
-        zh: '地图',
-        es: 'Mapa',
-        fr: 'Carte',
-      },
+      지도: {en: 'Map', ja: '地図', zh: '地图', es: 'Mapa', fr: 'Carte'},
       '호스트 정보': {
         en: 'Host Information',
-        ja: 'ホスト情報',
+        ja: 'ホ스트情報',
         zh: '主人信息',
         es: 'Información del Anfitrión',
-        fr: 'Informations sur l\'Hôte',
+        fr: "Informations sur l'Hôte",
       },
-      '수정': {
-        en: 'Edit',
-        ja: '編集',
-        zh: '编辑',
-        es: 'Editar',
-        fr: 'Modifier',
-      },
-      '삭제': {
+      수정: {en: 'Edit', ja: '編集', zh: '编辑', es: 'Editar', fr: 'Modifier'},
+      삭제: {
         en: 'Delete',
         ja: '削除',
         zh: '删除',
@@ -437,20 +472,8 @@ const Practice = () => {
         es: 'Confirmación de Eliminación',
         fr: 'Confirmation de Suppression',
       },
-      '성공': {
-        en: 'Success',
-        ja: '成功',
-        zh: '成功',
-        es: 'Éxito',
-        fr: 'Succès',
-      },
-      '오류': {
-        en: 'Error',
-        ja: 'エラー',
-        zh: '错误',
-        es: 'Error',
-        fr: 'Erreur',
-      },
+      성공: {en: 'Success', ja: '成功', zh: '成功', es: 'Éxito', fr: 'Succès'},
+      오류: {en: 'Error', ja: 'エラー', zh: '错误', es: 'Error', fr: 'Erreur'},
       '번역 중': {
         en: 'Translating',
         ja: '翻訳中',
@@ -465,20 +488,14 @@ const Practice = () => {
         es: '¿Estás seguro de que quieres eliminar este tour?',
         fr: 'Êtes-vous sûr de vouloir supprimer cette tournée ?',
       },
-      '취소': {
+      취소: {
         en: 'Cancel',
         ja: 'キャンセル',
         zh: '取消',
         es: 'Cancelar',
         fr: 'Annuler',
       },
-      '알림': {
-        en: 'Notice',
-        ja: 'お知らせ',
-        zh: '通知',
-        es: 'Aviso',
-        fr: 'Avis',
-      },
+      알림: {en: 'Notice', ja: 'お知らせ', zh: '通知', es: 'Aviso', fr: 'Avis'},
       '로그인이 필요합니다': {
         en: 'Login required',
         ja: 'ログインが必要です',
@@ -493,13 +510,7 @@ const Practice = () => {
         es: 'El tour ha sido eliminado',
         fr: 'La tournée a été supprimée',
       },
-      '확인': {
-        en: 'OK',
-        ja: '確認',
-        zh: '确认',
-        es: 'OK',
-        fr: 'OK',
-      },
+      확인: {en: 'OK', ja: '確認', zh: '确认', es: 'OK', fr: 'OK'},
       '투어 삭제에 실패했습니다': {
         en: 'Failed to delete tour',
         ja: 'ツアーの削除に失敗しました',
@@ -512,14 +523,14 @@ const Practice = () => {
         ja: 'ツアー削除中にエラーが発生しました',
         zh: '删除旅游项目时发生错误',
         es: 'Ocurrió un error al eliminar el tour',
-        fr: 'Une erreur s\'est produite lors de la suppression de la tournée',
+        fr: "Une erreur s'est produite lors de la suppression de la tournée",
       },
       '찜하기 기능을 사용할 수 없습니다': {
         en: 'Cannot use like function',
         ja: 'いいね機能を使用できません',
         zh: '无法使用喜欢功能',
         es: 'No se puede usar la función de me gusta',
-        fr: 'Impossible d\'utiliser la fonction j\'aime',
+        fr: "Impossible d'utiliser la fonction j'aime",
       },
       '채팅방을 생성할 수 없습니다': {
         en: 'Cannot create chat room',
@@ -533,7 +544,7 @@ const Practice = () => {
         ja: 'ネットワークエラーが発生しました',
         zh: '发生网络错误',
         es: 'Ocurrió un error de red',
-        fr: 'Une erreur réseau s\'est produite',
+        fr: "Une erreur réseau s'est produite",
       },
       '예약을 생성할 수 없습니다': {
         en: 'Cannot create reservation',
@@ -547,7 +558,7 @@ const Practice = () => {
         ja: '予約中にエラーが発生しました',
         zh: '预订时发生错误',
         es: 'Ocurrió un error durante la reserva',
-        fr: 'Une erreur s\'est produite lors de la réservation',
+        fr: "Une erreur s'est produite lors de la réservation",
       },
       '로딩 중': {
         en: 'Loading',
@@ -592,11 +603,11 @@ const Practice = () => {
         fr: 'Points Insuffisants',
       },
       '포인트가 부족합니다': {
-        en: 'You don\'t have enough points',
+        en: "You don't have enough points",
         ja: 'ポイントが不足しています',
         zh: '您的积分不足',
         es: 'No tienes suficientes puntos',
-        fr: 'Vous n\'avez pas assez de points',
+        fr: "Vous n'avez pas assez de points",
       },
       '포인트 충전': {
         en: 'Charge Points',
@@ -617,14 +628,14 @@ const Practice = () => {
         ja: 'ポイントでスケジュールを解除しますか？',
         zh: '是否要用积分解锁行程？',
         es: '¿Quieres desbloquear el horario con puntos?',
-        fr: 'Voulez-vous débloquer l\'horaire avec des points ?',
+        fr: "Voulez-vous débloquer l'horaire avec des points ?",
       },
       '결제로 일정을 해제하시겠습니까?': {
         en: 'Do you want to unlock the schedule with payment?',
         ja: '決済でスケジュールを解除しますか？',
         zh: '是否要付费解锁行程？',
         es: '¿Quieres desbloquear el horario con pago?',
-        fr: 'Voulez-vous débloquer l\'horaire avec un paiement ?',
+        fr: "Voulez-vous débloquer l'horaire avec un paiement ?",
       },
       '필요 포인트': {
         en: 'Required Points',
@@ -647,14 +658,8 @@ const Practice = () => {
         es: 'Monto de Pago',
         fr: 'Montant du Paiement',
       },
-      '₩': {
-        en: '₩',
-        ja: '₩',
-        zh: '₩',
-        es: '₩',
-        fr: '₩',
-      },
-      '해제': {
+      '₩': {en: '₩', ja: '₩', zh: '₩', es: '₩', fr: '₩'},
+      해제: {
         en: 'Unlock',
         ja: '解除',
         zh: '解锁',
@@ -666,7 +671,7 @@ const Practice = () => {
         ja: 'スケジュールが解除されました',
         zh: '行程已解锁',
         es: 'El horario ha sido desbloqueado',
-        fr: 'L\'horaire a été débloqué',
+        fr: "L'horaire a été débloqué",
       },
       '포인트가 차감되었습니다': {
         en: 'Points have been deducted',
@@ -699,9 +704,8 @@ const Practice = () => {
 
     setTranslating(true);
     setTranslationProgress(0);
-    
+
     try {
-      // 번역할 텍스트들 수집
       const textsToTranslate = [
         tourData.title || '',
         tourData.description || '',
@@ -709,40 +713,43 @@ const Practice = () => {
         ...(tourData.hashtags || []),
         ...(tourData.schedules || []).map(s => s.placeName || ''),
         ...(tourData.schedules || []).map(s => s.placeDescription || ''),
-        tourData.user?.name || ''
+        tourData.user?.name || '',
       ].filter(text => text.trim() !== '');
 
-      // 배치로 번역 처리
       const batchSize = 3;
       const translatedTexts: string[] = [];
-      
+
       for (let i = 0; i < textsToTranslate.length; i += batchSize) {
         const batch = textsToTranslate.slice(i, i + batchSize);
-        const batchPromises = batch.map(text => translateTextContent(text, targetLang));
+        const batchPromises = batch.map(text =>
+          translateTextContent(text, targetLang),
+        );
         const batchResults = await Promise.all(batchPromises);
         translatedTexts.push(...batchResults);
-        
+
         const progress = ((i + batchSize) / textsToTranslate.length) * 100;
         setTranslationProgress(Math.min(progress, 100));
       }
 
-      // 번역된 텍스트로 새로운 데이터 객체 생성
       let textIndex = 0;
       const translatedTourData: TourData = {
         ...tourData,
         title: translatedTexts[textIndex++] || tourData.title,
         description: translatedTexts[textIndex++] || tourData.description,
         region: translatedTexts[textIndex++] || tourData.region,
-        hashtags: (tourData.hashtags || []).map(() => translatedTexts[textIndex++] || ''),
+        hashtags: (tourData.hashtags || []).map(
+          () => translatedTexts[textIndex++] || '',
+        ),
         schedules: (tourData.schedules || []).map(schedule => ({
           ...schedule,
           placeName: translatedTexts[textIndex++] || schedule.placeName,
-          placeDescription: translatedTexts[textIndex++] || schedule.placeDescription,
+          placeDescription:
+            translatedTexts[textIndex++] || schedule.placeDescription,
         })),
         user: {
           ...tourData.user,
           name: translatedTexts[textIndex++] || tourData.user?.name,
-        }
+        },
       };
 
       setTranslatedData(translatedTourData);
@@ -758,7 +765,7 @@ const Practice = () => {
   const handleLanguageChange = async (languageCode: string) => {
     setSelectedLanguage(languageCode);
     setShowLanguageModal(false);
-    
+
     if (languageCode === 'ko') {
       setTranslatedData(null);
     } else if (data) {
@@ -770,7 +777,10 @@ const Practice = () => {
     try {
       const token = await AsyncStorage.getItem('accessToken');
       if (!token) {
-        Alert.alert(getTranslatedUIText('알림', selectedLanguage), getTranslatedUIText('로그인이 필요합니다.', selectedLanguage));
+        Alert.alert(
+          getTranslatedUIText('알림', selectedLanguage),
+          getTranslatedUIText('로그인이 필요합니다', selectedLanguage),
+        );
         return;
       }
 
@@ -789,22 +799,34 @@ const Practice = () => {
       if (response.data.status === 'OK') {
         setIsLiked(!isLiked);
         setData(prev => {
-          if (!prev) return prev;
+          if (!prev) {
+            return prev;
+          }
           return {
             ...prev,
-            wishlistCount: isLiked ? prev.wishlistCount - 1 : prev.wishlistCount + 1,
+            wishlistCount: isLiked
+              ? prev.wishlistCount - 1
+              : prev.wishlistCount + 1,
           };
         });
         console.log('🟢 찜하기 토글 성공:', !isLiked);
       }
     } catch (error) {
       console.error('❌ 찜하기 토글 실패:', error);
-      Alert.alert(getTranslatedUIText('오류', selectedLanguage), getTranslatedUIText('찜하기 기능을 사용할 수 없습니다.', selectedLanguage));
+      Alert.alert(
+        getTranslatedUIText('오류', selectedLanguage),
+        getTranslatedUIText(
+          '찜하기 기능을 사용할 수 없습니다',
+          selectedLanguage,
+        ),
+      );
     }
   };
 
   const getTotalDistance = (schedules: Schedule[]) => {
-    if (schedules.length < 2) return 0;
+    if (schedules.length < 2) {
+      return 0;
+    }
     let totalDistance = 0;
     for (let i = 0; i < schedules.length - 1; i++) {
       const distance = haversine(
@@ -820,7 +842,10 @@ const Practice = () => {
     try {
       const token = await AsyncStorage.getItem('accessToken');
       if (!token) {
-        Alert.alert(getTranslatedUIText('알림', selectedLanguage), getTranslatedUIText('로그인이 필요합니다.', selectedLanguage));
+        Alert.alert(
+          getTranslatedUIText('알림', selectedLanguage),
+          getTranslatedUIText('로그인이 필요합니다', selectedLanguage),
+        );
         return;
       }
 
@@ -847,13 +872,15 @@ const Practice = () => {
         });
       } else {
         console.error('❌ 채팅방 생성 실패:', response.data);
-        Alert.alert(getTranslatedUIText('오류', selectedLanguage), getTranslatedUIText('채팅방을 생성할 수 없습니다.', selectedLanguage));
+        Alert.alert(
+          getTranslatedUIText('오류', selectedLanguage),
+          getTranslatedUIText('채팅방을 생성할 수 없습니다', selectedLanguage),
+        );
       }
     } catch (error) {
       console.error('❌ 채팅방 생성 오류:', error);
       if (axios.isAxiosError(error)) {
         if (error.response?.status === 409) {
-          // 이미 채팅방이 존재하는 경우
           const chatRoomId = error.response.data.data.chatRoomId;
           console.log('🟢 기존 채팅방으로 이동:', chatRoomId);
           navigation.navigate('ChatRoom', {
@@ -861,17 +888,28 @@ const Practice = () => {
             tourProgramId: tourProgramId,
           });
         } else {
-          Alert.alert(getTranslatedUIText('오류', selectedLanguage), getTranslatedUIText('채팅방을 생성할 수 없습니다.', selectedLanguage));
+          Alert.alert(
+            getTranslatedUIText('오류', selectedLanguage),
+            getTranslatedUIText(
+              '채팅방을 생성할 수 없습니다',
+              selectedLanguage,
+            ),
+          );
         }
       } else {
-        Alert.alert(getTranslatedUIText('오류', selectedLanguage), getTranslatedUIText('네트워크 오류가 발생했습니다.', selectedLanguage));
+        Alert.alert(
+          getTranslatedUIText('오류', selectedLanguage),
+          getTranslatedUIText('네트워크 오류가 발생했습니다', selectedLanguage),
+        );
       }
     }
   };
 
   const handleEdit = () => {
-    if (!data) return;
-    
+    if (!data) {
+      return;
+    }
+
     // 기존 투어 데이터를 editData로 전달
     const editData = {
       title: data.title || '',
@@ -901,7 +939,10 @@ const Practice = () => {
   const handleDelete = async () => {
     Alert.alert(
       getTranslatedUIText('삭제 확인', selectedLanguage),
-      getTranslatedUIText('정말로 이 투어를 삭제하시겠습니까?', selectedLanguage),
+      getTranslatedUIText(
+        '정말로 이 투어를 삭제하시겠습니까?',
+        selectedLanguage,
+      ),
       [
         {text: getTranslatedUIText('취소', selectedLanguage), style: 'cancel'},
         {
@@ -911,7 +952,10 @@ const Practice = () => {
             try {
               const token = await AsyncStorage.getItem('accessToken');
               if (!token) {
-                Alert.alert(getTranslatedUIText('알림', selectedLanguage), getTranslatedUIText('로그인이 필요합니다.', selectedLanguage));
+                Alert.alert(
+                  getTranslatedUIText('알림', selectedLanguage),
+                  getTranslatedUIText('로그인이 필요합니다', selectedLanguage),
+                );
                 return;
               }
 
@@ -927,19 +971,38 @@ const Practice = () => {
 
               if (response.data.status === 'OK') {
                 console.log('🟢 투어 삭제 성공');
-                Alert.alert(getTranslatedUIText('성공', selectedLanguage), getTranslatedUIText('투어가 삭제되었습니다.', selectedLanguage), [
-                  {
-                    text: getTranslatedUIText('확인', selectedLanguage),
-                    onPress: () => navigation.goBack(),
-                  },
-                ]);
+                Alert.alert(
+                  getTranslatedUIText('성공', selectedLanguage),
+                  getTranslatedUIText(
+                    '투어가 삭제되었습니다',
+                    selectedLanguage,
+                  ),
+                  [
+                    {
+                      text: getTranslatedUIText('확인', selectedLanguage),
+                      onPress: () => navigation.goBack(),
+                    },
+                  ],
+                );
               } else {
                 console.error('❌ 투어 삭제 실패:', response.data);
-                Alert.alert(getTranslatedUIText('오류', selectedLanguage), getTranslatedUIText('투어 삭제에 실패했습니다.', selectedLanguage));
+                Alert.alert(
+                  getTranslatedUIText('오류', selectedLanguage),
+                  getTranslatedUIText(
+                    '투어 삭제에 실패했습니다',
+                    selectedLanguage,
+                  ),
+                );
               }
             } catch (error) {
               console.error('❌ 투어 삭제 오류:', error);
-              Alert.alert(getTranslatedUIText('오류', selectedLanguage), getTranslatedUIText('투어 삭제 중 오류가 발생했습니다.', selectedLanguage));
+              Alert.alert(
+                getTranslatedUIText('오류', selectedLanguage),
+                getTranslatedUIText(
+                  '투어 삭제 중 오류가 발생했습니다',
+                  selectedLanguage,
+                ),
+              );
             }
           },
         },
@@ -948,41 +1011,9 @@ const Practice = () => {
   };
 
   const handleReservation = async () => {
-    try {
-      const token = await AsyncStorage.getItem('accessToken');
-      if (!token) {
-        Alert.alert(getTranslatedUIText('알림', selectedLanguage), getTranslatedUIText('로그인이 필요합니다.', selectedLanguage));
-        return;
-      }
-
-      const cleanToken = token.replace('Bearer ', '');
-      const response = await axios.post(
-        'http://124.60.137.10:80/api/reservation',
-        {
-          tourProgramId: tourProgramId,
-        },
-        {
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${cleanToken}`,
-          },
-        },
-      );
-
-      if (response.data.status === 'OK') {
-        const reservationId = response.data.data.reservationId;
-        console.log('🟢 예약 생성 성공:', reservationId);
-        handleGoToPayment();
-      } else {
-        console.error('❌ 예약 생성 실패:', response.data);
-        // 예약 생성 실패 시에도 결제 페이지로 이동 (임시 처리)
-        console.log('⚠️ 예약 생성 실패했지만 결제 페이지로 이동합니다.');
-        handleGoToPayment();
-      }
-    } catch (error) {
-      
-      handleGoToPayment();
-    }
+    // 즉시 결제 페이지로 이동 (예약 생성은 결제 완료 후 처리)
+    console.log('🚀 결제 페이지로 즉시 이동');
+    handleGoToPayment();
   };
 
   const handleGoToPayment = () => {
@@ -993,27 +1024,25 @@ const Practice = () => {
   };
 
   const handlePlacePress = (item: Schedule) => {
-    // placeName에서 상세주소가 아닌 장소명만 추출 (예: '경복궁, 서울특별시 종로구...' -> '경복궁')
     let onlyPlaceName = item.placeName;
     if (onlyPlaceName && onlyPlaceName.includes(',')) {
       onlyPlaceName = onlyPlaceName.split(',')[0].trim();
     }
-    
-    // googlePlaceId 처리 - Google Place ID인지 좌표인지 확인
-    let googlePlaceId = item.googlePlaceId || item.placeId; // googlePlaceId 우선, 없으면 placeId 사용
-    if (!googlePlaceId || googlePlaceId === 'null' || googlePlaceId === 'undefined') {
-      // googlePlaceId가 없으면 좌표 조합으로 대체
+
+    let googlePlaceId = item.googlePlaceId || item.placeId;
+    if (
+      !googlePlaceId ||
+      googlePlaceId === 'null' ||
+      googlePlaceId === 'undefined'
+    ) {
       googlePlaceId = `${item.lat},${item.lon}`;
       console.log('⚠️ googlePlaceId가 없어서 좌표로 대체:', googlePlaceId);
     } else if (googlePlaceId.includes(',')) {
-      // 좌표 형식인 경우 (이미 좌표로 저장된 경우)
       console.log('📍 좌표 형식 googlePlaceId 사용:', googlePlaceId);
     } else {
-      // Google Place ID인 경우
       console.log('🏢 Google Place ID 사용:', googlePlaceId);
     }
-    
-    // placeName을 encodeURIComponent로 인코딩
+
     const encodedPlaceName = encodeURIComponent(onlyPlaceName);
     const logObj = {
       placeName: encodedPlaceName,
@@ -1026,16 +1055,18 @@ const Practice = () => {
       placeDescription: item.placeDescription,
       lat: item.lat,
       lon: item.lon,
-      placeId: googlePlaceId, // googlePlaceId를 placeId로 전달
+      placeId: googlePlaceId,
       language: 'kor',
       tourProgramId: tourProgramId,
     });
   };
 
-  // 모자이크 처리 함수들 추가
+  // 모자이크 처리 함수들
   const maskText = (text: string): string => {
-    if (!text || text.trim() === '') return text;
-    
+    if (!text || text.trim() === '') {
+      return text;
+    }
+
     switch (maskType) {
       case 'dots':
         return text.replace(/./g, '●');
@@ -1044,7 +1075,7 @@ const Practice = () => {
       case 'squares':
         return text.replace(/./g, '■');
       case 'blur':
-        return text; // blur 스타일일 때는 실제 텍스트 반환
+        return text;
       default:
         return text.replace(/./g, '●');
     }
@@ -1101,49 +1132,172 @@ const Practice = () => {
     setIsScheduleMasked(!isScheduleMasked);
   };
 
-  // 포인트/결제 관련 함수들 추가
-  const handleUnlockWithPoints = () => {
-    if (userPoints < scheduleUnlockCost) {
-      Alert.alert(
-        getTranslatedUIText('포인트 부족', selectedLanguage),
-        getTranslatedUIText('포인트가 부족합니다', selectedLanguage),
-        [
-          {text: getTranslatedUIText('취소', selectedLanguage), style: 'cancel'},
-          {
-            text: getTranslatedUIText('포인트 충전', selectedLanguage),
-            onPress: () => {
-              // 포인트 충전 페이지로 이동
-              console.log('포인트 충전 페이지로 이동');
-            }
-          }
-        ]
+  // ✅ [Points] 포인트로 결제하기 (API 연동)
+  const handleUnlockWithPoints = async () => {
+    try {
+      const token = await AsyncStorage.getItem('accessToken');
+      if (!token) {
+        Alert.alert(
+          getTranslatedUIText('알림', selectedLanguage),
+          getTranslatedUIText('로그인이 필요합니다', selectedLanguage),
+        );
+        return;
+      }
+      const cleanToken = token.replace('Bearer ', '');
+
+      // 1) 잔여 포인트 조회
+      const balanceUrl = 'http://124.60.137.10:8083/api/points/balance';
+      console.log('🟦 [POINTS][GET] →', balanceUrl, {
+        headers: {Authorization: `Bearer ${cleanToken.substring(0, 10)}...`},
+      });
+      const balanceRes = await axios.get(balanceUrl, {
+        headers: {
+          Authorization: `Bearer ${cleanToken}`,
+          'Content-Type': 'application/json',
+        },
+      });
+      console.log(
+        '🟩 [POINTS][GET] ← status:',
+        balanceRes.status,
+        'data:',
+        JSON.stringify(balanceRes.data, null, 2),
       );
-      return;
+
+      const current = balanceRes?.data?.data?.balance ?? 0;
+      setUserPoints(current);
+
+      // 2) 안내/확인 팝업
+      const after = current - scheduleUnlockCost;
+      if (current < scheduleUnlockCost) {
+        Alert.alert(
+          getTranslatedUIText('포인트 부족', selectedLanguage),
+          getTranslatedUIText('포인트가 부족합니다', selectedLanguage),
+          [
+            {
+              text: getTranslatedUIText('취소', selectedLanguage),
+              style: 'cancel',
+            },
+            {
+              text: getTranslatedUIText('포인트 충전', selectedLanguage),
+              onPress: () =>
+                console.log('🔔 포인트 충전 페이지로 이동 (미구현)'),
+            },
+          ],
+        );
+        return;
+      }
+
+      Alert.alert(
+        '포인트 결제',
+        `현재 포인트: ${current}\n결제 금액: ${scheduleUnlockCost}\n잔여 포인트: ${after}`,
+        [
+          {
+            text: getTranslatedUIText('취소', selectedLanguage),
+            style: 'cancel',
+          }, // 3-2) 취소는 아무 일도 안 함
+          {
+            text: getTranslatedUIText('해제', selectedLanguage),
+            onPress: async () => {
+              try {
+                // 3-1) 포인트 사용 요청
+                const useUrl = 'http://124.60.137.10:8083/api/points/use';
+                const body = {
+                  amount: scheduleUnlockCost,
+                  actionType: 'USE',
+                  actionSubject: 'CONTENT',
+                  targetId: tourProgramId,
+                };
+                console.log('🟦 [POINTS][POST] →', useUrl, 'body:', body, {
+                  headers: {
+                    Authorization: `Bearer ${cleanToken.substring(0, 10)}...`,
+                  },
+                });
+
+                const useRes = await axios.post(useUrl, body, {
+                  headers: {
+                    Authorization: `Bearer ${cleanToken}`,
+                    'Content-Type': 'application/json',
+                  },
+                });
+
+                console.log(
+                  '🟩 [POINTS][POST] ← status:',
+                  useRes.status,
+                  'data:',
+                  JSON.stringify(useRes.data, null, 2),
+                );
+
+                const remain = useRes?.data?.data?.balance ?? after;
+
+                // 3-2) 일정 해제 상태를 서버에 저장
+                try {
+                  const unlockUrl = `http://124.60.137.10:8083/api/tour-program/${tourProgramId}/unlock`;
+                  const unlockBody = {
+                    unlocked: true,
+                    unlockMethod: 'POINTS',
+                    unlockCost: scheduleUnlockCost,
+                  };
+                  
+                  console.log('🟦 [UNLOCK][POST] →', unlockUrl, 'body:', unlockBody);
+                  
+                  const unlockRes = await axios.post(unlockUrl, unlockBody, {
+                    headers: {
+                      Authorization: `Bearer ${cleanToken}`,
+                      'Content-Type': 'application/json',
+                    },
+                  });
+                  
+                  console.log('🟩 [UNLOCK][POST] ← status:', unlockRes.status, 'data:', unlockRes.data);
+                } catch (unlockError) {
+                  console.log('⚠️ 일정 해제 상태 저장 실패:', unlockError);
+                  // 일정 해제 상태 저장 실패해도 포인트는 이미 차감되었으므로 계속 진행
+                }
+
+                // 성공 처리: 일정 해제 + 알림
+                setScheduleUnlocked(true);
+                setIsScheduleMasked(false);
+                setShowUnlockModal(false);
+                setUserPoints(remain);
+                
+                // 로컬 스토리지에도 해제 상태 저장
+                await AsyncStorage.setItem(
+                  `schedule_unlocked_${tourProgramId}`,
+                  'true'
+                );
+                
+                Alert.alert(
+                  getTranslatedUIText('성공', selectedLanguage),
+                  `${getTranslatedUIText(
+                    '일정이 해제되었습니다',
+                    selectedLanguage,
+                  )}\n잔여 포인트: ${remain}`,
+                );
+              } catch (err: any) {
+                console.log(
+                  '🟥 [POINTS][POST] ERROR:',
+                  err?.response?.status,
+                  err?.response?.data || err?.message,
+                );
+                Alert.alert(
+                  getTranslatedUIText('오류', selectedLanguage),
+                  err?.response?.data?.message || '포인트 사용에 실패했습니다.',
+                );
+              }
+            },
+          },
+        ],
+      );
+    } catch (err: any) {
+      console.log(
+        '🟥 [POINTS][GET] ERROR:',
+        err?.response?.status,
+        err?.response?.data || err?.message,
+      );
+      Alert.alert(
+        getTranslatedUIText('오류', selectedLanguage),
+        '포인트 정보를 불러오지 못했습니다.',
+      );
     }
-
-    const before = userPoints;
-    const after = userPoints - scheduleUnlockCost;
-
-    Alert.alert(
-      '포인트 결제',
-      `현재 포인트: ${before}\n결제 금액: ${scheduleUnlockCost}\n잔여 포인트: ${after}`,
-      [
-        {text: getTranslatedUIText('취소', selectedLanguage), style: 'cancel'},
-        {
-          text: getTranslatedUIText('해제', selectedLanguage),
-          onPress: () => {
-            setUserPoints(after);
-            setIsScheduleMasked(false);
-            setShowUnlockModal(false);
-            Alert.alert(
-              getTranslatedUIText('성공', selectedLanguage),
-              getTranslatedUIText('일정이 해제되었습니다', selectedLanguage) + '\n' +
-              `잔여 포인트: ${after}`
-            );
-          }
-        }
-      ]
-    );
   };
 
   const handleUnlockWithPayment = () => {
@@ -1155,15 +1309,14 @@ const Practice = () => {
         {
           text: getTranslatedUIText('해제', selectedLanguage),
           onPress: () => {
-            // 결제 페이지로 이동
             navigation.navigate('PaymentScreen', {
               tourData: data,
               tourProgramId: tourProgramId,
               unlockSchedule: true,
             });
-          }
-        }
-      ]
+          },
+        },
+      ],
     );
   };
 
@@ -1185,7 +1338,9 @@ const Practice = () => {
   if (!data) {
     return (
       <View style={{flex: 1, justifyContent: 'center', alignItems: 'center'}}>
-        <Text>{getTranslatedUIText('데이터를 불러올 수 없습니다', selectedLanguage)}</Text>
+        <Text>
+          {getTranslatedUIText('데이터를 불러올 수 없습니다', selectedLanguage)}
+        </Text>
       </View>
     );
   }
@@ -1197,7 +1352,6 @@ const Practice = () => {
     return acc;
   }, {} as Record<string, Schedule[]>);
 
-  // 번역된 데이터의 일정 그룹화
   const getGroupedSchedules = () => {
     const schedules = (translatedData || data)?.schedules || [];
     return schedules.reduce((acc, cur) => {
@@ -1217,65 +1371,72 @@ const Practice = () => {
           {data.thumbnailUrl ? (
             <Image source={{uri: data.thumbnailUrl}} style={styles.thumbnail} />
           ) : null}
-          
+
           {/* 번역 진행 상태 표시 */}
           {translating && (
             <View style={styles.translationProgressContainer}>
               <Text style={styles.translationProgressText}>
-                {getTranslatedUIText('번역 중', selectedLanguage)}... {translationProgress.toFixed(0)}%
+                {getTranslatedUIText('번역 중', selectedLanguage)}...{' '}
+                {translationProgress.toFixed(0)}%
               </Text>
               <View style={styles.progressBar}>
-                <View 
+                <View
                   style={[
-                    styles.progressFill, 
-                    {width: `${translationProgress}%`}
-                  ]} 
+                    styles.progressFill,
+                    {width: `${translationProgress}%`},
+                  ]}
                 />
               </View>
             </View>
           )}
-          
+
           {/* 번역 버튼 */}
           <View style={styles.translationButtonContainer}>
             <TouchableOpacity
               style={styles.translationButton}
               onPress={() => setShowLanguageModal(true)}
-              disabled={translating}
-            >
+              disabled={translating}>
               <Ionicons name="language" size={20} color="#fff" />
               <Text style={styles.translationButtonText}>
-                {supportedLanguages.find(lang => lang.code === selectedLanguage)?.flag}
-                {selectedLanguage === 'ko' ? '한국어' : supportedLanguages.find(lang => lang.code === selectedLanguage)?.name}
+                {
+                  supportedLanguages.find(
+                    lang => lang.code === selectedLanguage,
+                  )?.flag
+                }
+                {selectedLanguage === 'ko'
+                  ? '한국어'
+                  : supportedLanguages.find(
+                      lang => lang.code === selectedLanguage,
+                    )?.name}
               </Text>
             </TouchableOpacity>
           </View>
-          
+
           <View style={styles.whiteBox}>
             <Text style={styles.title} selectable={true}>
-              {(translatedData || data)?.title || getTranslatedUIText('제목 없음', selectedLanguage)}
+              {(translatedData || data)?.title ||
+                getTranslatedUIText('제목 없음', selectedLanguage)}
             </Text>
 
             <View style={styles.editDeleteRow}>
               {/* 수정 버튼 임시로 항상 표시 */}
-              <TouchableOpacity
-                style={styles.editButton}
-                onPress={handleEdit}>
-                <Text style={styles.editButtonText}>{getTranslatedUIText('수정', selectedLanguage)}</Text>
+              <TouchableOpacity style={styles.editButton} onPress={handleEdit}>
+                <Text style={styles.editButtonText}>
+                  {getTranslatedUIText('수정', selectedLanguage)}
+                </Text>
               </TouchableOpacity>
-              
+
               {/* 삭제 버튼 일시 비활성화 */}
-              {/*
-              <TouchableOpacity
-                style={styles.deleteButton}
-                onPress={handleDelete}>
+              {/* <TouchableOpacity style={styles.deleteButton} onPress={handleDelete}>
                 <Text style={styles.deleteButtonText}>{getTranslatedUIText('삭제', selectedLanguage)}</Text>
-              </TouchableOpacity>
-              */}
+              </TouchableOpacity> */}
             </View>
 
             <View style={styles.rightAlignRow}>
               <Text style={styles.region} selectable={true}>
-                📍 {(translatedData || data)?.region || getTranslatedUIText('지역 정보 없음', selectedLanguage)}
+                📍{' '}
+                {(translatedData || data)?.region ||
+                  getTranslatedUIText('지역 정보 없음', selectedLanguage)}
               </Text>
               <TouchableOpacity
                 onPress={() => {
@@ -1284,56 +1445,105 @@ const Practice = () => {
                   });
                 }}>
                 <Text style={styles.review}>
-                  {getTranslatedUIText('리뷰', selectedLanguage)} {data.reviewCount || 0}
+                  {getTranslatedUIText('리뷰', selectedLanguage)}{' '}
+                  {data.reviewCount || 0}
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity onPress={toggleLike}>
                 <Text style={styles.like}>
-                  {isLiked ? `💖 ${getTranslatedUIText('찜함', selectedLanguage)}` : `🤍 ${getTranslatedUIText('찜', selectedLanguage)}`} {data.wishlistCount || 0}
+                  {isLiked
+                    ? `💖 ${getTranslatedUIText('찜함', selectedLanguage)}`
+                    : `🤍 ${getTranslatedUIText('찜', selectedLanguage)}`}{' '}
+                  {data.wishlistCount || 0}
                 </Text>
               </TouchableOpacity>
             </View>
 
             <View style={styles.tags}>
-              {(translatedData || data)?.hashtags ? (translatedData || data)?.hashtags?.map((tag, i) => (
-                <Text key={i} style={styles.tag} selectable={true}>
-                  #{tag || getTranslatedUIText('태그', selectedLanguage)}
-                </Text>
-              )) : null}
+              {(translatedData || data)?.hashtags
+                ? (translatedData || data)?.hashtags?.map((tag, i) => (
+                    <Text key={i} style={styles.tag} selectable={true}>
+                      #{tag || getTranslatedUIText('태그', selectedLanguage)}
+                    </Text>
+                  ))
+                : null}
             </View>
 
-            <Text style={styles.sectionTitle}>🗓️ {getTranslatedUIText('일정', selectedLanguage)}</Text>
+            <Text style={styles.sectionTitle}>
+              🗓️ {getTranslatedUIText('일정', selectedLanguage)}
+            </Text>
             <View style={styles.scheduleContainer}>
               {isScheduleMasked ? (
                 // 잠금 스타일 일정
                 <View style={styles.lockedScheduleContainer}>
                   {/* 첫 번째 일정만 미리보기 */}
                   <View style={styles.lockedPreviewBox}>
-                    {Object.keys(currentGroupedSchedules).slice(0, 1).map((day, i) => {
-                      const items = currentGroupedSchedules[day];
-                      return (
-                        <View key={i} style={styles.lockedPreviewDay}>
-                          <Text style={styles.lockedPreviewDayTitle}>{day}</Text>
-                          {items.slice(0, 2).map((item, idx) => (
-                            <View key={idx} style={styles.lockedPreviewPlace}>
-                              <Text style={styles.lockedPreviewPlaceName}>{item.placeName || getTranslatedUIText('장소명 없음', selectedLanguage)}</Text>
-                              <Text style={styles.lockedPreviewPlaceDesc}>{item.placeDescription || getTranslatedUIText('설명 없음', selectedLanguage)}</Text>
-                            </View>
-                          ))}
-                        </View>
-                      );
-                    })}
+                    {Object.keys(currentGroupedSchedules)
+                      .slice(0, 1)
+                      .map((day, i) => {
+                        const items = currentGroupedSchedules[day];
+                        return (
+                          <View key={i} style={styles.lockedPreviewDay}>
+                            <Text style={styles.lockedPreviewDayTitle}>
+                              {day}
+                            </Text>
+                            {items.slice(0, 2).map((item, idx) => (
+                              <View key={idx} style={styles.lockedPreviewPlace}>
+                                <Text style={styles.lockedPreviewPlaceName}>
+                                  {item.placeName ||
+                                    getTranslatedUIText(
+                                      '장소명 없음',
+                                      selectedLanguage,
+                                    )}
+                                </Text>
+                                <Text style={styles.lockedPreviewPlaceDesc}>
+                                  {item.placeDescription ||
+                                    getTranslatedUIText(
+                                      '설명 없음',
+                                      selectedLanguage,
+                                    )}
+                                </Text>
+                              </View>
+                            ))}
+                          </View>
+                        );
+                      })}
                   </View>
                   <View style={styles.lockedCenterBox}>
-                    <Text style={styles.lockIcon}>🔒</Text>
-                    <Text style={styles.lockedTitle}>상세 일정은 예약 후 확인 가능합니다</Text>
-                    <Text style={styles.lockedSub}>첫 번째 일정만 미리보기 가능</Text>
-                    <TouchableOpacity style={styles.lockedPayBtn} onPress={handleUnlockWithPoints}>
-                      <Text style={styles.lockedPayBtnText}>포인트로 결제하기</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.lockedCardBtn} onPress={handleUnlockWithPayment}>
-                      <Text style={styles.lockedCardBtnText}>카드로 결제하기</Text>
-                    </TouchableOpacity>
+                    {scheduleUnlocked ? (
+                      // 이미 해제된 상태
+                      <>
+                        <Text style={styles.lockIcon}>🔓</Text>
+                        <Text style={styles.lockedTitle}>
+                          일정이 해제되었습니다
+                        </Text>
+                        <Text style={styles.lockedSub}>
+                          모든 일정을 확인할 수 있습니다
+                        </Text>
+                      </>
+                    ) : (
+                      // 잠금 상태
+                      <>
+                        <Text style={styles.lockIcon}>🔒</Text>
+                        <Text style={styles.lockedTitle}>
+                          상세 일정은 예약 후 확인 가능합니다
+                        </Text>
+                        <Text style={styles.lockedSub}>
+                          첫 번째 일정만 미리보기 가능
+                        </Text>
+                        <TouchableOpacity
+                          style={styles.lockedPayBtn}
+                          onPress={handleUnlockWithPoints}>
+                          {/* ✅ [Points] 버튼 동작은 API 연동된 handleUnlockWithPoints */}
+                          <Text style={styles.lockedPayBtnText}>
+                            포인트로 결제하기
+                          </Text>
+                        </TouchableOpacity>
+                        {/* <TouchableOpacity style={styles.lockedCardBtn} onPress={handleUnlockWithPayment}>
+                          <Text style={styles.lockedCardBtnText}>카드로 결제하기</Text>
+                        </TouchableOpacity> */}
+                      </>
+                    )}
                   </View>
                 </View>
               ) : (
@@ -1343,31 +1553,69 @@ const Practice = () => {
                     const items = currentGroupedSchedules[day];
                     return (
                       <View key={i} style={styles.scheduleCard}>
-                        <Text style={styles.dayTitle} selectable={true}>{day}</Text>
+                        <Text style={styles.dayTitle} selectable={true}>
+                          {day}
+                        </Text>
                         {items.map((item, idx) => (
                           <React.Fragment key={idx}>
-                            <TouchableOpacity 
+                            <TouchableOpacity
                               style={styles.placeBox}
-                              onPress={() => handlePlacePress(item)}
-                            >
-                              <Text style={{fontSize: 15, lineHeight: 22}} selectable={true}>
-                                {getTranslatedUIText('장소', selectedLanguage)} {String(idx + 1)}. {(item.placeName && item.placeName.includes(',')) ? item.placeName.split(',')[0].trim() : (item.placeName || getTranslatedUIText('장소명 없음', selectedLanguage))}
+                              onPress={() => handlePlacePress(item)}>
+                              <Text
+                                style={{fontSize: 15, lineHeight: 22}}
+                                selectable={true}>
+                                {getTranslatedUIText('장소', selectedLanguage)}{' '}
+                                {String(idx + 1)}.{' '}
+                                {item.placeName && item.placeName.includes(',')
+                                  ? item.placeName.split(',')[0].trim()
+                                  : item.placeName ||
+                                    getTranslatedUIText(
+                                      '장소명 없음',
+                                      selectedLanguage,
+                                    )}
                                 {'\n'}
-                                {item.placeDescription || getTranslatedUIText('설명 없음', selectedLanguage)}
+                                {item.placeDescription ||
+                                  getTranslatedUIText(
+                                    '설명 없음',
+                                    selectedLanguage,
+                                  )}
                                 {'\n'}
-                                {getTranslatedUIText('소요시간', selectedLanguage)}: {String(item.travelTime || 0)}{getTranslatedUIText('분', selectedLanguage)}
+                                {getTranslatedUIText(
+                                  '소요시간',
+                                  selectedLanguage,
+                                )}
+                                : {String(item.travelTime || 0)}
+                                {getTranslatedUIText('분', selectedLanguage)}
                               </Text>
                               <View style={styles.placeArrow}>
-                                <Icon name="chevron-right" size={20} color="#007AFF" />
+                                <Icon
+                                  name="chevron-right"
+                                  size={20}
+                                  color="#007AFF"
+                                />
                               </View>
                             </TouchableOpacity>
                             {idx < items.length - 1 ? (
                               <View style={styles.verticalLineContainer}>
-                                <View style={styles.verticalLine} />
-                                <Text style={styles.moveTimeText} selectable={true}>
-                                  {getTranslatedUIText('이동시간', selectedLanguage)}: {getTranslatedUIText('이동시간 정보 없음', selectedLanguage)}
+                                <View
+                                  style={styles.verticalLine}
+                                />
+                                <Text
+                                  style={styles.moveTimeText}
+                                  selectable={true}>
+                                  {getTranslatedUIText(
+                                    '이동시간',
+                                    selectedLanguage,
+                                  )}
+                                  :{' '}
+                                  {getTranslatedUIText(
+                                    '이동시간 정보 없음',
+                                    selectedLanguage,
+                                  )}
                                 </Text>
-                                <View style={styles.verticalLine} />
+                                <View
+                                  style={styles.verticalLine}
+                                />
                               </View>
                             ) : null}
                           </React.Fragment>
@@ -1379,7 +1627,9 @@ const Practice = () => {
               )}
             </View>
 
-            <Text style={styles.sectionTitle}>🗺 {getTranslatedUIText('지도', selectedLanguage)}</Text>
+            <Text style={styles.sectionTitle}>
+              🗺 {getTranslatedUIText('지도', selectedLanguage)}
+            </Text>
             <View
               style={{
                 height: 300,
@@ -1405,37 +1655,60 @@ const Practice = () => {
                         longitudeDelta: 0.05,
                       }
                 }>
-                {data.schedules ? data.schedules.map((s, idx) => (
-                  <Marker
-                    key={idx}
-                    coordinate={{latitude: s.lat, longitude: s.lon}}
-                    title={`Day ${s.day} - ${s.placeName || getTranslatedUIText('장소명 없음', selectedLanguage)}`}
-                    description={s.placeDescription || getTranslatedUIText('설명 없음', selectedLanguage)}
-                    pinColor={dayColors[(s.day - 1) % dayColors.length]}
-                  />
-                )) : null}
+                {data.schedules
+                  ? data.schedules.map((s, idx) => (
+                      <Marker
+                        key={idx}
+                        coordinate={{latitude: s.lat, longitude: s.lon}}
+                        title={`Day ${s.day} - ${
+                          s.placeName ||
+                          getTranslatedUIText('장소명 없음', selectedLanguage)
+                        }`}
+                        description={
+                          s.placeDescription ||
+                          getTranslatedUIText('설명 없음', selectedLanguage)
+                        }
+                        pinColor={dayColors[(s.day - 1) % dayColors.length]}
+                      />
+                    ))
+                  : null}
                 <Polyline
-                  coordinates={data.schedules ? data.schedules.map(s => ({
-                    latitude: s.lat,
-                    longitude: s.lon,
-                  })) : []}
+                  coordinates={
+                    data.schedules
+                      ? data.schedules.map(s => ({
+                          latitude: s.lat,
+                          longitude: s.lon,
+                        }))
+                      : []
+                  }
                   strokeColor="#0288d1"
                   strokeWidth={3}
                 />
               </MapView>
-              <Text style={{textAlign: 'right', marginTop: 6}} selectable={true}>
-                {getTranslatedUIText('총 거리', selectedLanguage)}: {String(getTotalDistance(data.schedules || []))}{getTranslatedUIText('km', selectedLanguage)}
+              <Text
+                style={{textAlign: 'right', marginTop: 6}}
+                selectable={true}>
+                {getTranslatedUIText('총 거리', selectedLanguage)}:{' '}
+                {String(getTotalDistance(data.schedules || []))}
+                {getTranslatedUIText('km', selectedLanguage)}
               </Text>
             </View>
 
-            <Text style={styles.sectionTitle}>🧑‍💼 {getTranslatedUIText('호스트 정보', selectedLanguage)}</Text>
+            <Text style={styles.sectionTitle}>
+              🧑‍💼 {getTranslatedUIText('호스트 정보', selectedLanguage)}
+            </Text>
             <Text style={styles.description} selectable={true}>
-              {getTranslatedUIText('호스트', selectedLanguage)}: {(translatedData || data)?.user?.name || getTranslatedUIText('정보 없음', selectedLanguage)}
+              {getTranslatedUIText('호스트', selectedLanguage)}:{' '}
+              {(translatedData || data)?.user?.name ||
+                getTranslatedUIText('정보 없음', selectedLanguage)}
             </Text>
 
-            <Text style={styles.sectionTitle}>📖 {getTranslatedUIText('투어 설명', selectedLanguage)}</Text>
+            <Text style={styles.sectionTitle}>
+              📖 {getTranslatedUIText('투어 설명', selectedLanguage)}
+            </Text>
             <Text style={styles.description} selectable={true}>
-              {(translatedData || data)?.description || getTranslatedUIText('설명이 없습니다', selectedLanguage)}
+              {(translatedData || data)?.description ||
+                getTranslatedUIText('설명이 없습니다', selectedLanguage)}
             </Text>
 
             <View style={{height: 100}} />
@@ -1444,16 +1717,21 @@ const Practice = () => {
 
         <View style={styles.bottomBar}>
           <Text style={styles.price} selectable={true}>
-            ₩{(data.guidePrice || 0).toLocaleString()} {getTranslatedUIText('인당', selectedLanguage)}
+            ₩{(data.guidePrice || 0).toLocaleString()}{' '}
+            {getTranslatedUIText('인당', selectedLanguage)}
           </Text>
           <View style={styles.buttonGroup}>
             <TouchableOpacity style={styles.chatBtn} onPress={handleChat}>
-              <Text style={styles.chatText}>{getTranslatedUIText('상담하기', selectedLanguage)}</Text>
+              <Text style={styles.chatText}>
+                {getTranslatedUIText('상담하기', selectedLanguage)}
+              </Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.reserveBtn}
               onPress={handleReservation}>
-              <Text style={styles.reserveText}>{getTranslatedUIText('예약하기', selectedLanguage)}</Text>
+              <Text style={styles.reserveText}>
+                {getTranslatedUIText('예약하기', selectedLanguage)}
+              </Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -1464,29 +1742,29 @@ const Practice = () => {
         visible={showLanguageModal}
         transparent={true}
         animationType="fade"
-        onRequestClose={() => setShowLanguageModal(false)}
-      >
+        onRequestClose={() => setShowLanguageModal(false)}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContainer}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>{getTranslatedUIText('언어 선택', selectedLanguage)}</Text>
+              <Text style={styles.modalTitle}>
+                {getTranslatedUIText('언어 선택', selectedLanguage)}
+              </Text>
               <TouchableOpacity
                 onPress={() => setShowLanguageModal(false)}
-                style={styles.closeButton}
-              >
+                style={styles.closeButton}>
                 <Icon name="close" size={24} color="#666" />
               </TouchableOpacity>
             </View>
             <ScrollView style={styles.languageList}>
-              {supportedLanguages.map((language) => (
+              {supportedLanguages.map(language => (
                 <TouchableOpacity
                   key={language.code}
                   style={[
                     styles.languageItem,
-                    selectedLanguage === language.code && styles.selectedLanguageItem
+                    selectedLanguage === language.code &&
+                      styles.selectedLanguageItem,
                   ]}
-                  onPress={() => handleLanguageChange(language.code)}
-                >
+                  onPress={() => handleLanguageChange(language.code)}>
                   <Text style={styles.languageFlag}>{language.flag}</Text>
                   <Text style={styles.languageName}>{language.name}</Text>
                   {selectedLanguage === language.code && (
@@ -1869,5 +2147,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default Practice;
-
+export default Program_detail;
