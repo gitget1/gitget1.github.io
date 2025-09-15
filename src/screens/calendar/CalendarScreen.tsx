@@ -76,46 +76,27 @@ function CalendarScreen() {
     }
   }, [selectedDateString, selectedDateReservations, isSelectedDateLoading, isSelectedDateError]);
 
-  // 월별 예약 데이터 조회 (캘린더 표시용)
+  // 월별 예약 데이터 조회 (캘린더 표시용) - 받은 예약 사용
   const { 
     data: monthlyReservations = [], 
     isLoading: isMonthlyLoading, 
     isError: isMonthlyError 
   } = useGetMyReservations(start, end);
 
-  // 7월 중간에 더미 데이터 추가
-  const [dummyReservations, setDummyReservations] = useState([
-    {
-      id: 1,
-      tourProgramTitle: '아산과 함께 자연을',
-      guideStartDate: '2025-07-15T09:00:00',
-      guideEndDate: '2025-07-15T18:00:00',
-      requestStatus: 'PENDING',
-      username: '김민성',
-      numOfPeople: 4,
-    },
-    {
-      id: 2,
-      tourProgramTitle: '아산과 함께 자연을',
-      guideStartDate: '2025-07-22T10:00:00',
-      guideEndDate: '2025-07-22T17:00:00',
-      requestStatus: 'PENDING',
-      username: '이영희',
-      numOfPeople: 2,
-    },
-    {
-      id: 3,
-      tourProgramTitle: '아산과 함께 자연을',
-      guideStartDate: '2025-07-08T14:00:00',
-      guideEndDate: '2025-07-08T16:00:00',
-      requestStatus: 'REJECTED',
-      username: '박민수',
-      numOfPeople: 6,
-    },
-  ]);
+  // 월별 예약 데이터 디버깅 로그
+  useEffect(() => {
+    console.log('📅 월별 예약 데이터 디버깅:', {
+      start,
+      end,
+      monthlyReservations,
+      monthlyReservationsCount: monthlyReservations.length,
+      isLoading: isMonthlyLoading,
+      isError: isMonthlyError
+    });
+  }, [start, end, monthlyReservations, isMonthlyLoading, isMonthlyError]);
 
-  // API 데이터와 더미 데이터 합치기 (캘린더 표시용)
-  const reservations = [...monthlyReservations, ...dummyReservations];
+  // API 데이터만 사용 (캘린더 표시용)
+  const reservations = monthlyReservations;
 
   // 디버깅 로그 제거
   // console.log('📅 CalendarScreen Debug:');
@@ -157,17 +138,8 @@ function CalendarScreen() {
     console.log('📅 미니 캘린더에서 날짜 업데이트:', newSelectedDateStr);
   };
 
-  // 예약 상태 변경 함수 (더미 데이터만 사용)
-  const handleStatusChange = (reservationId: number, newStatus: 'ACCEPTED' | 'PENDING' | 'REJECTED') => {
-    // 더미 데이터 업데이트
-    setDummyReservations(prev => 
-      prev.map(reservation => 
-        reservation.id === reservationId 
-          ? {...reservation, requestStatus: newStatus}
-          : reservation
-      )
-    );
-    
+  // 예약 상태 변경 함수
+  const handleStatusChange = (reservationId: number, newStatus: 'ACCEPTED' | 'PENDING' | 'REJECTED' | 'CANCELLED_BY_USER' | 'CANCELLED_BY_GUIDE' | 'COMPLETED') => {
     // 상태 변경 시 필터 해제 (모든 예약이 보이도록)
     setSelectedStatus(null);
   };

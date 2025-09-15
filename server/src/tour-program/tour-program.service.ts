@@ -134,4 +134,55 @@ export class TourProgramService {
 
     await this.tourProgramRepository.softDelete(id);
   }
+
+  async getUnlockStatus(
+    id: number,
+    user: User,
+  ): Promise<{ unlocked: boolean }> {
+    const tourProgram = await this.tourProgramRepository.findOne({
+      where: { id },
+      relations: ['user'],
+    });
+
+    if (!tourProgram) {
+      throw new NotFoundException('투어 프로그램을 찾을 수 없습니다.');
+    }
+
+    // 투어 프로그램 소유자이거나 해제된 상태인 경우에만 접근 가능
+    if (tourProgram.user.id !== user.id && !tourProgram.unlocked) {
+      throw new ForbiddenException(
+        '해당 투어 프로그램의 일정을 확인할 권한이 없습니다.',
+      );
+    }
+
+    return { unlocked: tourProgram.unlocked };
+  }
+
+  async unlockSchedule(
+    id: number,
+    unlockData: { unlocked: boolean; unlockMethod: string; unlockCost: number },
+    user: User,
+  ): Promise<void> {
+    const tourProgram = await this.tourProgramRepository.findOne({
+      where: { id },
+      relations: ['user'],
+    });
+
+    if (!tourProgram) {
+      throw new NotFoundException('투어 프로그램을 찾을 수 없습니다.');
+    }
+
+    // 투어 프로그램 소유자만 해제할 수 있음
+    if (tourProgram.user.id !== user.id) {
+      throw new ForbiddenException(
+        '해당 투어 프로그램을 해제할 권한이 없습니다.',
+      );
+    }
+
+    tourProgram.unlocked = unlockData.unlocked;
+    tourProgram.unlockMethod = unlockData.unlockMethod;
+    tourProgram.unlockCost = unlockData.unlockCost;
+
+    await this.tourProgramRepository.save(tourProgram);
+  }
 }

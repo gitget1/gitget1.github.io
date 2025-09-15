@@ -481,12 +481,17 @@ const PlaceDetailScreen = () => {
         if (verificationResult.data?.isVerified) {
           // "이미 방문 권한이 있다"는 경우 성공 메시지 표시
           if (verificationResult.data?.message?.includes('이미 방문 권한이 있습니다')) {
-            Alert.alert('GPS 권한 확인', '이미 방문 권한이 있습니다.');
+            Alert.alert('GPS 권한 확인', '이미 방문 권한이 있습니다. 리뷰를 작성하시겠습니까?', [
+              { text: '취소', style: 'cancel' },
+              { text: '리뷰 작성', onPress: () => setShowReviewModal(true) }
+            ]);
           } else {
-            Alert.alert('GPS 권한 성공', verificationResult.data.message || '현장 방문이 확인되었습니다!');
+            Alert.alert('GPS 권한 성공', verificationResult.data.message || '현장 방문이 확인되었습니다! 리뷰를 작성하시겠습니까?', [
+              { text: '취소', style: 'cancel' },
+              { text: '리뷰 작성', onPress: () => setShowReviewModal(true) }
+            ]);
           }
           console.log('🟢 GPS 권한 성공:', verificationResult);
-          // 리뷰 작성 모달을 열지 않음
         } else {
           Alert.alert(
             'GPS 권한 실패',
@@ -512,8 +517,10 @@ const PlaceDetailScreen = () => {
           const errorMessage = error.response?.data?.message || '';
           if (errorMessage.includes('이미 해당 장소에 대한 방문 권한이 있습니다')) {
             console.log('🟢 이미 방문 권한이 있음 - 성공으로 처리');
-            Alert.alert('GPS 권한 확인', '이미 방문 권한이 있습니다.');
-            // 리뷰 작성 모달을 열지 않음
+            Alert.alert('GPS 권한 확인', '이미 방문 권한이 있습니다. 리뷰를 작성하시겠습니까?', [
+              { text: '취소', style: 'cancel' },
+              { text: '리뷰 작성', onPress: () => setShowReviewModal(true) }
+            ]);
             return;
           }
 
@@ -531,8 +538,10 @@ const PlaceDetailScreen = () => {
           const errorMessage = error.response?.data?.message || '';
           if (errorMessage.includes('이미 존재하는 데이터입니다') || errorMessage.includes('이미 해당 장소에 대한 방문 권한이 있습니다')) {
             console.log('🟢 이미 방문 권한이 있음 (409) - 성공으로 처리');
-            Alert.alert('GPS 권한 확인', '이미 방문 권한이 있습니다.');
-            // 리뷰 작성 모달을 열지 않음
+            Alert.alert('GPS 권한 확인', '이미 방문 권한이 있습니다. 리뷰를 작성하시겠습니까?', [
+              { text: '취소', style: 'cancel' },
+              { text: '리뷰 작성', onPress: () => setShowReviewModal(true) }
+            ]);
             return;
           }
 

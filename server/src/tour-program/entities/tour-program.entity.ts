@@ -39,6 +39,15 @@ export class TourProgram extends BaseEntity {
   @Column('text', { array: true, default: '{}' })
   hashtags: string[];
 
+  @Column({ default: false })
+  unlocked: boolean;
+
+  @Column({ nullable: true })
+  unlockMethod: string;
+
+  @Column({ nullable: true })
+  unlockCost: number;
+
   @CreateDateColumn()
   createdAt: Date;
 

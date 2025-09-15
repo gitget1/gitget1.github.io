@@ -68,21 +68,74 @@ const getStatusColor = (status: RequestStatus) => {
   }
 };
 
-// ✅ 상태별 한글 텍스트
-const getStatusText = (status: RequestStatus) => {
+// ✅ 사용자 역할 확인 함수
+const getUserRole = async () => {
+  try {
+    // 여러 방법으로 사용자 정보 확인
+    const userInfo = await AsyncStorage.getItem('userInfo');
+    const userData = await AsyncStorage.getItem('userData');
+    const user = await AsyncStorage.getItem('user');
+    
+    console.log('🔍 사용자 정보 확인:', {
+      userInfo,
+      userData,
+      user
+    });
+    
+    // userInfo에서 role 확인
+    if (userInfo) {
+      const parsed = JSON.parse(userInfo);
+      console.log('📋 userInfo parsed:', parsed);
+      if (parsed.role) {
+        return parsed.role;
+      }
+    }
+    
+    // userData에서 role 확인
+    if (userData) {
+      const parsed = JSON.parse(userData);
+      console.log('📋 userData parsed:', parsed);
+      if (parsed.role) {
+        return parsed.role;
+      }
+    }
+    
+    // user에서 role 확인
+    if (user) {
+      const parsed = JSON.parse(user);
+      console.log('📋 user parsed:', parsed);
+      if (parsed.role) {
+        return parsed.role;
+      }
+    }
+    
+    // 기본값: 예약 데이터를 보고 판단
+    console.log('⚠️ 명시적인 역할 정보가 없음, 기본값 USER 사용');
+    return 'USER';
+  } catch (error) {
+    console.log('사용자 역할 확인 실패:', error);
+    return 'USER';
+  }
+};
+
+// ✅ 상태별 한글 텍스트 (역할 포함)
+const getStatusText = async (status: RequestStatus) => {
+  const userRole = await getUserRole();
+  const isGuide = userRole === 'GUIDE';
+  
   switch (status) {
     case 'ACCEPTED':
-      return '가이드 승인';
+      return isGuide ? '내가 승인한 예약' : '가이드가 승인한 예약';
     case 'REJECTED':
-      return '가이드 거절';
+      return isGuide ? '내가 거절한 예약' : '가이드가 거절한 예약';
     case 'PENDING':
-      return '예약 대기';
+      return isGuide ? '내가 받은 예약 (대기중)' : '내가 한 예약 (대기중)';
     case 'CANCELLED_BY_USER':
-      return '사용자 예약 취소';
+      return isGuide ? '사용자가 취소한 예약' : '내가 취소한 예약';
     case 'CANCELLED_BY_GUIDE':
-      return '가이드 예약 취소';
+      return isGuide ? '내가 취소한 예약' : '가이드가 취소한 예약';
     case 'COMPLETED':
-      return '예약 완료';
+      return isGuide ? '내가 완료한 예약' : '내가 완료한 예약';
     default:
       return status;
   }
@@ -126,62 +179,29 @@ async function patchReservationStatus(
   }
 }
 
-// ✅ 사용자에게 알림 전송
-async function sendNotificationToUser(
-  reservationId: number,
-  status: RequestStatus,
-  username: string,
-) {
-  const rid = Math.random().toString(36).slice(2, 8);
-  const url = `${BE_server}/api/notifications/reservation`;
-
-  try {
-    const headers = await getAuthHeader();
-    const notificationData = {
-      reservationId,
-      status,
-      message: getNotificationMessage(status, username),
-    };
-
-    console.log(`[NOTIF][${rid}] → POST ${url}`, notificationData);
-
-    const started = Date.now();
-    const res = await axios.post(url, notificationData, {
-      headers,
-      timeout: 10000,
-    });
-
-    console.log(`[NOTIF][${rid}] ← ${res.status} (${Date.now() - started}ms)`, {
-      data: res.data,
-    });
-    return {ok: true as const};
-  } catch (err: any) {
-    console.log(`[NOTIF][${rid}] ✖ ERROR`, {
-      statusCode: err?.response?.status,
-      data: err?.response?.data,
-      message: err?.message,
-    });
-    return {ok: false as const};
-  }
-}
-
-// ✅ 알림 메시지 생성
-function getNotificationMessage(status: RequestStatus, username: string): string {
-  switch (status) {
-    case 'ACCEPTED':
-      return `${username}님의 예약이 승인되었습니다!`;
-    case 'REJECTED':
-      return `${username}님의 예약이 거절되었습니다.`;
-    case 'CANCELLED_BY_GUIDE':
-      return `${username}님의 예약이 가이드에 의해 취소되었습니다.`;
-    case 'COMPLETED':
-      return `${username}님의 예약이 완료되었습니다!`;
-    default:
-      return `${username}님의 예약 상태가 변경되었습니다.`;
-  }
-}
 
 function EventList({posts, onStatusChange, onRemoveFromList}: EventListProps) {
+  const [statusTexts, setStatusTexts] = React.useState<{[key: string]: string}>({});
+  const [userRole, setUserRole] = React.useState<string>('');
+
+  // 사용자 역할과 상태 텍스트를 미리 로드
+  React.useEffect(() => {
+    const loadData = async () => {
+      // 사용자 역할 로드
+      const role = await getUserRole();
+      setUserRole(role);
+      
+      // 상태 텍스트 로드
+      const texts: {[key: string]: string} = {};
+      for (const post of posts) {
+        const text = await getStatusText(post.requestStatus);
+        texts[`${post.id}-${post.requestStatus}`] = text;
+      }
+      setStatusTexts(texts);
+    };
+    loadData();
+  }, [posts]);
+
   const handlePress = async (
     reservationId: number,
     newStatus: RequestStatus,
@@ -202,11 +222,10 @@ function EventList({posts, onStatusChange, onRemoveFromList}: EventListProps) {
     // 상태별 차별화된 처리
     switch (newStatus) {
       case 'ACCEPTED':
-        // 승인: 사용자에게 알림 전송 후 목록에서 제거
-        await sendNotificationToUser(reservationId, newStatus, reservation.username);
+        // 승인: 목록에서 제거
         Alert.alert(
           '예약 승인 완료',
-          `${reservation.username}님의 예약이 승인되었습니다.\n예약자에게 알림이 전송되었습니다.`,
+          `${reservation.username}님의 예약이 승인되었습니다.`,
           [
             {
               text: '확인',
@@ -220,11 +239,10 @@ function EventList({posts, onStatusChange, onRemoveFromList}: EventListProps) {
         break;
 
       case 'REJECTED':
-        // 거절: 사용자에게 알림 전송 후 목록에서 제거
-        await sendNotificationToUser(reservationId, newStatus, reservation.username);
+        // 거절: 목록에서 제거
         Alert.alert(
           '예약 거절 완료',
-          `${reservation.username}님의 예약이 거절되었습니다.\n예약자에게 알림이 전송되었습니다.`,
+          `${reservation.username}님의 예약이 거절되었습니다.`,
           [
             {
               text: '확인',
@@ -238,11 +256,10 @@ function EventList({posts, onStatusChange, onRemoveFromList}: EventListProps) {
         break;
 
       case 'CANCELLED_BY_GUIDE':
-        // 가이드 취소: 사용자에게 알림 전송 후 목록에서 제거
-        await sendNotificationToUser(reservationId, newStatus, reservation.username);
+        // 가이드 취소: 목록에서 제거
         Alert.alert(
           '예약 취소 완료',
-          `${reservation.username}님의 예약이 취소되었습니다.\n예약자에게 알림이 전송되었습니다.`,
+          `${reservation.username}님의 예약이 취소되었습니다.`,
           [
             {
               text: '확인',
@@ -256,11 +273,10 @@ function EventList({posts, onStatusChange, onRemoveFromList}: EventListProps) {
         break;
 
       case 'COMPLETED':
-        // 완료: 사용자에게 알림 전송 후 목록에서 제거
-        await sendNotificationToUser(reservationId, newStatus, reservation.username);
+        // 완료: 목록에서 제거
         Alert.alert(
           '예약 완료',
-          `${reservation.username}님의 예약이 완료되었습니다.\n예약자에게 완료 알림이 전송되었습니다.`,
+          `${reservation.username}님의 예약이 완료되었습니다.`,
           [
             {
               text: '확인',
@@ -276,9 +292,10 @@ function EventList({posts, onStatusChange, onRemoveFromList}: EventListProps) {
       case 'PENDING':
       case 'CANCELLED_BY_USER':
         // 대기/사용자 취소: 단순 상태 변경만 (목록에 유지)
+        const statusText = await getStatusText(newStatus);
         Alert.alert(
           '상태 변경 완료',
-          `예약 상태가 "${getStatusText(newStatus)}"로 변경되었습니다.`,
+          `예약 상태가 "${statusText}"로 변경되었습니다.`,
         );
         onStatusChange?.(reservationId, newStatus);
         break;
@@ -304,8 +321,16 @@ function EventList({posts, onStatusChange, onRemoveFromList}: EventListProps) {
             />
             <View style={styles.infoContainer}>
               <Text style={styles.titleText}>{post.tourProgramTitle}</Text>
+              
+              {/* 사용자 역할 표시 */}
+              <View style={styles.roleContainer}>
+                <Text style={styles.roleText}>
+                  {userRole === 'GUIDE' ? '👨‍🏫 가이드 입장' : '👤 예약자 입장'}
+                </Text>
+              </View>
+              
               <View style={styles.detailRow}>
-                <Text style={styles.detailText}>예약자: {post.username}</Text>
+                
                 <Text style={styles.detailText}>
                   인원: {post.numOfPeople}명
                 </Text>
@@ -320,7 +345,7 @@ function EventList({posts, onStatusChange, onRemoveFromList}: EventListProps) {
               {/* 상태 텍스트 */}
               <View style={styles.statusContainer}>
                 <Text style={styles.statusText}>
-                  {getStatusText(post.requestStatus)}
+                  {statusTexts[`${post.id}-${post.requestStatus}`] || '로딩 중...'}
                 </Text>
               </View>
 
@@ -387,6 +412,19 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     marginBottom: 4,
+  },
+  roleContainer: {
+    marginBottom: 8,
+  },
+  roleText: {
+    fontSize: 12,
+    color: colors.BLUE_500,
+    fontWeight: '600',
+    backgroundColor: '#e3f2fd',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    alignSelf: 'flex-start',
   },
   detailRow: {
     flexDirection: 'row',

@@ -31,7 +31,7 @@ export type RootStackParamList = {
   MyPage: undefined;
   QuestionScreen: undefined;
   Result: {result: any};
-  MakeProgram: undefined;
+  Make_program: undefined;
   Practice: undefined;
 };
 
@@ -57,7 +57,7 @@ const AppNavigator = () => {
           options={{title: '테스트 결과'}}
         />
         <Stack.Screen
-          name="MakeProgram"
+          name="Make_program"
           component={Make_program}
           options={{title: '프로그램 작성하기'}}
         />

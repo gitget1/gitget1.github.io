@@ -51,6 +51,7 @@ type TourData = {
   guidePrice: number;
   tourProgramId: number;
   wishlisted: boolean;
+  pointPaid: boolean; // 포인트 결제 여부 추가
 };
 
 const Program_detail = () => {
@@ -184,7 +185,7 @@ const Program_detail = () => {
 
         console.log('🟢 서버 응답:', tourResponse.data);
 
-        if (tourResponse.data.status === 'OK') {
+        if (tourResponse.data.status === 'OK' || tourResponse.data.status === '100 CONTINUE') {
           const tourData = tourResponse.data.data;
 
           // schedules 데이터 구조 확인
@@ -214,16 +215,18 @@ const Program_detail = () => {
           });
           setIsLiked(tourData.wishlisted || false);
           
-          // 일정 해제 상태 설정
-          setScheduleUnlocked(isUnlocked);
-          setIsScheduleMasked(!isUnlocked);
+          // ✅ pointPaid 값에 따라 모자이크 상태 설정
+          const isPointPaid = tourData.pointPaid || false;
+          setScheduleUnlocked(isPointPaid);
+          setIsScheduleMasked(!isPointPaid);
 
           console.log('🟢 투어 데이터 로드 완료:', {
             tourProgramId: tourData.tourProgramId || tourData.id,
             wishlisted: tourData.wishlisted,
             wishlistCount: tourData.wishlistCount,
             schedulesCount: tourData.schedules?.length || 0,
-            scheduleUnlocked: isUnlocked,
+            pointPaid: isPointPaid,
+            scheduleUnlocked: isPointPaid,
           });
         } else {
           console.error('❌ 서버 응답 에러:', tourResponse.data);
@@ -1426,10 +1429,12 @@ const Program_detail = () => {
                 </Text>
               </TouchableOpacity>
 
-              {/* 삭제 버튼 일시 비활성화 */}
-              {/* <TouchableOpacity style={styles.deleteButton} onPress={handleDelete}>
-                <Text style={styles.deleteButtonText}>{getTranslatedUIText('삭제', selectedLanguage)}</Text>
-              </TouchableOpacity> */}
+              {/* 삭제 버튼 임시로 활성화 */}
+              <TouchableOpacity style={styles.deleteButton} onPress={handleDelete}>
+                <Text style={styles.deleteButtonText}>
+                  {getTranslatedUIText('삭제', selectedLanguage)}
+                </Text>
+              </TouchableOpacity>
             </View>
 
             <View style={styles.rightAlignRow}>
@@ -1511,7 +1516,7 @@ const Program_detail = () => {
                   </View>
                   <View style={styles.lockedCenterBox}>
                     {scheduleUnlocked ? (
-                      // 이미 해제된 상태
+                      // 이미 해제된 상태 (pointPaid: true)
                       <>
                         <Text style={styles.lockIcon}>🔓</Text>
                         <Text style={styles.lockedTitle}>
@@ -1522,11 +1527,11 @@ const Program_detail = () => {
                         </Text>
                       </>
                     ) : (
-                      // 잠금 상태
+                      // 잠금 상태 (pointPaid: false)
                       <>
                         <Text style={styles.lockIcon}>🔒</Text>
                         <Text style={styles.lockedTitle}>
-                          상세 일정은 예약 후 확인 가능합니다
+                          상세 일정은 포인트 결제 후 확인 가능합니다
                         </Text>
                         <Text style={styles.lockedSub}>
                           첫 번째 일정만 미리보기 가능

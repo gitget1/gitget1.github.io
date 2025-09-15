@@ -18,13 +18,19 @@ interface ReservationCalendarDTO {
   requestStatus: string;
 }
 
-// 세 가지 API 엔드포인트를 지원하는 함수들
+// 두 가지 API 엔드포인트를 지원하는 함수들
 const fetchMyReservations = async (
   start: string,
   end: string,
   token: string,
 ) => {
   console.log('📋 Fetching my reservations...');
+  console.log(
+    '📋 API URL: http://124.60.137.10:8083/api/calendar/my-reservations',
+  );
+  console.log('📋 Params:', {start, end});
+  console.log('📋 Token exists:', !!token);
+
   const response = await axios.get(
     'http://124.60.137.10:8083/api/calendar/my-reservations',
     {
@@ -36,6 +42,15 @@ const fetchMyReservations = async (
       timeout: 10000,
     },
   );
+
+  console.log('📋 Response status:', response.status);
+  console.log('📋 Response data:', response.data);
+  console.log('📋 Response data type:', typeof response.data);
+  console.log(
+    '📋 Response data length:',
+    Array.isArray(response.data) ? response.data.length : 'not array',
+  );
+
   return response.data || [];
 };
 
@@ -47,26 +62,6 @@ const fetchCalendarStatus = async (
   console.log('📅 Fetching calendar status...');
   const response = await axios.get(
     'http://124.60.137.10:8083/api/calendar/status',
-    {
-      params: {start, end},
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
-      timeout: 10000,
-    },
-  );
-  return response.data || [];
-};
-
-const fetchReceivedReservations = async (
-  start: string,
-  end: string,
-  token: string,
-) => {
-  console.log('📨 Fetching received reservations...');
-  const response = await axios.get(
-    'http://124.60.137.10:8083/api/calendar/received',
     {
       params: {start, end},
       headers: {
@@ -116,37 +111,22 @@ const fetchCalendarReservations = async (start: string, end: string) => {
       console.warn('⚠️ Continuing without calendar status');
     }
 
-    // 3. 가이드가 받은 예약 조회 (선택적)
-    let receivedReservations: ReservationCalendarDTO[] = [];
-    try {
-      receivedReservations = await fetchReceivedReservations(start, end, token);
-      console.log('✅ Received Reservations API Success!');
-      console.log('- Received reservations:', receivedReservations);
-      console.log(
-        '- Received reservations count:',
-        receivedReservations.length,
-      );
-    } catch (receivedError) {
-      console.error('❌ Received Reservations API failed:', receivedError);
-      if (axios.isAxiosError(receivedError)) {
-        console.error('- Received error code:', receivedError.response?.status);
-        console.error('- Received error data:', receivedError.response?.data);
-        console.error('- Received error message:', receivedError.message);
-      }
-      console.warn('⚠️ Continuing without received reservations');
-    }
-
     // 내 예약 내역을 기본으로 반환 (다른 API들은 로그만 출력)
     const combinedData = myReservations.map(reservation => ({
       id: reservation.id || 0,
       tourProgramTitle: reservation.tourProgramTitle || '',
       guideStartDate: reservation.guideStartDate || '',
       guideEndDate: reservation.guideEndDate || '',
-      username: '', // 서버에서 제공하지 않음
+      username: '예약자', // 서버에서 제공하지 않으므로 기본값 설정
       numOfPeople: reservation.numOfPeople || 0,
       requestStatus:
-        (reservation.requestStatus as 'ACCEPTED' | 'PENDING' | 'REJECTED') ||
-        'PENDING',
+        (reservation.requestStatus as
+          | 'ACCEPTED'
+          | 'PENDING'
+          | 'REJECTED'
+          | 'CANCELLED_BY_USER'
+          | 'CANCELLED_BY_GUIDE'
+          | 'COMPLETED') || 'PENDING',
     }));
 
     console.log('✅ Final combined data:', combinedData);
@@ -154,7 +134,6 @@ const fetchCalendarReservations = async (start: string, end: string) => {
     console.log('📊 API Summary:');
     console.log('- My reservations:', myReservations.length);
     console.log('- Calendar status:', calendarStatus.length);
-    console.log('- Received reservations:', receivedReservations.length);
 
     return combinedData || [];
   } catch (error) {
@@ -250,7 +229,25 @@ export function useGetMyReservations(start: string, end: string) {
         return [];
       }
       console.log('📅 선택된 날짜 API 요청:', {start, end});
-      return await fetchMyReservations(start, end, token);
+      const myReservations = await fetchMyReservations(start, end, token);
+
+      // API 응답을 표준 형식으로 변환
+      return myReservations.map(reservation => ({
+        id: reservation.id || 0,
+        tourProgramTitle: reservation.tourProgramTitle || '',
+        guideStartDate: reservation.guideStartDate || '',
+        guideEndDate: reservation.guideEndDate || '',
+        username: '예약자', // 서버에서 제공하지 않으므로 기본값 설정
+        numOfPeople: reservation.numOfPeople || 0,
+        requestStatus:
+          (reservation.requestStatus as
+            | 'ACCEPTED'
+            | 'PENDING'
+            | 'REJECTED'
+            | 'CANCELLED_BY_USER'
+            | 'CANCELLED_BY_GUIDE'
+            | 'COMPLETED') || 'PENDING',
+      }));
     },
     enabled: !!(start && end), // start와 end가 있을 때만 쿼리 실행
     refetchInterval: 50000000,
@@ -267,21 +264,6 @@ export function useGetCalendarStatus(start: string, end: string) {
       const token = await AsyncStorage.getItem('accessToken');
       if (!token) return [];
       return await fetchCalendarStatus(start, end, token);
-    },
-    refetchInterval: 50000000,
-    refetchOnWindowFocus: true,
-    staleTime: 0,
-  });
-}
-
-// 가이드가 받은 예약 조회 훅
-export function useGetReceivedReservations(start: string, end: string) {
-  return useQuery({
-    queryKey: ['receivedReservations', start, end],
-    queryFn: async () => {
-      const token = await AsyncStorage.getItem('accessToken');
-      if (!token) return [];
-      return await fetchReceivedReservations(start, end, token);
     },
     refetchInterval: 50000000,
     refetchOnWindowFocus: true,

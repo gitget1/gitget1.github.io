@@ -24,7 +24,7 @@ type RootStackParamList = {
   MyPage: undefined;
   QuestionScreen: undefined;
   Result: undefined;
-  MakeProgram: undefined;
+  Make_program: undefined;
   MyReviewList: undefined;
 };
 
@@ -161,7 +161,7 @@ const MainScreen = () => {
 
   // --- 네비게이션 ---
   const goToTest = () => navigation.navigate('QuestionScreen');
-  const goToMakeProgram = () => navigation.navigate('MakeProgram' as any);
+  const goToMakeProgram = () => navigation.navigate('Make_program' as any);
   const goToReview = () => navigation.navigate('MyReviewList');
 
   // --- 포인트 조회 ---

@@ -92,4 +92,36 @@ export class TourProgramController {
       message: '투어 프로그램이 삭제되었습니다.',
     };
   }
+
+  @Get(':id/unlock-status')
+  async getUnlockStatus(
+    @Param('id', ParseIntPipe) id: number,
+    @GetUser() user: User,
+  ) {
+    const unlockStatus = await this.tourProgramService.getUnlockStatus(
+      id,
+      user,
+    );
+
+    return {
+      status: 'OK',
+      message: '일정 해제 상태를 조회했습니다.',
+      data: unlockStatus,
+    };
+  }
+
+  @Post(':id/unlock')
+  async unlockSchedule(
+    @Param('id', ParseIntPipe) id: number,
+    @Body()
+    unlockData: { unlocked: boolean; unlockMethod: string; unlockCost: number },
+    @GetUser() user: User,
+  ) {
+    await this.tourProgramService.unlockSchedule(id, unlockData, user);
+
+    return {
+      status: 'OK',
+      message: '일정 해제 상태가 저장되었습니다.',
+    };
+  }
 }
