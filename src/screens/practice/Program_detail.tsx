@@ -1331,7 +1331,7 @@ const Program_detail = () => {
     return (
       <View style={{flex: 1, justifyContent: 'center', alignItems: 'center'}}>
         <ActivityIndicator size="large" />
-        <Text style={{marginTop: 10, color: '#666'}}>
+        <Text style={{marginTop: 10, color: '#228B22'}}>
           {getTranslatedUIText('로딩 중', selectedLanguage)}
         </Text>
       </View>
@@ -1596,7 +1596,7 @@ const Program_detail = () => {
                                 <Icon
                                   name="chevron-right"
                                   size={20}
-                                  color="#007AFF"
+                                  color="#228B22"
                                 />
                               </View>
                             </TouchableOpacity>

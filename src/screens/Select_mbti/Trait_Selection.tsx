@@ -1095,7 +1095,7 @@ const TraitDropdown = () => {
         console.log('🟢 MBTI 목록 응답:', res.data);
         setMbtiList(res.data.data);
       } catch (err) {
-        console.error('🔴 MBTI 리스트 로딩 실패:', err);
+        console.log('MBTI 목록 조회 실패:', err);
       }
     };
     fetchMbtiList();
@@ -1107,7 +1107,7 @@ const TraitDropdown = () => {
       try {
         const token = await AsyncStorage.getItem('accessToken');
         if (!token) {
-          console.error('🔴 토큰이 없습니다. 로그인이 필요합니다.');
+          console.log('토큰이 없습니다. 로그인이 필요합니다.');
           return;
         }
 
@@ -1202,24 +1202,10 @@ const TraitDropdown = () => {
           setPosts(prev => (isLoadMore ? [...prev, ...newPosts] : newPosts));
           setPage(currentPage);
         } else {
-          console.error('🔴 서버 응답 실패:', response.data);
+          console.log('서버 응답 실패:', response.data);
         }
       } catch (error) {
-        if (axios.isAxiosError(error)) {
-          console.error('🔴 투어 프로그램 목록 로딩 실패:', {
-            message: error.message,
-            response: error.response?.data,
-            status: error.response?.status,
-            config: {
-              url: error.config?.url,
-              method: error.config?.method,
-              headers: error.config?.headers,
-              params: error.config?.params,
-            },
-          });
-        } else {
-          console.error('🔴 투어 프로그램 목록 로딩 실패:', error);
-        }
+        console.log('투어 프로그램 목록 로딩 실패:', error);
       }
     },
     [page, size, selectedSort, selectedHashtags, selectedRegions],
@@ -1267,7 +1253,7 @@ const TraitDropdown = () => {
       setShowDropdown(false);
       setDisplayedPosts(10);
     } catch (err) {
-      console.error('🔴 MBTI 상세정보 로딩 실패:', err);
+      console.log('MBTI 상세정보 로딩 실패:', err);
     }
   };
 
@@ -1396,9 +1382,7 @@ const TraitDropdown = () => {
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
               <Text style={styles.emptyText}>
-                {selectedHashtags.length > 0 || selectedRegions.length > 0
-                  ? '선택한 조건에 맞는 게시물이 없습니다.'
-                  : '게시물이 없습니다.'}
+                데이터가 없습니다{'\n'}성향테스트에서 결과를 저장해보세요
               </Text>
             </View>
           }

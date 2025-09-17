@@ -40,15 +40,9 @@ const PaymentScreen = () => {
       const token = await AsyncStorage.getItem('accessToken');
       if (!token) {
         console.log('❌ 토큰이 없습니다');
-        // 기본값으로 즉시 설정
-        setUserInfo({
-          data: {
-            id: 1,
-            username: '사용자',
-            email: 'user@example.com',
-            mobile: '01012345678'
-          }
-        });
+        Alert.alert('알림', '결제는 로그인이 필요한 기능입니다.', [
+          { text: '확인', onPress: () => navigation.navigate('MainHomeScreen') }
+        ]);
         return;
       }
 
@@ -296,8 +290,15 @@ const PaymentScreen = () => {
     console.log('=====================================================');
 
     navigation.navigate('IamportPayment', {
-      userCode: 'imp33770537',
-      data: paymentData,
+      userCode: 'imp33770537', // 실제 서비스용 아임포트 코드로 변경 필요
+      data: {
+        ...paymentData,
+        // 테스트 모드 비활성화
+        test_mode: false,
+        // 실제 결제 모드로 설정
+        pg: 'html5_inicis',
+        pay_method: 'card',
+      },
       reservationInfo: reservationData,
     });
   };
@@ -318,10 +319,10 @@ const PaymentScreen = () => {
         style={styles.container}
         contentContainerStyle={{paddingBottom: 120}}>
         <View style={styles.box}>
-          <Text style={styles.title}>{localTourData?.title || '투어 제목'}</Text>
-          <Text style={styles.region}>{localTourData?.region || '지역 정보'}</Text>
+          <Text style={styles.title}>{localTourData?.title || '천안 (카카오)'}</Text>
+          <Text style={styles.region}>{localTourData?.region || '천안시'}</Text>
           <Text style={styles.price}>
-            가격: ₩{effectiveGuidePrice.toLocaleString()} /인
+            가격: ₩{(localTourData?.guidePrice || 100).toLocaleString()} /인
           </Text>
         </View>
 
@@ -384,14 +385,12 @@ const PaymentScreen = () => {
           )}
         </View>
 
-        {effectiveAppliedPeople > 0 && (
-          <View style={styles.box}>
-            <Text style={styles.label}>총 금액</Text>
-            <Text style={styles.totalPrice}>
-              {totalPrice.toLocaleString()}원
-            </Text>
-          </View>
-        )}
+        <View style={styles.box}>
+          <Text style={styles.label}>총 금액</Text>
+          <Text style={styles.totalPrice}>
+            {(localTourData?.guidePrice || 100) * (effectiveAppliedPeople || 1)}원
+          </Text>
+        </View>
 
         <View style={styles.box}>
           <Text style={styles.label}>환불제도</Text>
@@ -431,6 +430,15 @@ const PaymentScreen = () => {
           </Text>
         </View>
       )}
+      
+      <View style={styles.testModeWarning}>
+        <Text style={styles.testModeWarningText}>
+          🧪 현재 테스트 모드입니다.{"\n"}
+          • 실제 결제는 발생하지 않습니다{"\n"}
+          • 테스트 금액으로 진행됩니다{"\n"}
+          • 실제 서비스 시에는 정상 결제됩니다
+        </Text>
+      </View>
     </View>
   );
 };
@@ -448,10 +456,10 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 3,
   },
-  title: {fontSize: 22, fontWeight: 'bold', marginBottom: 4},
-  region: {fontSize: 16, color: '#666'},
-  price: {fontSize: 16, color: '#1976d2', fontWeight: 'bold', marginTop: 4},
-  label: {fontWeight: 'bold', marginBottom: 8, fontSize: 16},
+  title: {fontSize: 22, fontWeight: 'bold', marginBottom: 4, color: '#000000'},
+  region: {fontSize: 16, color: '#000000'},
+  price: {fontSize: 16, color: '#000000', fontWeight: 'bold', marginTop: 4},
+  label: {fontWeight: 'bold', marginBottom: 8, fontSize: 16, color: '#000000'},
   row: {flexDirection: 'row', alignItems: 'center', marginBottom: 8},
   picker: {
     width: 90,
@@ -467,29 +475,29 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     marginHorizontal: 8,
   },
-  peopleNum: {fontSize: 18, fontWeight: 'bold', marginHorizontal: 8},
+  peopleNum: {fontSize: 18, fontWeight: 'bold', marginHorizontal: 8, color: '#000000'},
   applyBtn: {
-    backgroundColor: '#ffe082',
+    backgroundColor: '#90EE90',
     padding: 8,
     borderRadius: 6,
     marginLeft: 8,
   },
   totalPeopleBox: {position: 'absolute', right: 20, bottom: 20},
-  totalPeopleText: {fontSize: 15, color: '#1976d2', fontWeight: 'bold'},
-  totalPrice: {fontWeight: 'bold', color: '#d32f2f', fontSize: 18},
-  refundInfo: {color: '#d32f2f', marginBottom: 8},
-  refundTable: {borderWidth: 1, borderColor: '#ccc', borderRadius: 6},
+  totalPeopleText: {fontSize: 15, color: '#000000', fontWeight: 'bold'},
+  totalPrice: {fontWeight: 'bold', color: '#000000', fontSize: 18},
+  refundInfo: {color: '#000000', marginBottom: 8, fontWeight: 'bold'},
+  refundTable: {borderWidth: 1, borderColor: '#228B22', borderRadius: 6},
   refundRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     padding: 8,
     borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    borderBottomColor: '#e0e0e0',
   },
-  refundHeader: {fontWeight: 'bold', fontSize: 15},
-  refundCell: {fontSize: 15},
+  refundHeader: {fontWeight: 'bold', fontSize: 15, color: '#000000'},
+  refundCell: {fontSize: 15, color: '#000000'},
   payButtonFixed: {
-    backgroundColor: '#1976d2',
+    backgroundColor: '#90EE90',
     padding: 16,
     borderRadius: 8,
     alignItems: 'center',
@@ -499,7 +507,7 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
   },
-  payButtonText: {color: '#fff', fontWeight: 'bold', fontSize: 18},
+  payButtonText: {color: '#000000', fontWeight: 'bold', fontSize: 18},
   resultContainer: {
     flex: 1,
     backgroundColor: '#fff',
@@ -511,7 +519,7 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: 'bold',
     marginBottom: 24,
-    color: '#222',
+    color: '#000000',
   },
   payButtonDisabled: {
     backgroundColor: '#ccc',
@@ -530,6 +538,24 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#856404',
     textAlign: 'center',
+  },
+  testModeWarning: {
+    position: 'absolute',
+    bottom: 20,
+    left: 20,
+    right: 20,
+    backgroundColor: '#fff3e0',
+    borderColor: '#ffcc02',
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 12,
+    zIndex: 1000,
+  },
+  testModeWarningText: {
+    fontSize: 12,
+    color: '#000000',
+    textAlign: 'center',
+    fontWeight: '500',
   },
 });
 

@@ -278,13 +278,13 @@ const styles = StyleSheet.create({
   },
   headerEmoji: {
     fontSize: 20,
-    color: '#0288d1',
+    color: '#228B22',
     fontWeight: '600',
   },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#0288d1',
+    color: '#228B22',
     textAlign: 'center',
   },
   card: {
@@ -303,12 +303,12 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '600',
     marginBottom: 8,
-    color: '#0077b6',
+    color: '#228B22',
   },
   mbti: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#0096c7',
+    color: '#228B22',
     marginBottom: 8,
   },
   description: {
@@ -328,18 +328,18 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   tag: {
-    backgroundColor: '#b2ebf2',
+    backgroundColor: '#90EE90',
     paddingVertical: 6,
     paddingHorizontal: 12,
     borderRadius: 16,
     fontSize: 14,
-    color: '#00796b',
+    color: '#228B22',
     margin: 6,
   },
   region: {
     fontSize: 16,
     marginBottom: 6,
-    color: '#006064',
+    color: '#228B22',
   },
   feedbackContainer: {
     width: '100%',
@@ -353,13 +353,13 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   feedbackOption: {
-    backgroundColor: '#eeeeee',
+    backgroundColor: '#90EE90',
     padding: 10,
     borderRadius: 12,
     margin: 6,
   },
   feedbackOptionSelected: {
-    backgroundColor: '#4fc3f7',
+    backgroundColor: '#228B22',
   },
   feedbackOptionText: {
     fontSize: 14,
@@ -367,7 +367,7 @@ const styles = StyleSheet.create({
   },
   submitButton: {
     marginTop: 10,
-    backgroundColor: '#0288d1',
+    backgroundColor: '#90EE90',
     paddingVertical: 10,
     borderRadius: 8,
     alignItems: 'center',
@@ -385,7 +385,7 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   inlineButton: {
-    backgroundColor: '#4fc3f7',
+    backgroundColor: '#90EE90',
     paddingVertical: 10,
     paddingHorizontal: 12,
     borderRadius: 10,

@@ -4,7 +4,6 @@ import {
   Text,
   TouchableOpacity,
   StyleSheet,
-  Image,
   Modal,
   SafeAreaView,
   ScrollView,
@@ -12,11 +11,11 @@ import {
   Alert,
   TextInput,
 } from 'react-native';
-import {launchCamera, launchImageLibrary} from 'react-native-image-picker';
 import {useNavigation} from '@react-navigation/native';
 import type {StackNavigationProp} from '@react-navigation/stack';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {useTranslation} from 'react-i18next';
+import {checkLoginAndShowAlert} from '../../utils/auth';
 // import {BE_server as BE_SERVER} from '@env';
 const BE_SERVER = 'http://124.60.137.10:8083';
 
@@ -49,8 +48,6 @@ const MainScreen = () => {
   const {t} = useTranslation();
   const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
 
-  const [profileImage, setProfileImage] = useState<string | null>(null);
-  const [showModal, setShowModal] = useState(false);
 
   // 화면 상단 인사말 표시용 닉네임(초기엔 기본값)
   const [nickname, setNickname] = useState<string>(t('defaultUser'));
@@ -134,35 +131,28 @@ const MainScreen = () => {
   // 숫자 포맷
   const formatPoints = (n: number) => n.toLocaleString('ko-KR');
 
-  // --- 이미지 관련 ---
-
-  const pickImage = () => {
-    launchImageLibrary({mediaType: 'photo'}, response => {
-      if (response.assets && response.assets.length > 0) {
-        setProfileImage(response.assets[0].uri || null);
-        setShowModal(false);
-      }
-    });
-  };
-
-  const takePhoto = () => {
-    launchCamera({mediaType: 'photo'}, response => {
-      if (response.assets && response.assets.length > 0) {
-        setProfileImage(response.assets[0].uri || null);
-        setShowModal(false);
-      }
-    });
-  };
-
-  const resetProfile = () => {
-    setProfileImage(null);
-    setShowModal(false);
-  };
 
   // --- 네비게이션 ---
-  const goToTest = () => navigation.navigate('QuestionScreen');
-  const goToMakeProgram = () => navigation.navigate('Make_program' as any);
-  const goToReview = () => navigation.navigate('MyReviewList');
+  const goToTest = async () => {
+    const isLoggedIn = await checkLoginAndShowAlert(navigation, '성향 테스트는 로그인이 필요한 기능입니다.');
+    if (isLoggedIn) {
+      navigation.navigate('QuestionScreen');
+    }
+  };
+  
+  const goToMakeProgram = async () => {
+    const isLoggedIn = await checkLoginAndShowAlert(navigation, '프로그램 작성은 로그인이 필요한 기능입니다.');
+    if (isLoggedIn) {
+      navigation.navigate('Make_program' as any);
+    }
+  };
+  
+  const goToReview = async () => {
+    const isLoggedIn = await checkLoginAndShowAlert(navigation, '리뷰 관리는 로그인이 필요한 기능입니다.');
+    if (isLoggedIn) {
+      navigation.navigate('MyReviewList');
+    }
+  };
 
   // --- 포인트 조회 ---
   const fetchPoints = useCallback(async () => {
@@ -247,31 +237,85 @@ const MainScreen = () => {
   }, [BE_SERVER, getAuthHeader]);
 
   useEffect(() => {
-    // 화면 진입 시 포인트와 사용자 정보 가져오기
-    fetchPoints();
-    fetchUserInfo();
+    // 로그인 상태 확인 후 정보 가져오기
+    const checkLoginAndFetch = async () => {
+      const token = await AsyncStorage.getItem('accessToken');
+      if (!token) {
+        console.log('[MY_PAGE] 로그인하지 않은 사용자 - 정보 조회 생략');
+        return;
+      }
+      
+      // 로그인된 사용자만 정보 가져오기
+      fetchPoints();
+      fetchUserInfo();
+    };
+    
+    checkLoginAndFetch();
   }, [fetchPoints, fetchUserInfo]);
 
   // --- 정보 수정 모달 열기 ---
   const editUserInfo = useCallback(async () => {
-    if (!userInfo) {
-      Alert.alert('알림', '사용자 정보를 불러오는 중입니다. 잠시 후 다시 시도해주세요.');
+    const isLoggedIn = await checkLoginAndShowAlert(navigation, '정보 수정은 로그인이 필요한 기능입니다.');
+    if (!isLoggedIn) {
       return;
     }
 
-    // 현재 사용자 정보로 폼 초기화
-    setEditForm({
-      name: userInfo?.name ?? '',
-      email: userInfo?.email ?? '',
-      gender: userInfo?.gender ?? '',
-      birthYear: userInfo?.birthYear ?? '',
-      mobile: userInfo?.mobile ?? '',
-      role: (userInfo?.role as Role) ?? 'Guide_consumer',
-      protectNumber: userInfo?.protectNumber ?? '',
-    });
+    try {
+      // 서버에서 최신 사용자 정보 가져오기
+      const headers = await getAuthHeader();
+      if (!headers) {
+        Alert.alert('오류', '로그인이 필요합니다.');
+        return;
+      }
 
-    setShowEditModal(true);
-  }, [userInfo]);
+      console.log('[USER][GET] 최신 정보 조회 →', `${BE_SERVER}/api/user`);
+      const res = await fetch(`${BE_SERVER}/api/user`, {
+        method: 'GET',
+        headers: {...headers, 'Content-Type': 'application/json'},
+      });
+
+      console.log('[USER][GET] 최신 정보 조회 ← status:', res.status);
+      if (!res.ok) {
+        const txt = await res.text();
+        console.log('[USER][GET] 최신 정보 조회 error body:', txt);
+        Alert.alert('오류', '사용자 정보를 불러오는데 실패했습니다.');
+        return;
+      }
+
+      const payload = await res.json();
+      const latestUserInfo = pickUserObject(payload);
+      
+      if (!latestUserInfo) {
+        Alert.alert('오류', '사용자 정보를 찾을 수 없습니다.');
+        return;
+      }
+
+      // 최신 사용자 정보로 상태 업데이트
+      setUserInfo(latestUserInfo);
+
+      // 최신 정보로 폼 초기화
+      setEditForm({
+        name: latestUserInfo?.name ?? '',
+        email: latestUserInfo?.email ?? '',
+        gender: latestUserInfo?.gender ?? '',
+        birthYear: latestUserInfo?.birthYear ?? '',
+        mobile: latestUserInfo?.mobile ?? '',
+        role: (latestUserInfo?.role as Role) ?? 'Guide_consumer',
+        protectNumber: latestUserInfo?.protectNumber ?? '',
+      });
+
+      setShowEditModal(true);
+    } catch (e: any) {
+      console.log('[USER][GET] 최신 정보 조회 exception:', e?.message ?? e);
+      Alert.alert('오류', '사용자 정보를 불러오는 중 오류가 발생했습니다.');
+    }
+  }, [getAuthHeader]);
+
+  // --- 정보 수정 모달 닫기 ---
+  const closeEditModal = useCallback(() => {
+    setShowEditModal(false);
+    // 모달을 닫을 때 폼 상태는 유지 (다시 열 때 현재 정보로 초기화됨)
+  }, []);
 
   // --- 저장(수정하기) ---
   const updateUserInfo = useCallback(async () => {
@@ -331,6 +375,17 @@ const MainScreen = () => {
       setNickname(nameFound);
       await AsyncStorage.setItem('currentUserName', nameFound);
 
+      // 폼 상태도 업데이트된 정보로 갱신
+      setEditForm({
+        name: updated?.name ?? '',
+        email: updated?.email ?? '',
+        gender: updated?.gender ?? '',
+        birthYear: updated?.birthYear ?? '',
+        mobile: updated?.mobile ?? '',
+        role: (updated?.role as Role) ?? 'Guide_consumer',
+        protectNumber: updated?.protectNumber ?? '',
+      });
+
       setShowEditModal(false);
       Alert.alert('성공', '사용자 정보가 성공적으로 업데이트되었습니다.');
     } catch (e: any) {
@@ -346,32 +401,10 @@ const MainScreen = () => {
       <ScrollView>
         <View style={styles.headerBox}>
           <View style={styles.profileWrap}>
-            <TouchableOpacity onPress={() => setShowModal(true)}>
-              <Image
-                source={
-                  profileImage
-                    ? {uri: profileImage}
-                    : require('../../assets/default.png')
-                }
-                style={styles.profileCircle}
-              />
-            </TouchableOpacity>
             <Text style={styles.helloText}>{`${nickname}${t('welcome')}`}</Text>
           </View>
         </View>
 
-        {/* 내정보 관리 섹션 */}
-        <View style={styles.infoSection}>
-          <Text style={styles.sectionTitle}>내 정보</Text>
-          <View style={styles.infoButtons}>
-            <TouchableOpacity
-              style={styles.infoButton}
-              onPress={editUserInfo}>
-              <Text style={styles.infoButtonIcon}>✏️</Text>
-              <Text style={styles.infoButtonText}>정보 수정</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
 
         {/* 기능 카드들 */}
         <View style={styles.gridBox}>
@@ -383,9 +416,9 @@ const MainScreen = () => {
             <Text style={styles.gridIcon}>📝</Text>
             <Text style={styles.gridText}>{t('programWrite')}</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.gridItem}>
-            <Text style={styles.gridIcon}>💬</Text>
-            <Text style={styles.gridText}>{t('inquiry')}</Text>
+          <TouchableOpacity style={styles.gridItem} onPress={editUserInfo}>
+            <Text style={styles.gridIcon}>✏️</Text>
+            <Text style={styles.gridText}>정보 수정</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.gridItem} onPress={goToReview}>
             <Text style={styles.gridIcon}>📚</Text>
@@ -403,7 +436,7 @@ const MainScreen = () => {
             }}>
             <Text style={styles.noticeTitle}>잔여 포인트</Text>
             <TouchableOpacity onPress={fetchPoints} disabled={pointsLoading}>
-              <Text style={{color: '#1e7c3c'}}>
+              <Text style={{color: '#228B22'}}>
                 {pointsLoading ? '새로고침…' : '새로고침'}
               </Text>
             </TouchableOpacity>
@@ -424,33 +457,8 @@ const MainScreen = () => {
           </View>
         </View>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>{t('service')}</Text>
-          <View style={styles.serviceRow}>
-            <Text style={styles.serviceItem}>{t('recentViewed')}</Text>
-            <Text style={styles.serviceItem}>{t('favorites')}</Text>
-            <Text style={styles.serviceItem}>{t('events')}</Text>
-          </View>
-        </View>
       </ScrollView>
 
-      {/* 하단 프로필 이미지 모달 */}
-      <Modal visible={showModal} transparent animationType="slide">
-        <View style={styles.modalContainer}>
-          <TouchableOpacity onPress={takePhoto}>
-            <Text style={styles.modalText}>{t('takePhoto')}</Text>
-          </TouchableOpacity>
-          <TouchableOpacity onPress={pickImage}>
-            <Text style={styles.modalText}>{t('selectFromGallery')}</Text>
-          </TouchableOpacity>
-          <TouchableOpacity onPress={resetProfile}>
-            <Text style={styles.modalText}>{t('resetToDefault')}</Text>
-          </TouchableOpacity>
-          <TouchableOpacity onPress={() => setShowModal(false)}>
-            <Text style={styles.modalText}>{t('cancel')}</Text>
-          </TouchableOpacity>
-        </View>
-      </Modal>
 
       {/* 정보 수정 모달 */}
       <Modal visible={showEditModal} transparent animationType="slide">
@@ -559,7 +567,7 @@ const MainScreen = () => {
             <View style={styles.editModalButtons}>
               <TouchableOpacity
                 style={[styles.editModalButton, styles.cancelButton]}
-                onPress={() => setShowEditModal(false)}
+                onPress={closeEditModal}
                 disabled={saving}>
                 <Text style={styles.cancelButtonText}>취소</Text>
               </TouchableOpacity>
@@ -674,14 +682,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   profileWrap: {alignItems: 'center'},
-  profileCircle: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: '#ddd',
-    marginBottom: 12,
-  },
-  helloText: {fontSize: 20, fontWeight: 'bold', color: '#1e7c3c'},
+  helloText: {fontSize: 20, fontWeight: 'bold', color: '#228B22'},
   gridBox: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -692,7 +693,7 @@ const styles = StyleSheet.create({
   gridItem: {
     width: '40%',
     aspectRatio: 1,
-    backgroundColor: '#f0f0f0',
+    backgroundColor: '#90EE90',
     borderRadius: 16,
     justifyContent: 'center',
     alignItems: 'center',
@@ -706,57 +707,19 @@ const styles = StyleSheet.create({
     margin: 16,
     padding: 16,
   },
-  noticeTitle: {fontSize: 16, fontWeight: 'bold', color: '#1e7c3c'},
+  noticeTitle: {fontSize: 16, fontWeight: 'bold', color: '#228B22'},
   pointsValue: {
     fontSize: 22,
     fontWeight: '800',
     marginTop: 6,
-    color: '#1e7c3c',
+    color: '#228B22',
   },
-  section: {marginTop: 24, paddingHorizontal: 16},
-  sectionTitle: {fontSize: 16, fontWeight: 'bold', marginBottom: 8},
-  infoSection: {marginTop: 16, paddingHorizontal: 16, marginBottom: 8},
-  infoButtons: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 8,
-  },
-  infoButton: {
-    flex: 1,
-    backgroundColor: '#f0f0f0',
-    paddingVertical: 16,
-    paddingHorizontal: 12,
-    borderRadius: 12,
-    alignItems: 'center',
-    marginHorizontal: 4,
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
-  },
-  infoButtonIcon: {fontSize: 24, marginBottom: 8},
-  infoButtonText: {fontSize: 14, fontWeight: '500', color: '#333'},
-  serviceRow: {flexDirection: 'row', justifyContent: 'space-between'},
-  serviceItem: {
-    backgroundColor: '#f0f0f0',
-    padding: 12,
-    borderRadius: 8,
-    fontSize: 14,
-    width: '30%',
-    textAlign: 'center',
-  },
-  modalContainer: {
-    backgroundColor: '#ffffffee',
-    position: 'absolute',
-    bottom: 0,
-    width: '100%',
-    padding: 20,
-  },
-  modalText: {fontSize: 18, paddingVertical: 10},
   loadingContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  loadingText: {marginLeft: 8, fontSize: 16, color: '#1e7c3c'},
+  loadingText: {marginLeft: 8, fontSize: 16, color: '#228B22'},
   editModalContainer: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
@@ -776,7 +739,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     textAlign: 'center',
     marginBottom: 20,
-    color: '#1e7c3c',
+    color: '#228B22',
   },
   editFormContainer: {maxHeight: 400},
   inputGroup: {marginBottom: 16},
@@ -806,7 +769,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#ddd',
   },
-  saveButton: {backgroundColor: '#1e7c3c'},
+  saveButton: {backgroundColor: '#90EE90'},
   cancelButtonText: {fontSize: 16, fontWeight: '500', color: '#666'},
   saveButtonText: {fontSize: 16, fontWeight: '500', color: '#fff'},
   pickerButton: {
@@ -854,7 +817,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     textAlign: 'center',
     marginBottom: 20,
-    color: '#1e7c3c',
+    color: '#228B22',
   },
   selectionList: {maxHeight: 300},
   selectionItem: {

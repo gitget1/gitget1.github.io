@@ -27,9 +27,10 @@ interface Reservation {
   tourProgramTitle: string;
   guideStartDate: string;
   guideEndDate: string;
-  username: string;
   numOfPeople: number;
   requestStatus: RequestStatus;
+  role: string; // "GUIDE" or "USER"
+  counterpartName: string;
 }
 
 interface EventListProps {
@@ -68,60 +69,14 @@ const getStatusColor = (status: RequestStatus) => {
   }
 };
 
-// ✅ 사용자 역할 확인 함수
-const getUserRole = async () => {
-  try {
-    // 여러 방법으로 사용자 정보 확인
-    const userInfo = await AsyncStorage.getItem('userInfo');
-    const userData = await AsyncStorage.getItem('userData');
-    const user = await AsyncStorage.getItem('user');
-    
-    console.log('🔍 사용자 정보 확인:', {
-      userInfo,
-      userData,
-      user
-    });
-    
-    // userInfo에서 role 확인
-    if (userInfo) {
-      const parsed = JSON.parse(userInfo);
-      console.log('📋 userInfo parsed:', parsed);
-      if (parsed.role) {
-        return parsed.role;
-      }
-    }
-    
-    // userData에서 role 확인
-    if (userData) {
-      const parsed = JSON.parse(userData);
-      console.log('📋 userData parsed:', parsed);
-      if (parsed.role) {
-        return parsed.role;
-      }
-    }
-    
-    // user에서 role 확인
-    if (user) {
-      const parsed = JSON.parse(user);
-      console.log('📋 user parsed:', parsed);
-      if (parsed.role) {
-        return parsed.role;
-      }
-    }
-    
-    // 기본값: 예약 데이터를 보고 판단
-    console.log('⚠️ 명시적인 역할 정보가 없음, 기본값 USER 사용');
-    return 'USER';
-  } catch (error) {
-    console.log('사용자 역할 확인 실패:', error);
-    return 'USER';
-  }
+// ✅ 예약 데이터에서 역할 확인 함수 (새로운 DTO 구조 사용)
+const getUserRoleFromReservation = (reservation: Reservation) => {
+  return reservation.role || 'USER';
 };
 
 // ✅ 상태별 한글 텍스트 (역할 포함)
-const getStatusText = async (status: RequestStatus) => {
-  const userRole = await getUserRole();
-  const isGuide = userRole === 'GUIDE';
+const getStatusText = (status: RequestStatus, role: string) => {
+  const isGuide = role === 'GUIDE';
   
   switch (status) {
     case 'ACCEPTED':
@@ -182,24 +137,15 @@ async function patchReservationStatus(
 
 function EventList({posts, onStatusChange, onRemoveFromList}: EventListProps) {
   const [statusTexts, setStatusTexts] = React.useState<{[key: string]: string}>({});
-  const [userRole, setUserRole] = React.useState<string>('');
 
-  // 사용자 역할과 상태 텍스트를 미리 로드
+  // 상태 텍스트를 미리 로드
   React.useEffect(() => {
-    const loadData = async () => {
-      // 사용자 역할 로드
-      const role = await getUserRole();
-      setUserRole(role);
-      
-      // 상태 텍스트 로드
-      const texts: {[key: string]: string} = {};
-      for (const post of posts) {
-        const text = await getStatusText(post.requestStatus);
-        texts[`${post.id}-${post.requestStatus}`] = text;
-      }
-      setStatusTexts(texts);
-    };
-    loadData();
+    const texts: {[key: string]: string} = {};
+    for (const post of posts) {
+      const text = getStatusText(post.requestStatus, post.role);
+      texts[`${post.id}-${post.requestStatus}`] = text;
+    }
+    setStatusTexts(texts);
   }, [posts]);
 
   const handlePress = async (
@@ -225,7 +171,7 @@ function EventList({posts, onStatusChange, onRemoveFromList}: EventListProps) {
         // 승인: 목록에서 제거
         Alert.alert(
           '예약 승인 완료',
-          `${reservation.username}님의 예약이 승인되었습니다.`,
+          `${reservation.counterpartName}님의 예약이 승인되었습니다.`,
           [
             {
               text: '확인',
@@ -242,7 +188,7 @@ function EventList({posts, onStatusChange, onRemoveFromList}: EventListProps) {
         // 거절: 목록에서 제거
         Alert.alert(
           '예약 거절 완료',
-          `${reservation.username}님의 예약이 거절되었습니다.`,
+          `${reservation.counterpartName}님의 예약이 거절되었습니다.`,
           [
             {
               text: '확인',
@@ -259,7 +205,7 @@ function EventList({posts, onStatusChange, onRemoveFromList}: EventListProps) {
         // 가이드 취소: 목록에서 제거
         Alert.alert(
           '예약 취소 완료',
-          `${reservation.username}님의 예약이 취소되었습니다.`,
+          `${reservation.counterpartName}님의 예약이 취소되었습니다.`,
           [
             {
               text: '확인',
@@ -276,7 +222,7 @@ function EventList({posts, onStatusChange, onRemoveFromList}: EventListProps) {
         // 완료: 목록에서 제거
         Alert.alert(
           '예약 완료',
-          `${reservation.username}님의 예약이 완료되었습니다.`,
+          `${reservation.counterpartName}님의 예약이 완료되었습니다.`,
           [
             {
               text: '확인',
@@ -292,7 +238,7 @@ function EventList({posts, onStatusChange, onRemoveFromList}: EventListProps) {
       case 'PENDING':
       case 'CANCELLED_BY_USER':
         // 대기/사용자 취소: 단순 상태 변경만 (목록에 유지)
-        const statusText = await getStatusText(newStatus);
+        const statusText = getStatusText(newStatus, reservation.role);
         Alert.alert(
           '상태 변경 완료',
           `예약 상태가 "${statusText}"로 변경되었습니다.`,
@@ -325,12 +271,14 @@ function EventList({posts, onStatusChange, onRemoveFromList}: EventListProps) {
               {/* 사용자 역할 표시 */}
               <View style={styles.roleContainer}>
                 <Text style={styles.roleText}>
-                  {userRole === 'GUIDE' ? '👨‍🏫 가이드 입장' : '👤 예약자 입장'}
+                  {post.role === 'GUIDE' ? '👨‍🏫 가이드 입장' : '👤 예약자 입장'}
                 </Text>
               </View>
               
               <View style={styles.detailRow}>
-                
+                <Text style={styles.detailText}>
+                  상대방: {post.counterpartName}
+                </Text>
                 <Text style={styles.detailText}>
                   인원: {post.numOfPeople}명
                 </Text>

@@ -116,6 +116,40 @@ export class TourProgramService {
     });
   }
 
+  async getTourPrograms(filters: {
+    mbti?: string;
+    hashtags?: string;
+    regions?: string;
+  }): Promise<TourProgram[]> {
+    const queryBuilder = this.tourProgramRepository
+      .createQueryBuilder('tourProgram')
+      .leftJoinAndSelect('tourProgram.schedules', 'schedules')
+      .leftJoinAndSelect('tourProgram.user', 'user');
+
+    // 해시태그 필터 (배열에서 포함 검색)
+    if (filters.hashtags) {
+      const hashtagArray = filters.hashtags.split(',').map((tag) => tag.trim());
+      queryBuilder.andWhere('tourProgram.hashtags && :hashtags', {
+        hashtags: hashtagArray,
+      });
+    }
+
+    // 지역 필터
+    if (filters.regions) {
+      const regionArray = filters.regions
+        .split(',')
+        .map((region) => region.trim());
+      queryBuilder.andWhere('tourProgram.region IN (:...regions)', {
+        regions: regionArray,
+      });
+    }
+
+    // MBTI 필터는 현재 User 엔티티에 mbti 필드가 없으므로 임시로 제외
+    // TODO: User 엔티티에 mbti 필드 추가 후 구현
+
+    return queryBuilder.orderBy('tourProgram.createdAt', 'DESC').getMany();
+  }
+
   async deleteTourProgram(id: number, user: User): Promise<void> {
     const tourProgram = await this.tourProgramRepository.findOne({
       where: { id },

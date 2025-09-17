@@ -9,6 +9,7 @@ import {
   UseGuards,
   ValidationPipe,
   ParseIntPipe,
+  Query,
 } from '@nestjs/common';
 import { TourProgramService } from './tour-program.service';
 import { SaveTourProgramRequestDto } from './dto/save-tour-program-request.dto';
@@ -69,13 +70,21 @@ export class TourProgramController {
   }
 
   @Get()
-  async getUserTourPrograms(@GetUser() user: User) {
-    const tourPrograms =
-      await this.tourProgramService.getUserTourPrograms(user);
+  async getTourPrograms(
+    @GetUser() user: User,
+    @Query('mbti') mbti?: string,
+    @Query('hashtags') hashtags?: string,
+    @Query('regions') regions?: string,
+  ) {
+    const tourPrograms = await this.tourProgramService.getTourPrograms({
+      mbti,
+      hashtags,
+      regions,
+    });
 
     return {
       status: 'OK',
-      message: '사용자의 투어 프로그램 목록을 조회했습니다.',
+      message: '투어 프로그램 목록을 조회했습니다.',
       data: tourPrograms,
     };
   }

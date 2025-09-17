@@ -13,6 +13,7 @@ import {
   Modal,
   Platform,
   FlatList,
+  PermissionsAndroid,
 } from 'react-native';
 import {launchImageLibrary} from 'react-native-image-picker';
 import MapView, {
@@ -50,7 +51,9 @@ interface GeolocationPosition {
   coords: {
     latitude: number;
     longitude: number;
+    accuracy: number;
   };
+  timestamp: number;
 }
 
 interface GeolocationError {
@@ -162,7 +165,7 @@ function Make_program() {
   const [plan, setPlan] = useState<DayPlan>({
     place: '',
     memo: '',
-    travelTime: 0,
+    travelTime: undefined,
   });
   const [regionInput, setRegionInput] = useState('');
   const [guidePrice, setGuidePrice] = useState('');
@@ -193,6 +196,8 @@ function Make_program() {
     dayIdx: number;
     planIdx: number;
   } | null>(null);
+  const [isAnimating, setIsAnimating] = useState(false); // 지도 애니메이션 중인지 확인
+  const [watchId, setWatchId] = useState<number | null>(null); // 위치 감시 ID
 
   useEffect(() => {
     if (editData) {
@@ -251,14 +256,54 @@ function Make_program() {
         });
       }
     } else {
-      // 편집 모드가 아닐 때만 현재 위치 가져오기
-      getCurrentLocation();
+      // 편집 모드가 아닐 때만 현재 위치 가져오기 (메시지 없이)
+      getCurrentLocationSilently();
     }
   }, [editData]);
 
-  // 현재 위치 가져오기 함수
-  const getCurrentLocation = () => {
+  // 컴포넌트 언마운트 시 위치 감시 정리
+  useEffect(() => {
+    return () => {
+      if (watchId !== null) {
+        Geolocation.clearWatch(watchId);
+        console.log('📍 위치 감시 정리됨');
+      }
+    };
+  }, [watchId]);
+
+  // 위치 권한 요청 (Android)
+  const requestLocationPermission = async () => {
+    if (Platform.OS === 'android') {
+      try {
+        const granted = await PermissionsAndroid.request(
+          PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+          {
+            title: '위치 권한 요청',
+            message: '현재 위치를 표시하기 위해 위치 권한이 필요합니다.',
+            buttonNeutral: '나중에',
+            buttonNegative: '취소',
+            buttonPositive: '확인',
+          },
+        );
+        return granted === PermissionsAndroid.RESULTS.GRANTED;
+      } catch (err) {
+        console.warn(err);
+        return false;
+      }
+    }
+    return true; // iOS는 자동으로 권한 요청
+  };
+
+  // 현재 위치 가져오기 함수 (메시지 없이, 페이지 진입 시 사용)
+  const getCurrentLocationSilently = async () => {
     setLocationLoading(true);
+
+    // 위치 권한 확인
+    const hasPermission = await requestLocationPermission();
+    if (!hasPermission) {
+      setLocationLoading(false);
+      return;
+    }
 
     // 개발 모드에서 에뮬레이터 감지 (실제 기기에서는 이 조건이 false)
     const isEmulator = __DEV__ && Platform.OS === 'android';
@@ -268,8 +313,8 @@ function Make_program() {
       const soonchunhyangLocation = {
         latitude: 36.7994,
         longitude: 126.9306,
-        latitudeDelta: 0.0922,
-        longitudeDelta: 0.0421,
+        latitudeDelta: 0.01,
+        longitudeDelta: 0.01,
       };
       setRegion(soonchunhyangLocation);
       setCurrentLocation({
@@ -278,67 +323,363 @@ function Make_program() {
       });
 
       if (mapRef.current) {
+        setIsAnimating(true);
         mapRef.current.animateToRegion(soonchunhyangLocation, 1000);
+        setTimeout(() => setIsAnimating(false), 1200);
       }
 
       setLocationLoading(false);
       return;
     }
 
-    Geolocation.getCurrentPosition(
-      (position: GeolocationPosition) => {
-        const newRegion = {
-          latitude: position.coords.latitude,
-          longitude: position.coords.longitude,
-          latitudeDelta: 0.0922,
-          longitudeDelta: 0.0421,
-        };
-        setRegion(newRegion);
-        setCurrentLocation({
-          latitude: position.coords.latitude,
-          longitude: position.coords.longitude,
-        });
+    // 더 정확한 위치를 위해 여러 번 시도
+    let bestPosition: GeolocationPosition | null = null;
+    let attempts = 0;
+    const maxAttempts = 2; // 페이지 진입 시에는 2번만 시도
 
-        // 지도를 현재 위치로 이동
-        if (mapRef.current) {
-          mapRef.current.animateToRegion(newRegion, 1000);
-        }
+    const tryGetLocation = (): Promise<GeolocationPosition> => {
+      return new Promise((resolve, reject) => {
+        Geolocation.getCurrentPosition(
+          (position: GeolocationPosition) => {
+            console.log(`📍 GPS 시도 ${attempts + 1} (조용히):`, {
+              latitude: position.coords.latitude,
+              longitude: position.coords.longitude,
+              accuracy: position.coords.accuracy,
+            });
 
-        setLocationLoading(false);
-        Alert.alert('위치 확인', '현재 위치로 이동했습니다.');
-      },
-      (error: GeolocationError) => {
-        setLocationLoading(false);
-        console.error('위치 오류:', error);
+            // 정확도가 더 좋은 위치를 선택
+            if (!bestPosition || position.coords.accuracy < bestPosition.coords.accuracy) {
+              bestPosition = position;
+            }
 
-        // 에러 발생 시 기본 위치로 설정
-        const defaultLocation = {
-          latitude: 36.7994,
-          longitude: 126.9306,
-          latitudeDelta: 0.0922,
-          longitudeDelta: 0.0421,
-        };
-        setRegion(defaultLocation);
-        setCurrentLocation({
-          latitude: 36.7994,
-          longitude: 126.9306,
-        });
-
-        if (mapRef.current) {
-          mapRef.current.animateToRegion(defaultLocation, 1000);
-        }
-
-        Alert.alert(
-          '위치 오류',
-          `현재 위치를 가져올 수 없어 기본 위치(순천향대학교)로 설정합니다.\n\n실제 기기에서 테스트해주세요.`,
+            // 정확도가 20m 이하이거나 최대 시도 횟수에 도달하면 완료
+            if (position.coords.accuracy <= 20 || attempts >= maxAttempts - 1) {
+              resolve(bestPosition!);
+            } else {
+              attempts++;
+              // 1초 후 다시 시도
+              setTimeout(() => {
+                tryGetLocation().then(resolve).catch(reject);
+              }, 1000);
+            }
+          },
+          (error: GeolocationError) => {
+            console.error(`위치 오류 (시도 ${attempts + 1}):`, error);
+            attempts++;
+            
+            if (attempts >= maxAttempts) {
+              reject(error);
+            } else {
+              // 1초 후 다시 시도
+              setTimeout(() => {
+                tryGetLocation().then(resolve).catch(reject);
+              }, 1000);
+            }
+          },
+          {
+            enableHighAccuracy: true,
+            timeout: 10000, // 각 시도마다 10초 타임아웃
+            maximumAge: 0, // 캐시된 위치 사용하지 않음
+            distanceFilter: 0, // 거리 필터 없음
+          },
         );
-      },
-      {
-        enableHighAccuracy: true,
-        timeout: 15000,
-        maximumAge: 10000,
-      },
-    );
+      });
+    };
+
+    try {
+      const position = await tryGetLocation();
+      
+      console.log('📍 최종 GPS 위치 (조용히):', {
+        latitude: position.coords.latitude,
+        longitude: position.coords.longitude,
+        accuracy: position.coords.accuracy,
+      });
+
+      const newRegion = {
+        latitude: position.coords.latitude,
+        longitude: position.coords.longitude,
+        latitudeDelta: 0.01, // 기본 줌 레벨
+        longitudeDelta: 0.01,
+      };
+      setRegion(newRegion);
+      setCurrentLocation({
+        latitude: position.coords.latitude,
+        longitude: position.coords.longitude,
+      });
+
+      // 지도를 현재 위치로 이동
+      if (mapRef.current) {
+        setIsAnimating(true);
+        mapRef.current.animateToRegion(newRegion, 1000);
+        setTimeout(() => setIsAnimating(false), 1200);
+      }
+
+      setLocationLoading(false);
+      
+    } catch (error: any) {
+      setLocationLoading(false);
+      console.error('최종 위치 오류 (조용히):', error);
+
+      // 에러 발생 시 기본 위치로 설정
+      const defaultLocation = {
+        latitude: 36.7994,
+        longitude: 126.9306,
+        latitudeDelta: 0.01,
+        longitudeDelta: 0.01,
+      };
+      setRegion(defaultLocation);
+      setCurrentLocation({
+        latitude: 36.7994,
+        longitude: 126.9306,
+      });
+
+      if (mapRef.current) {
+        setIsAnimating(true);
+        mapRef.current.animateToRegion(defaultLocation, 1000);
+        setTimeout(() => setIsAnimating(false), 1200);
+      }
+    }
+  };
+
+  // 현재 위치 가져오기 함수 (더 정확한 GPS 설정, 버튼 클릭 시 사용)
+  const getCurrentLocation = async () => {
+    setLocationLoading(true);
+
+    // 위치 권한 확인
+    const hasPermission = await requestLocationPermission();
+    if (!hasPermission) {
+      setLocationLoading(false);
+      Alert.alert('권한 필요', '위치 권한이 필요합니다. 설정에서 위치 권한을 허용해주세요.');
+      return;
+    }
+
+    // 개발 모드에서 에뮬레이터 감지 (실제 기기에서는 이 조건이 false)
+    const isEmulator = __DEV__ && Platform.OS === 'android';
+
+    if (isEmulator) {
+      // 에뮬레이터에서는 순천향대학교 위치로 설정
+      const soonchunhyangLocation = {
+        latitude: 36.7994,
+        longitude: 126.9306,
+        latitudeDelta: 0.01,
+        longitudeDelta: 0.01,
+      };
+      setRegion(soonchunhyangLocation);
+      setCurrentLocation({
+        latitude: 36.7994,
+        longitude: 126.9306,
+      });
+
+      if (mapRef.current) {
+        setIsAnimating(true);
+        mapRef.current.animateToRegion(soonchunhyangLocation, 1000);
+        setTimeout(() => setIsAnimating(false), 1200);
+      }
+
+      setLocationLoading(false);
+      Alert.alert('위치 확인', '현재 위치로 이동했습니다.');
+      return;
+    }
+
+    // 더 정확한 위치를 위해 여러 번 시도
+    let bestPosition: GeolocationPosition | null = null;
+    let attempts = 0;
+    const maxAttempts = 3;
+
+    const tryGetLocation = (): Promise<GeolocationPosition> => {
+      return new Promise((resolve, reject) => {
+        Geolocation.getCurrentPosition(
+          (position: GeolocationPosition) => {
+            console.log(`📍 GPS 시도 ${attempts + 1}:`, {
+              latitude: position.coords.latitude,
+              longitude: position.coords.longitude,
+              accuracy: position.coords.accuracy,
+              timestamp: new Date(position.timestamp).toLocaleString(),
+            });
+
+            // 정확도가 더 좋은 위치를 선택
+            if (!bestPosition || position.coords.accuracy < bestPosition.coords.accuracy) {
+              bestPosition = position;
+            }
+
+            // 정확도가 10m 이하이거나 최대 시도 횟수에 도달하면 완료
+            if (position.coords.accuracy <= 10 || attempts >= maxAttempts - 1) {
+              resolve(bestPosition!);
+            } else {
+              attempts++;
+              // 2초 후 다시 시도
+              setTimeout(() => {
+                tryGetLocation().then(resolve).catch(reject);
+              }, 2000);
+            }
+          },
+          (error: GeolocationError) => {
+            console.error(`위치 오류 (시도 ${attempts + 1}):`, error);
+            attempts++;
+            
+            if (attempts >= maxAttempts) {
+              reject(error);
+            } else {
+              // 2초 후 다시 시도
+              setTimeout(() => {
+                tryGetLocation().then(resolve).catch(reject);
+              }, 2000);
+            }
+          },
+          {
+            enableHighAccuracy: true,
+            timeout: 15000, // 각 시도마다 15초 타임아웃
+            maximumAge: 0, // 캐시된 위치 사용하지 않음
+            distanceFilter: 0, // 거리 필터 없음
+          },
+        );
+      });
+    };
+
+    try {
+      const position = await tryGetLocation();
+      
+      console.log('📍 최종 GPS 위치:', {
+        latitude: position.coords.latitude,
+        longitude: position.coords.longitude,
+        accuracy: position.coords.accuracy,
+        timestamp: new Date(position.timestamp).toLocaleString(),
+      });
+
+      const newRegion = {
+        latitude: position.coords.latitude,
+        longitude: position.coords.longitude,
+        latitudeDelta: 0.005, // 더 가까운 줌 레벨
+        longitudeDelta: 0.005,
+      };
+      setRegion(newRegion);
+      setCurrentLocation({
+        latitude: position.coords.latitude,
+        longitude: position.coords.longitude,
+      });
+
+      // 지도를 현재 위치로 이동
+      if (mapRef.current) {
+        setIsAnimating(true);
+        mapRef.current.animateToRegion(newRegion, 1000);
+        setTimeout(() => setIsAnimating(false), 1200);
+      }
+
+      // 정확도가 낮으면 위치 감시 시작
+      if (position.coords.accuracy > 10) {
+        console.log('📍 정확도가 낮아 위치 감시를 시작합니다...');
+        
+        // 기존 감시 중지
+        if (watchId !== null) {
+          Geolocation.clearWatch(watchId);
+        }
+
+        const newWatchId = Geolocation.watchPosition(
+          (watchedPosition: GeolocationPosition) => {
+            console.log('📍 위치 감시 업데이트:', {
+              latitude: watchedPosition.coords.latitude,
+              longitude: watchedPosition.coords.longitude,
+              accuracy: watchedPosition.coords.accuracy,
+            });
+
+            // 정확도가 개선되면 위치 업데이트
+            if (watchedPosition.coords.accuracy < position.coords.accuracy) {
+              const updatedRegion = {
+                latitude: watchedPosition.coords.latitude,
+                longitude: watchedPosition.coords.longitude,
+                latitudeDelta: 0.005,
+                longitudeDelta: 0.005,
+              };
+              setRegion(updatedRegion);
+              setCurrentLocation({
+                latitude: watchedPosition.coords.latitude,
+                longitude: watchedPosition.coords.longitude,
+              });
+
+              if (mapRef.current) {
+                setIsAnimating(true);
+                mapRef.current.animateToRegion(updatedRegion, 1000);
+                setTimeout(() => setIsAnimating(false), 1200);
+              }
+
+              // 정확도가 충분히 좋아지면 감시 중지
+              if (watchedPosition.coords.accuracy <= 5) {
+                Geolocation.clearWatch(newWatchId);
+                setWatchId(null);
+                console.log('📍 위치 감시 중지 (정확도 충분)');
+              }
+            }
+          },
+          (error: GeolocationError) => {
+            console.error('위치 감시 오류:', error);
+          },
+          {
+            enableHighAccuracy: true,
+            timeout: 10000,
+            maximumAge: 1000, // 1초마다 업데이트
+            distanceFilter: 1, // 1미터 이상 이동시에만 업데이트
+          }
+        );
+
+        setWatchId(newWatchId);
+        
+        // 30초 후 자동으로 감시 중지
+        setTimeout(() => {
+          if (newWatchId !== null) {
+            Geolocation.clearWatch(newWatchId);
+            setWatchId(null);
+            console.log('📍 위치 감시 자동 중지 (30초 경과)');
+          }
+        }, 30000);
+      }
+
+      setLocationLoading(false);
+      
+      // 정확도에 따른 메시지
+      let accuracyMessage = '';
+      if (position.coords.accuracy <= 5) {
+        accuracyMessage = '매우 정확한 위치입니다';
+      } else if (position.coords.accuracy <= 10) {
+        accuracyMessage = '정확한 위치입니다';
+      } else if (position.coords.accuracy <= 20) {
+        accuracyMessage = '적당한 정확도입니다. 위치를 더 정확하게 조정 중...';
+      } else {
+        accuracyMessage = '정확도가 낮습니다. 실외에서 다시 시도해보세요';
+      }
+
+      Alert.alert(
+        '위치 확인', 
+        `${accuracyMessage}\n정확도: ${Math.round(position.coords.accuracy)}m`
+      );
+      
+    } catch (error: any) {
+      setLocationLoading(false);
+      console.error('최종 위치 오류:', error);
+
+      // 에러 발생 시 기본 위치로 설정
+      const defaultLocation = {
+        latitude: 36.7994,
+        longitude: 126.9306,
+        latitudeDelta: 0.01,
+        longitudeDelta: 0.01,
+      };
+      setRegion(defaultLocation);
+      setCurrentLocation({
+        latitude: 36.7994,
+        longitude: 126.9306,
+      });
+
+      if (mapRef.current) {
+        setIsAnimating(true);
+        mapRef.current.animateToRegion(defaultLocation, 1000);
+        setTimeout(() => setIsAnimating(false), 1200);
+      }
+
+      Alert.alert(
+        '위치 오류',
+        `현재 위치를 가져올 수 없습니다.\n\n오류: ${error.message}\n\n기본 위치로 이동합니다.\n\n실외에서 다시 시도해보세요.`,
+      );
+    }
   };
 
   // 썸네일(사진) 추가
@@ -439,7 +780,9 @@ function Make_program() {
     }
     
     setDays(newDays);
-    setPlan({place: '', memo: '', travelTime: 0});
+    
+    
+    setPlan({place: '', memo: '', travelTime: undefined});
   };
 
   // Day별 일정 삭제
@@ -456,7 +799,7 @@ function Make_program() {
     setPlan({
       place: planToEdit.place,
       memo: planToEdit.memo,
-      travelTime: planToEdit.travelTime || 0,
+      travelTime: planToEdit.travelTime || undefined,
       coordinate: planToEdit.coordinate,
       googlePlaceId: planToEdit.googlePlaceId,
     });
@@ -1023,27 +1366,23 @@ function Make_program() {
         <View style={styles.regionModalOverlay}>
           <View style={styles.regionModalCard}>
             <Text style={styles.regionModalTitle}>충청남도 지역 선택</Text>
-            <FlatList
-              data={CHUNGNAM_REGIONS}
-              keyExtractor={item => item.name}
-              renderItem={({item}) => (
+            <ScrollView contentContainerStyle={styles.regionGrid}>
+              {CHUNGNAM_REGIONS.map(regionItem => (
                 <TouchableOpacity
-                  style={styles.regionItem}
-                  onPress={() =>
-                    handleSelectRegion(item.name, item.latitude, item.longitude)
-                  }>
-                  <Text style={styles.regionItemText}>{item.name}</Text>
+                  key={regionItem.name}
+                  style={styles.regionChip}
+                  onPress={() => handleSelectRegion(regionItem.name, regionItem.latitude, regionItem.longitude)}
+                >
+                  <Text style={styles.regionChipText}>📍 {regionItem.name}</Text>
                 </TouchableOpacity>
-              )}
-              ItemSeparatorComponent={() => (
-                <View style={styles.regionDivider} />
-              )}
-            />
-            <View style={{height: 8}} />
-            <Button
-              title="닫기"
-              onPress={() => setRegionSelectVisible(false)}
-            />
+              ))}
+            </ScrollView>
+            <View style={styles.regionFooter}>
+              <Button
+                title="닫기"
+                onPress={() => setRegionSelectVisible(false)}
+              />
+            </View>
           </View>
         </View>
       </Modal>
@@ -1089,144 +1428,198 @@ function Make_program() {
           contentContainerStyle={styles.container}
           keyboardShouldPersistTaps="handled"
           nestedScrollEnabled={true}>
-          {/* 상단: 썸네일 + 제목/소개 + region/guidePrice/hashtags 입력란 */}
-          <View style={styles.topRow}>
+          {/* 에어비엔비 스타일 헤더 */}
+          <View style={styles.airbnbHeader}>
+            <Text style={styles.airbnbTitle}>새로운 투어 프로그램 만들기</Text>
+            <Text style={styles.airbnbSubtitle}>여행객들에게 특별한 경험을 제공하세요</Text>
+          </View>
+
+          {/* 썸네일 섹션 */}
+          <View style={styles.thumbnailSection}>
+            <Text style={styles.sectionLabel}>대표 사진</Text>
             <TouchableOpacity
-              style={styles.thumbnailBox}
+              style={styles.airbnbThumbnailBox}
               onPress={handlePickThumbnail}>
               {thumbnail ? (
                 <Image
                   source={{uri: thumbnail}}
-                  style={styles.thumbnailImg}
+                  style={styles.airbnbThumbnailImg}
                   resizeMode="cover"
                 />
               ) : (
-                <View style={styles.thumbnailPlaceholder}>
-                  <Text style={styles.thumbnailText}>사진추가</Text>
-                  <Text style={styles.thumbnailSubText}>클릭하여 선택</Text>
+                <View style={styles.airbnbThumbnailPlaceholder}>
+                  <Text style={styles.airbnbThumbnailIcon}>📷</Text>
+                  <Text style={styles.airbnbThumbnailText}>사진 추가하기</Text>
+                  <Text style={styles.airbnbThumbnailSubText}>클릭하여 이미지를 선택하세요</Text>
                 </View>
               )}
             </TouchableOpacity>
-            <View style={styles.titleBox}>
+          </View>
+
+          {/* 기본 정보 섹션 */}
+          <View style={styles.infoSection}>
+            <Text style={styles.sectionLabel}>기본 정보</Text>
+            
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>프로그램 제목</Text>
               <TextInput
-                style={styles.titleInput}
-                placeholder="제목"
+                style={styles.airbnbInput}
+                placeholder="매력적인 제목을 입력하세요"
                 value={title}
                 onChangeText={setTitle}
               />
-              {/* 지역 선택 */}
-              <TouchableOpacity onPress={() => setRegionSelectVisible(true)}>
-                <View pointerEvents="none">
-                  <TextInput
-                    style={[styles.input, {color: regionInput ? '#000' : '#888'}]}
-                    placeholder="지역 선택 (터치)"
-                    value={regionInput}
-                    editable={false}
-                  />
-                </View>
-              </TouchableOpacity>
+            </View>
 
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>가이드 가격 (원)</Text>
               <TextInput
-                style={styles.input}
-                placeholder="가이드 가격"
+                style={styles.airbnbInput}
+                placeholder="가격을 입력하세요"
                 value={guidePrice}
                 onChangeText={setGuidePrice}
                 keyboardType="numeric"
               />
-
-              {/* 해시태그 선택 */}
-              <View style={{gap: 6}}>
-                <TouchableOpacity
-                  style={styles.hashtagSelectBtn}
-                  onPress={() => setHashtagModalVisible(true)}>
-                  <Text style={styles.hashtagSelectBtnText}>해시태그 선택</Text>
-                </TouchableOpacity>
-                {/* 선택 결과 미리보기 (칩) */}
-                {selectedHashtags.length > 0 ? (
-                  <View style={styles.selectedTagsWrap}>
-                    {selectedHashtags.map(tag => (
-                      <View key={tag} style={styles.selectedTagChip}>
-                        <Text style={styles.selectedTagText}>{tag}</Text>
-                        <TouchableOpacity
-                          onPress={() => toggleHashtag(tag)}
-                          style={styles.removeTagBtn}>
-                          <Text style={styles.removeTagX}>×</Text>
-                        </TouchableOpacity>
-                      </View>
-                    ))}
-                  </View>
-                ) : (
-                  <Text style={{color: '#888'}}>선택된 해시태그 없음</Text>
-                )}
-              </View>
             </View>
           </View>
 
-          {/* 지도 */}
-          <View style={styles.mapBox}>
-            <MapView
-              ref={mapRef}
-              provider={PROVIDER_GOOGLE}
-              style={styles.map}
-              region={region}
-              onRegionChangeComplete={setRegion}
-              showsUserLocation={false}
-              showsMyLocationButton={false}>
-              {/* 현재 위치 마커 */}
-              {currentLocation && (
-                <Marker
-                  coordinate={currentLocation}
-                  title="현재 위치"
-                  description="내가 있는 곳"
-                  pinColor="#FF0000">
-                  <View style={styles.currentLocationMarker}>
-                    <Text style={styles.currentLocationText}>📍</Text>
+          {/* 해시태그 섹션 */}
+          <View style={styles.infoSection}>
+            <Text style={styles.sectionLabel}>해시태그</Text>
+            <TouchableOpacity
+              style={styles.airbnbButton}
+              onPress={() => setHashtagModalVisible(true)}>
+              <Text style={styles.airbnbButtonText}>해시태그 선택하기</Text>
+            </TouchableOpacity>
+            {selectedHashtags.length > 0 && (
+              <View style={styles.selectedTagsWrap}>
+                {selectedHashtags.map(tag => (
+                  <View key={tag} style={styles.airbnbTagChip}>
+                    <Text style={styles.airbnbTagText}>#{tag}</Text>
+                    <TouchableOpacity
+                      onPress={() => toggleHashtag(tag)}
+                      style={styles.airbnbRemoveTagBtn}>
+                      <Text style={styles.airbnbRemoveTagX}>×</Text>
+                    </TouchableOpacity>
                   </View>
-                </Marker>
-              )}
+                ))}
+              </View>
+            )}
+          </View>
 
-              {days.map((day, dayIdx) => (
-                <React.Fragment key={dayIdx}>
-                  {/* 마커 */}
-                  {day.plans.map(
-                    (p, planIdx) =>
-                      p.coordinate && (
-                        <Marker
-                          key={`${dayIdx}-${planIdx}`}
-                          coordinate={p.coordinate}
-                          title={p.place}
-                          description={p.memo}
-                          pinColor={dayColors[dayIdx % dayColors.length]}
-                        />
-                      ),
-                  )}
-                  {/* Directions API 경로 Polyline */}
-                  {day.plans.length > 1 &&
-                    day.plans.slice(1).map((p, idx) => {
-                      const key = `${dayIdx}-${idx}-${idx + 1}`;
-                      const routeCoords = routes[key];
-                      return (
-                        routeCoords && (
-                          <Polyline
-                            key={`route-${key}`}
-                            coordinates={routeCoords}
-                            strokeColor={dayColors[dayIdx % dayColors.length]}
-                            strokeWidth={3}
+          {/* 지역 선택 섹션 */}
+          <View style={styles.infoSection}>
+            <Text style={styles.sectionLabel}>지역 선택</Text>
+            <TouchableOpacity
+              style={styles.airbnbButton}
+              onPress={() => setRegionSelectVisible(true)}>
+              <Text style={styles.airbnbButtonText}>지역 선택하기</Text>
+            </TouchableOpacity>
+            {regionInput && (
+              <View style={styles.selectedRegionWrap}>
+                <View style={styles.airbnbRegionChip}>
+                  <Text style={styles.airbnbRegionText}>📍 {regionInput}</Text>
+                  <TouchableOpacity
+                    onPress={() => {
+                      setRegionInput('');
+                      setRegion({
+                        latitude: 36.7994,
+                        longitude: 126.9306,
+                        latitudeDelta: 0.0922,
+                        longitudeDelta: 0.0421,
+                      });
+                    }}
+                    style={styles.airbnbRemoveRegionBtn}>
+                    <Text style={styles.airbnbRemoveRegionX}>×</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
+          </View>
+
+          {/* 프로그램 설명 섹션 */}
+          <View style={styles.infoSection}>
+            <Text style={styles.sectionLabel}>프로그램 설명</Text>
+            <TextInput
+              style={styles.airbnbDescriptionInput}
+              placeholder="여행객들에게 전달하고 싶은 프로그램의 특징과 매력을 자유롭게 작성해주세요..."
+              value={description}
+              onChangeText={setDescription}
+              multiline
+              textAlignVertical="top"
+            />
+          </View>
+
+          {/* 지도 섹션 */}
+          <View style={styles.infoSection}>
+            <Text style={styles.sectionLabel}>여행 경로</Text>
+            <View style={styles.airbnbMapBox}>
+              <MapView
+                ref={mapRef}
+                provider={PROVIDER_GOOGLE}
+                style={styles.airbnbMap}
+                region={region}
+                onRegionChangeComplete={(newRegion) => {
+                  if (!isAnimating) {
+                    setRegion(newRegion);
+                  }
+                }}
+                showsUserLocation={true}
+                showsMyLocationButton={false}
+                userLocationAnnotationTitle="현재 위치">
+
+                {days.map((day, dayIdx) => (
+                  <React.Fragment key={dayIdx}>
+                    {/* 마커 - 선택된 Day만 표시 */}
+                    {selectedDay === dayIdx && day.plans.map(
+                      (p, planIdx) =>
+                        p.coordinate && (
+                          <Marker
+                            key={`${dayIdx}-${planIdx}`}
+                            coordinate={p.coordinate}
+                            title={p.place}
+                            description={p.memo}
+                            pinColor={dayColors[dayIdx % dayColors.length]}
                           />
-                        )
-                      );
-                    })}
-                  {/* 거리 표시 */}
-                  {day.plans.length > 1 &&
-                    day.plans.slice(1).map((p, idx) => {
-                      const key = `${dayIdx}-${idx}-${idx + 1}`;
-                      const roadDistance = routeDistances[key];
+                        ),
+                    )}
+                    {/* Directions API 경로 Polyline - 선택된 Day만 표시 */}
+                    {selectedDay === dayIdx && day.plans.length > 1 &&
+                      day.plans.slice(1).map((p, idx) => {
+                        const key = `${dayIdx}-${idx}-${idx + 1}`;
+                        const routeCoords = routes[key];
+                        return (
+                          routeCoords && (
+                            <Polyline
+                              key={`route-${key}`}
+                              coordinates={routeCoords}
+                              strokeColor={dayColors[dayIdx % dayColors.length]}
+                              strokeWidth={4}
+                            />
+                          )
+                        );
+                      })}
+                    {/* 거리 표시 - 선택된 Day만 표시 */}
+                    {selectedDay === dayIdx && day.plans.length > 1 &&
+                      day.plans.slice(1).map((p, idx) => {
+                        const key = `${dayIdx}-${idx}-${idx + 1}`;
+                        const roadDistance = routeDistances[key];
 
-                      // 실제 도로 거리가 있으면 사용, 없으면 직선 거리 사용
-                      let displayDistance;
-                      if (roadDistance) {
-                        displayDistance = roadDistance;
-                      } else {
+                        // 실제 도로 거리가 있으면 사용, 없으면 직선 거리 사용
+                        let displayDistance;
+                        if (roadDistance) {
+                          displayDistance = roadDistance;
+                        } else {
+                          const prev = day.plans[idx].coordinate as {
+                            latitude: number;
+                            longitude: number;
+                          };
+                          const curr = p.coordinate as {
+                            latitude: number;
+                            longitude: number;
+                          };
+                          displayDistance = haversine(prev, curr) / 1000;
+                        }
+
                         const prev = day.plans[idx].coordinate as {
                           latitude: number;
                           longitude: number;
@@ -1235,230 +1628,199 @@ function Make_program() {
                           latitude: number;
                           longitude: number;
                         };
-                        displayDistance = haversine(prev, curr) / 1000;
-                      }
-
-                      const prev = day.plans[idx].coordinate as {
-                        latitude: number;
-                        longitude: number;
-                      };
-                      const curr = p.coordinate as {
-                        latitude: number;
-                        longitude: number;
-                      };
-                      const mid = {
-                        latitude: (prev.latitude + curr.latitude) / 2,
-                        longitude: (prev.longitude + curr.longitude) / 2,
-                      };
-                      return (
-                        <Marker
-                          key={`dist-${dayIdx}-${idx}`}
-                          coordinate={mid}
-                          anchor={{x: 0.5, y: 0.5}}>
-                          <View
-                            style={[
-                              styles.distanceBox,
-                              {
-                                borderColor:
-                                  dayColors[dayIdx % dayColors.length],
-                              },
-                            ]}>
-                            <Text
+                        const mid = {
+                          latitude: (prev.latitude + curr.latitude) / 2,
+                          longitude: (prev.longitude + curr.longitude) / 2,
+                        };
+                        return (
+                          <Marker
+                            key={`dist-${dayIdx}-${idx}`}
+                            coordinate={mid}
+                            anchor={{x: 0.5, y: 0.5}}>
+                            <View
                               style={[
-                                styles.distanceText,
-                                {color: dayColors[dayIdx % dayColors.length]},
+                                styles.distanceBox,
+                                {
+                                  borderColor:
+                                    dayColors[dayIdx % dayColors.length],
+                                },
                               ]}>
-                              {displayDistance.toFixed(1)}km
-                              {roadDistance && (
-                                <Text style={{fontSize: 10}}> 🛣️</Text>
-                              )}
-                            </Text>
-                          </View>
-                        </Marker>
-                      );
-                    })}
-                </React.Fragment>
-              ))}
-            </MapView>
+                              <Text
+                                style={[
+                                  styles.distanceText,
+                                  {color: dayColors[dayIdx % dayColors.length]},
+                                ]}>
+                                {displayDistance.toFixed(1)}km
+                                {roadDistance && (
+                                  <Text style={{fontSize: 10}}> 🛣️</Text>
+                                )}
+                              </Text>
+                            </View>
+                          </Marker>
+                        );
+                      })}
+                  </React.Fragment>
+                ))}
+              </MapView>
 
-            {/* 현재 위치 버튼 */}
-            <TouchableOpacity
-              style={styles.locationButton}
-              onPress={getCurrentLocation}
-              disabled={locationLoading}>
-              <Text style={styles.locationButtonText}>
-                {locationLoading ? '📍' : '🎯'}
-              </Text>
-            </TouchableOpacity>
-
-            {/* 총 거리 표시 */}
-            {days[selectedDay].plans.length > 1 && (
-              <View style={styles.totalDistanceBox}>
-                <Text style={styles.totalDistanceText}>
-                  총 거리: {getDayDistance(days[selectedDay].plans).toFixed(1)}
-                  km
-                </Text>
-              </View>
-            )}
-          </View>
-
-          {/* 본문 입력 */}
-          <View style={styles.contentBox}>
-            <TextInput
-              style={styles.contentInput}
-              placeholder="본문을 입력하세요"
-              value={description}
-              onChangeText={setDescription}
-              multiline
-              textAlignVertical="top"
-            />
-          </View>
-
-          {/* Day별 일정 */}
-          {days.map((day, idx) => (
-            <View key={idx} style={styles.dayBox}>
-              <TouchableOpacity onPress={() => setSelectedDay(idx)}>
-                <Text
-                  style={[
-                    styles.dayTitle,
-                    selectedDay === idx && {
-                      fontWeight: 'bold',
-                      textDecorationLine: 'underline',
-                      color: dayColors[idx % dayColors.length],
-                    },
-                  ]}>
-                  Day {idx + 1}
+              {/* 현재 위치 버튼 */}
+              <TouchableOpacity
+                style={styles.airbnbLocationButton}
+                onPress={getCurrentLocation}
+                disabled={locationLoading}>
+                <Text style={styles.airbnbLocationButtonText}>
+                  {locationLoading ? '📍' : '🎯'}
                 </Text>
               </TouchableOpacity>
-              {day.plans.map((p, pIdx) => (
-                <View key={pIdx}>
-                  <View style={styles.planItem}>
-                    <Text style={{flex: 1}}>
-                      {p.place} {p.memo ? `- ${p.memo}` : ''}
-                    </Text>
-                    <View style={styles.planActions}>
+
+
+              {/* 총 거리 표시 */}
+              {days[selectedDay].plans.length > 1 && (
+                <View style={styles.airbnbTotalDistanceBox}>
+                  <Text style={styles.airbnbTotalDistanceText}>
+                    총 거리: {getDayDistance(days[selectedDay].plans).toFixed(1)}km
+                  </Text>
+                </View>
+              )}
+            </View>
+          </View>
+
+          {/* 일정 섹션 */}
+          <View style={styles.infoSection}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionLabel}>여행 일정</Text>
+              <TouchableOpacity 
+                style={styles.addDayButton}
+                onPress={addDay}
+              >
+                <Text style={styles.addDayButtonText}>+ 일정 추가</Text>
+              </TouchableOpacity>
+            </View>
+
+            {days.map((day, idx) => (
+              <View key={idx} style={styles.airbnbDayBox}>
+                <TouchableOpacity 
+                  style={styles.dayHeader}
+                  onPress={() => {
+                    setSelectedDay(idx);
+                    // Day 선택 시 해당 Day의 첫 번째 장소로 지도 이동
+                    if (day.plans.length > 0 && day.plans[0].coordinate) {
+                      const firstPlace = day.plans[0];
+                      const newRegion: Region = {
+                        latitude: firstPlace.coordinate!.latitude,
+                        longitude: firstPlace.coordinate!.longitude,
+                        latitudeDelta: 0.01,
+                        longitudeDelta: 0.01,
+                      };
+                      setRegion(newRegion);
+                      
+                      // 지도 애니메이션으로 이동
+                      setTimeout(() => {
+                        setIsAnimating(true);
+                        mapRef.current?.animateToRegion(newRegion, 1000);
+                        setTimeout(() => setIsAnimating(false), 1200);
+                      }, 100);
+                    }
+                  }}
+                >
+                  <View style={styles.dayHeaderLeft}>
+                    <View style={[styles.dayNumber, {backgroundColor: dayColors[idx % dayColors.length]}]}>
+                      <Text style={styles.dayNumberText}>{idx + 1}</Text>
+                    </View>
+                    <Text style={styles.dayTitle}>Day {idx + 1}</Text>
+                  </View>
+                  <Text style={styles.dayToggle}>{selectedDay === idx ? '▼' : '▶'}</Text>
+                </TouchableOpacity>
+
+                {selectedDay === idx && (
+                  <View style={styles.dayContent}>
+                    {day.plans.map((p, pIdx) => (
+                      <View key={pIdx} style={styles.airbnbPlanItem}>
+                        <View style={styles.planInfo}>
+                          <Text style={styles.planPlace}>{p.place}</Text>
+                          {p.memo && <Text style={styles.planMemo}>{p.memo}</Text>}
+                        </View>
+                        <View style={styles.planActions}>
+                          <TouchableOpacity 
+                            style={styles.airbnbEditButton}
+                            onPress={() => editPlan(idx, pIdx)}
+                          >
+                            <Text style={styles.airbnbEditButtonText}>수정</Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity 
+                            style={styles.airbnbDeleteButton}
+                            onPress={() => removePlan(idx, pIdx)}
+                          >
+                            <Text style={styles.airbnbDeleteButtonText}>삭제</Text>
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+                    ))}
+
+                    {/* 장소 추가 입력란 - 세로 배치 */}
+                    <View style={styles.airbnbPlanInputColumn}>
+                      {/* 장소 검색 */}
+                      <View style={styles.inputRow}>
+                        <TextInput
+                          style={styles.airbnbPlanInputWide}
+                          placeholder="장소 검색"
+                          value={selectedDay === idx ? plan.place : ''}
+                          onFocus={() => {
+                            setSelectedDay(idx);
+                            setPlaceModalVisible(true);
+                          }}
+                          editable={true}
+                        />
+                        <TextInput
+                          style={styles.airbnbPlanInputSmall}
+                          placeholder="소요시간(분)"
+                          value={selectedDay === idx ? (plan.travelTime ? plan.travelTime.toString() : '') : ''}
+                          onChangeText={text => {
+                            setSelectedDay(idx);
+                            setPlan(p => ({...p, travelTime: text ? parseInt(text) : undefined}));
+                          }}
+                          keyboardType="numeric"
+                        />
+                      </View>
+                      
+                      {/* 장소 설명 */}
+                      <TextInput
+                        style={styles.airbnbPlanDescriptionInput}
+                        placeholder="장소에 대한 설명을 자유롭게 작성해주세요..."
+                        value={selectedDay === idx ? plan.memo : ''}
+                        onChangeText={text => {
+                          setSelectedDay(idx);
+                          setPlan(p => ({...p, memo: text}));
+                        }}
+                        multiline
+                        textAlignVertical="top"
+                      />
+                      
+                      {/* 추가 버튼 */}
                       <TouchableOpacity 
-                        style={styles.editButton}
-                        onPress={() => editPlan(idx, pIdx)}>
-                        <Text style={styles.editButtonText}>수정</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity 
-                        style={styles.deleteButton}
-                        onPress={() => removePlan(idx, pIdx)}>
-                        <Text style={styles.deleteButtonText}>삭제</Text>
+                        style={styles.airbnbAddButtonWide}
+                        onPress={() => addPlan(idx)}
+                      >
+                        <Text style={styles.airbnbAddButtonText}>
+                          {editingPlan && editingPlan.dayIdx === idx ? "수정" : "추가"}
+                        </Text>
                       </TouchableOpacity>
                     </View>
                   </View>
-                  {/* 다음 장소가 있다면 거리와 세로선 표시 */}
-                  {pIdx < day.plans.length - 1 &&
-                    day.plans[pIdx + 1].coordinate &&
-                    p.coordinate && (
-                      <View
-                        style={{
-                          alignItems: 'center',
-                          marginVertical: 0,
-                          flexDirection: 'column',
-                          height: 50,
-                          justifyContent: 'center',
-                        }}>
-                        <View
-                          style={{
-                            width: 3,
-                            height: 30,
-                            backgroundColor: dayColors[idx % dayColors.length],
-                          }}
-                        />
-                        <Text
-                          style={{
-                            color: dayColors[idx % dayColors.length],
-                            fontWeight: '900',
-                            marginVertical: 2,
-                            fontSize: 15,
-                            textShadowColor: '#ffffff',
-                            textShadowOffset: {width: 1, height: 1},
-                            textShadowRadius: 2,
-                            letterSpacing: 0.3,
-                            backgroundColor: 'rgba(255, 255, 255, 0.9)',
-                            paddingHorizontal: 6,
-                            paddingVertical: 2,
-                            borderRadius: 8,
-                            borderWidth: 1,
-                            borderColor: dayColors[idx % dayColors.length],
-                          }}>
-                          {(() => {
-                            const key = `${idx}-${pIdx}-${pIdx + 1}`;
-                            const roadDistance = routeDistances[key];
-
-                            if (roadDistance) {
-                              return `${roadDistance.toFixed(1)}km 🛣️`;
-                            } else {
-                              const directDistance =
-                                haversine(
-                                  p.coordinate as {
-                                    latitude: number;
-                                    longitude: number;
-                                  },
-                                  day.plans[pIdx + 1].coordinate as {
-                                    latitude: number;
-                                    longitude: number;
-                                  },
-                                ) / 1000;
-                              return `${directDistance.toFixed(1)}km`;
-                            }
-                          })()}
-                        </Text>
-                        <View
-                          style={{
-                            width: 3,
-                            height: 10,
-                            backgroundColor: dayColors[idx % dayColors.length],
-                          }}
-                        />
-                      </View>
-                    )}
-                </View>
-              ))}
-              {/* 장소 입력란, 메모, 추가 버튼 등 기존 코드 유지 */}
-              <View style={styles.planInputRow}>
-                <TextInput
-                  style={[styles.input, {flex: 2}]}
-                  placeholder="장소"
-                  value={selectedDay === idx ? plan.place : ''}
-                  onFocus={() => {
-                    setSelectedDay(idx);
-                    setPlaceModalVisible(true);
-                  }}
-                  editable={true}
-                />
-                <TextInput
-                  style={[styles.input, {flex: 2}]}
-                  placeholder="메모"
-                  value={selectedDay === idx ? plan.memo : ''}
-                  onChangeText={text => {
-                    setSelectedDay(idx);
-                    setPlan(p => ({...p, memo: text}));
-                  }}
-                />
-                <TextInput
-                  style={[styles.input, {flex: 1}]}
-                  placeholder="소요시간(분)"
-                  value={selectedDay === idx ? plan.travelTime?.toString() : ''}
-                  onChangeText={text => {
-                    setSelectedDay(idx);
-                    setPlan(p => ({...p, travelTime: parseInt(text) || 0}));
-                  }}
-                  keyboardType="numeric"
-                />
-                <Button 
-                  title={editingPlan && editingPlan.dayIdx === idx ? "수정" : "추가"} 
-                  onPress={() => addPlan(idx)} 
-                />
+                )}
               </View>
-            </View>
-          ))}
-          <Button title="일정 추가" onPress={addDay} />
-          <View style={{height: 20}} />
-          <Button title="게시하기" onPress={handleSubmit} />
+            ))}
+          </View>
+
+          {/* 게시 버튼 */}
+          <View style={styles.publishSection}>
+            <TouchableOpacity 
+              style={styles.publishButton}
+              onPress={handleSubmit}
+            >
+              <Text style={styles.publishButtonText}>프로그램 게시하기</Text>
+            </TouchableOpacity>
+          </View>
         </ScrollView>
       )}
     </SafeAreaView>
@@ -1471,65 +1833,203 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     flexGrow: 1,
   },
-  topRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
+  // 에어비엔비 스타일
+  airbnbHeader: {
+    backgroundColor: '#fff',
+    paddingVertical: 24,
+    paddingHorizontal: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
     marginBottom: 20,
   },
-  thumbnailBox: {
-    width: 100,
-    height: 100,
-    backgroundColor: '#f0f0f0',
-    borderRadius: 8,
+  airbnbTitle: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#222',
+    marginBottom: 8,
+  },
+  airbnbSubtitle: {
+    fontSize: 16,
+    color: '#666',
+    lineHeight: 22,
+  },
+  thumbnailSection: {
+    marginBottom: 24,
+    paddingHorizontal: 20,
+  },
+  sectionLabel: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#222',
+    marginBottom: 12,
+  },
+  airbnbThumbnailBox: {
+    width: '100%',
+    height: 200,
+    backgroundColor: '#f8f9fa',
+    borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 15,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: '#ddd',
+    borderWidth: 2,
+    borderColor: '#e9ecef',
+    borderStyle: 'dashed',
   },
-  thumbnailImg: {
+  airbnbThumbnailImg: {
     width: '100%',
     height: '100%',
-    borderRadius: 8,
+    borderRadius: 10,
   },
-  thumbnailPlaceholder: {
+  airbnbThumbnailPlaceholder: {
     alignItems: 'center',
     justifyContent: 'center',
   },
-  thumbnailText: {
-    color: '#666',
+  airbnbThumbnailIcon: {
+    fontSize: 32,
+    marginBottom: 8,
+  },
+  airbnbThumbnailText: {
     fontSize: 16,
+    fontWeight: '600',
+    color: '#222',
     marginBottom: 4,
   },
-  thumbnailSubText: {
-    color: '#999',
-    fontSize: 12,
+  airbnbThumbnailSubText: {
+    fontSize: 14,
+    color: '#666',
   },
-  titleBox: {
-    flex: 1,
+  infoSection: {
+    marginBottom: 24,
+    paddingHorizontal: 20,
   },
-  titleInput: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    borderBottomWidth: 1,
-    borderColor: '#ccc',
+  inputGroup: {
+    marginBottom: 16,
+  },
+  inputLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#222',
     marginBottom: 8,
-    padding: 4,
   },
-  mapBox: {
-    height: 300,
-    borderRadius: 10,
-    overflow: 'hidden',
-    marginBottom: 20,
+  airbnbInput: {
     borderWidth: 1,
     borderColor: '#ddd',
+    borderRadius: 8,
+    padding: 16,
+    fontSize: 16,
+    backgroundColor: '#fff',
+    color: '#222',
   },
-  map: {
+  airbnbButton: {
+    backgroundColor: '#90EE90',
+    borderRadius: 8,
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  airbnbButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  airbnbTagChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f0f8ff',
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginRight: 8,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#e1f5fe',
+  },
+  airbnbTagText: {
+    color: '#1976d2',
+    fontSize: 14,
+    fontWeight: '500',
+    marginRight: 6,
+  },
+  airbnbRemoveTagBtn: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: '#90EE90',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  airbnbRemoveTagX: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  airbnbDescriptionInput: {
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 12,
+    padding: 16,
+    fontSize: 16,
+    backgroundColor: '#fff',
+    color: '#222',
+    minHeight: 120,
+    textAlignVertical: 'top',
+  },
+  airbnbMapBox: {
+    height: 300,
+    borderRadius: 12,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#e9ecef',
+    backgroundColor: '#f8f9fa',
+  },
+  airbnbMap: {
     flex: 1,
   },
+  airbnbLocationButton: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    backgroundColor: '#fff',
+    borderRadius: 24,
+    width: 48,
+    height: 48,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 2},
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+    borderWidth: 1,
+    borderColor: '#e9ecef',
+  },
+  airbnbLocationButtonText: {
+    fontSize: 20,
+    fontWeight: 'bold',
+  },
+  airbnbTotalDistanceBox: {
+    position: 'absolute',
+    left: 12,
+    bottom: 12,
+    backgroundColor: '#fff',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#e9ecef',
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 1},
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  airbnbTotalDistanceText: {
+    color: '#222',
+    fontWeight: '600',
+    fontSize: 14,
+  },
   markerNumberBox: {
-    backgroundColor: '#0288d1',
+    backgroundColor: '#90EE90',
     borderRadius: 12,
     width: 24,
     height: 24,
@@ -1582,27 +2082,183 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     fontSize: 15,
   },
-  dayBox: {
-    backgroundColor: '#f7f7f7',
-    borderRadius: 8,
-    padding: 10,
-    marginBottom: 15,
+  // 에어비엔비 일정 스타일
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
   },
-  dayTitle: {
+  addDayButton: {
+    backgroundColor: '#f0f8ff',
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: '#1976d2',
+  },
+  addDayButtonText: {
+    color: '#1976d2',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  airbnbDayBox: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#e9ecef',
+    overflow: 'hidden',
+  },
+  dayHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    backgroundColor: '#f8f9fa',
+  },
+  dayHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  dayNumber: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  dayNumberText: {
+    color: '#fff',
     fontSize: 16,
     fontWeight: 'bold',
-    marginBottom: 8,
   },
-  planItem: {
+  dayTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#222',
+  },
+  dayToggle: {
+    fontSize: 16,
+    color: '#666',
+  },
+  dayContent: {
+    padding: 16,
+  },
+  airbnbPlanItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  planInfo: {
+    flex: 1,
+  },
+  planPlace: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#222',
+    marginBottom: 4,
+  },
+  planMemo: {
+    fontSize: 14,
+    color: '#666',
+  },
+  airbnbPlanInputColumn: {
+    marginTop: 16,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#f0f0f0',
+  },
+  inputRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 5,
+    gap: 8,
+    marginBottom: 12,
   },
-  planInputRow: {
-    flexDirection: 'row',
+  airbnbPlanInputWide: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 14,
+    backgroundColor: '#fff',
+  },
+  airbnbPlanInputSmall: {
+    width: 100,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 14,
+    backgroundColor: '#fff',
+  },
+  airbnbPlanDescriptionInput: {
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 14,
+    backgroundColor: '#fff',
+    minHeight: 140,
+    marginBottom: 12,
+    textAlignVertical: 'top',
+  },
+  airbnbAddButtonWide: {
+    backgroundColor: '#90EE90',
+    borderRadius: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     alignItems: 'center',
-    gap: 5,
-    marginTop: 8,
+  },
+  airbnbAddButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  airbnbEditButton: {
+    backgroundColor: '#007AFF',
+    borderRadius: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    marginRight: 8,
+  },
+  airbnbEditButtonText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  airbnbDeleteButton: {
+    backgroundColor: '#FF3B30',
+    borderRadius: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  airbnbDeleteButtonText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  publishSection: {
+    paddingHorizontal: 20,
+    paddingVertical: 24,
+    backgroundColor: '#f8f9fa',
+    marginTop: 20,
+  },
+  publishButton: {
+    backgroundColor: '#90EE90',
+    borderRadius: 12,
+    paddingVertical: 18,
+    alignItems: 'center',
+  },
+  publishButtonText: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: 'bold',
   },
   input: {
     borderWidth: 1,
@@ -1630,7 +2286,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 10,
     right: 10,
-    backgroundColor: '#0288d1',
+    backgroundColor: '#90EE90',
     borderRadius: 20,
     width: 40,
     height: 40,
@@ -1687,7 +2343,8 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 
-  // 지역 모달
+
+  // 지역 모달 (해시태그 스타일과 동일)
   regionModalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.35)',
@@ -1695,8 +2352,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   regionModalCard: {
-    width: '88%',
-    maxHeight: '75%',
+    width: '92%',
+    maxHeight: '80%',
     backgroundColor: '#fff',
     borderRadius: 12,
     padding: 16,
@@ -1707,9 +2364,55 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   regionModalTitle: {fontSize: 18, fontWeight: 'bold', marginBottom: 12},
-  regionItem: {paddingVertical: 12, paddingHorizontal: 8, borderRadius: 8},
-  regionItemText: {fontSize: 16},
-  regionDivider: {height: 1, backgroundColor: '#eee'},
+  regionGrid: {flexDirection: 'row', flexWrap: 'wrap', gap: 8},
+  regionChip: {
+    borderWidth: 1,
+    borderColor: '#ccc',
+    borderRadius: 20,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    backgroundColor: '#fff',
+  },
+  regionChipText: {fontSize: 14, color: '#333'},
+  regionFooter: {
+    marginTop: 12,
+    alignItems: 'center',
+  },
+  
+  // 선택된 지역 표시
+  selectedRegionWrap: {
+    marginTop: 12,
+  },
+  airbnbRegionChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f0f8ff',
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: '#e1f5fe',
+    alignSelf: 'flex-start',
+  },
+  airbnbRegionText: {
+    color: '#1976d2',
+    fontSize: 14,
+    fontWeight: '500',
+    marginRight: 6,
+  },
+  airbnbRemoveRegionBtn: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: '#90EE90',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  airbnbRemoveRegionX: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
 
   // 해시태그 모달/칩
   hashtagModalOverlay: {
@@ -1756,7 +2459,7 @@ const styles = StyleSheet.create({
 
   // 선택된 해시태그 미리보기
   hashtagSelectBtn: {
-    backgroundColor: '#0288d1',
+    backgroundColor: '#90EE90',
     paddingVertical: 10,
     paddingHorizontal: 12,
     borderRadius: 8,
@@ -1780,7 +2483,7 @@ const styles = StyleSheet.create({
     width: 18,
     height: 18,
     borderRadius: 9,
-    backgroundColor: '#0288d1',
+    backgroundColor: '#90EE90',
     alignItems: 'center',
     justifyContent: 'center',
   },

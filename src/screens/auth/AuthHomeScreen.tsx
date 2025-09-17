@@ -102,11 +102,11 @@ function AuthHomeScreen({navigation, navigationOverride}: AuthHomeScreenProps) {
             }
           />
 
-          <Pressable onPress={navigationOverride}>
+          {/* <Pressable onPress={navigationOverride}>
             <Text style={styles.emailText}>
               로그인없이 메인화면으로 이동하기
             </Text>
-          </Pressable>
+          </Pressable> */}
         </View>
       </SafeAreaView>
     </View>
@@ -171,7 +171,7 @@ const styles = StyleSheet.create({
     textDecorationLine: 'underline',
     fontWeight: '500',
     padding: 10,
-    color: colors.BLACK,
+    color: '#999',
     alignSelf: 'center',
   },
   NAVERButtonContainer: {

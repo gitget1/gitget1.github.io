@@ -217,7 +217,7 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: 'bold',
     marginBottom: 18,
-    color: '#0288d1',
+    color: '#228B22',
     alignSelf: 'center',
   },
   reviewCard: {
@@ -240,7 +240,7 @@ const styles = StyleSheet.create({
   actions: {flexDirection: 'row', gap: 12},
   actionText: {
     fontSize: 14,
-    color: '#0288d1',
+    color: '#228B22',
   },
   content: {
     fontSize: 15,

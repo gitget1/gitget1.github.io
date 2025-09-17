@@ -25,14 +25,14 @@ const BottomTabNavigator = () => {
 
           return <Ionicons name={iconName} size={size} color={color} />;
         },
-        tabBarActiveTintColor: '#0288d1',
-        tabBarInactiveTintColor: 'gray',
+        tabBarActiveTintColor: '#228B22',
+        tabBarInactiveTintColor: '#90EE90',
       })}>
       <Tab.Screen
         name="Home"
         component={MainHomeScreen}
         options={{
-          tabBarLabel: () => <Text>{t('home')}</Text>,
+          tabBarLabel: () => <Text style={{color: '#000000'}}>{t('home')}</Text>,
           headerShown: false,
         }}
       />
@@ -41,7 +41,7 @@ const BottomTabNavigator = () => {
         name="Wishlist"
         component={WishlistScreen}
         options={{
-          tabBarLabel: () => <Text>{t('wishlist')}</Text>,
+          tabBarLabel: () => <Text style={{color: '#000000'}}>{t('wishlist')}</Text>,
           headerShown: false,
         }}
       />
@@ -49,7 +49,7 @@ const BottomTabNavigator = () => {
       <Tab.Screen
         name="MyPage"
         component={Mypage}
-        options={{tabBarLabel: () => <Text>{t('mypage')}</Text>}}
+        options={{tabBarLabel: () => <Text style={{color: '#000000'}}>{t('mypage')}</Text>}}
       />
     </Tab.Navigator>
   );

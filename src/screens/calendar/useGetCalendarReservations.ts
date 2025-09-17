@@ -16,6 +16,8 @@ interface ReservationCalendarDTO {
   guideEndDate: string;
   numOfPeople: number;
   requestStatus: string;
+  role: string; // "GUIDE" or "USER"
+  counterpartName: string;
 }
 
 // 두 가지 API 엔드포인트를 지원하는 함수들
@@ -29,6 +31,12 @@ const fetchMyReservations = async (
     '📋 API URL: http://124.60.137.10:8083/api/calendar/my-reservations',
   );
   console.log('📋 Params:', {start, end});
+  console.log('📋 Date range:', {
+    startDate: start,
+    endDate: end,
+    startFormatted: start ? new Date(start).toLocaleString() : 'N/A',
+    endFormatted: end ? new Date(end).toLocaleString() : 'N/A',
+  });
   console.log('📋 Token exists:', !!token);
 
   const response = await axios.get(
@@ -117,7 +125,6 @@ const fetchCalendarReservations = async (start: string, end: string) => {
       tourProgramTitle: reservation.tourProgramTitle || '',
       guideStartDate: reservation.guideStartDate || '',
       guideEndDate: reservation.guideEndDate || '',
-      username: '예약자', // 서버에서 제공하지 않으므로 기본값 설정
       numOfPeople: reservation.numOfPeople || 0,
       requestStatus:
         (reservation.requestStatus as
@@ -127,6 +134,8 @@ const fetchCalendarReservations = async (start: string, end: string) => {
           | 'CANCELLED_BY_USER'
           | 'CANCELLED_BY_GUIDE'
           | 'COMPLETED') || 'PENDING',
+      role: reservation.role || 'USER', // 서버에서 제공하는 role 필드 사용
+      counterpartName: reservation.counterpartName || '', // 서버에서 제공하는 counterpartName 필드 사용
     }));
 
     console.log('✅ Final combined data:', combinedData);
@@ -173,12 +182,13 @@ const fetchCalendarReservations = async (start: string, end: string) => {
               tourProgramTitle: reservation.tourProgramTitle,
               guideStartDate: reservation.guideStartDate,
               guideEndDate: reservation.guideEndDate,
-              username: '',
               numOfPeople: reservation.numOfPeople,
               requestStatus: reservation.requestStatus as
                 | 'ACCEPTED'
                 | 'PENDING'
                 | 'REJECTED',
+              role: reservation.role || 'USER',
+              counterpartName: reservation.counterpartName || '',
             }));
 
             return combinedData;
@@ -237,7 +247,6 @@ export function useGetMyReservations(start: string, end: string) {
         tourProgramTitle: reservation.tourProgramTitle || '',
         guideStartDate: reservation.guideStartDate || '',
         guideEndDate: reservation.guideEndDate || '',
-        username: '예약자', // 서버에서 제공하지 않으므로 기본값 설정
         numOfPeople: reservation.numOfPeople || 0,
         requestStatus:
           (reservation.requestStatus as
@@ -247,6 +256,8 @@ export function useGetMyReservations(start: string, end: string) {
             | 'CANCELLED_BY_USER'
             | 'CANCELLED_BY_GUIDE'
             | 'COMPLETED') || 'PENDING',
+        role: reservation.role || 'USER',
+        counterpartName: reservation.counterpartName || '',
       }));
     },
     enabled: !!(start && end), // start와 end가 있을 때만 쿼리 실행

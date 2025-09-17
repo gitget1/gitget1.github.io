@@ -202,20 +202,12 @@ const PlaceDetailScreen = () => {
           console.log('🔍 최신 리뷰 미리보기:', response.data.data.travelLocalEvaluation.reviews.slice(0, 3));
         }
       } else {
-        console.error('❌ 서버 응답 에러:', response.data);
         throw new Error(
           response.data.message || '장소 정보를 불러오는데 실패했습니다.',
         );
       }
     } catch (error) {
-      console.error('❌ 장소 정보 로딩 실패:', error);
       if (axios.isAxiosError(error)) {
-        console.error('❌ Axios 에러 상세:', {
-          status: error.response?.status,
-          data: error.response?.data,
-          message: error.message,
-          code: error.code,
-        });
 
         // 네트워크 오류 처리
         if (error.code === 'NETWORK_ERROR' || error.message === 'Network Error') {
@@ -349,7 +341,6 @@ const PlaceDetailScreen = () => {
           });
         },
         (error) => {
-          console.error('위치 가져오기 실패:', error);
           reject(error);
         },
         {
@@ -426,12 +417,6 @@ const PlaceDetailScreen = () => {
           }
         }
         
-        console.error('❌ 위치 검증 실패:', error);
-        console.error('❌ Axios 에러 상세:', {
-          status: error.response?.status,
-          data: error.response?.data,
-          message: error.message,
-        });
       }
 
       // 다른 에러들은 그대로 throw
@@ -617,7 +602,6 @@ const PlaceDetailScreen = () => {
         Alert.alert('오류', '리뷰 등록에 실패했습니다.');
       }
     } catch (error) {
-      console.error('리뷰 제출 실패:', error);
       Alert.alert('오류', '리뷰 등록 중 오류가 발생했습니다.');
     }
   };
@@ -748,6 +732,7 @@ const PlaceDetailScreen = () => {
             </View>
           )}
 
+          {/* 영업시간 정보 */}
           {placeDetail?.googleResponse?.openingHours && (
             <View style={{ marginBottom: 8 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center' }}>
@@ -789,23 +774,24 @@ const PlaceDetailScreen = () => {
                   ));
                 })()}
               </View>
-              {/* GPS로 리뷰권한 받기 버튼 */}
-              <TouchableOpacity
-                style={{
-                  marginTop: 12,
-                  alignSelf: 'flex-start',
-                  backgroundColor: '#1976D2',
-                  borderRadius: 8,
-                  paddingHorizontal: 16,
-                  paddingVertical: 10,
-                }}
-                onPress={handleWriteReview}>
-                <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 15 }}>
-                  GPS로 리뷰권한 받기
-                </Text>
-              </TouchableOpacity>
             </View>
           )}
+
+          {/* GPS로 리뷰권한 받기 버튼 - 모든 장소에서 표시 */}
+          <TouchableOpacity
+            style={{
+              marginTop: 12,
+              alignSelf: 'flex-start',
+              backgroundColor: '#90EE90',
+              borderRadius: 8,
+              paddingHorizontal: 16,
+              paddingVertical: 10,
+            }}
+            onPress={handleWriteReview}>
+            <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 15 }}>
+              GPS로 리뷰권한 받기
+            </Text>
+          </TouchableOpacity>
         </View>
 
         {/* 탭 네비게이션 */}

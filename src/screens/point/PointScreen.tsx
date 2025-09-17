@@ -10,6 +10,7 @@ import {
   Alert,
   RefreshControl,
 } from 'react-native';
+import {useNavigation} from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import {getPointBalance, getPointTransactions, adjustPoints} from '../../api/point';
 
@@ -24,6 +25,7 @@ interface PointTransaction {
 }
 
 const PointScreen = () => {
+  const navigation = useNavigation();
   const [balance, setBalance] = useState<number>(0);
   const [transactions, setTransactions] = useState<PointTransaction[]>([]);
   const [loading, setLoading] = useState(true);
@@ -43,9 +45,15 @@ const PointScreen = () => {
 
       setBalance(balanceResponse.data.balance);
       setTransactions(transactionsResponse.data.transactions);
-    } catch (error) {
+    } catch (error: any) {
       console.error('포인트 데이터 로드 실패:', error);
-      Alert.alert('오류', '포인트 정보를 불러오는데 실패했습니다.');
+      if (error.message === '로그인이 필요합니다.') {
+        Alert.alert('알림', '포인트 조회는 로그인이 필요한 기능입니다.', [
+          { text: '확인', onPress: () => navigation.navigate('MainHomeScreen') }
+        ]);
+      } else {
+        Alert.alert('오류', '포인트 정보를 불러오는데 실패했습니다.');
+      }
     } finally {
       setLoading(false);
     }
@@ -137,7 +145,7 @@ const PointScreen = () => {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#4CAF50" />
+          <ActivityIndicator size="large" color="#228B22" />
           <Text style={styles.loadingText}>포인트 정보를 불러오는 중...</Text>
         </View>
       </SafeAreaView>
@@ -154,7 +162,7 @@ const PointScreen = () => {
         {/* 포인트 잔액 카드 */}
         <View style={styles.balanceCard}>
           <View style={styles.balanceHeader}>
-            <Icon name="account-balance-wallet" size={32} color="#4CAF50" />
+            <Icon name="account-balance-wallet" size={32} color="#228B22" />
             <Text style={styles.balanceTitle}>포인트 잔액</Text>
           </View>
           <Text style={styles.balanceAmount}>{balance.toLocaleString()}P</Text>
@@ -169,15 +177,15 @@ const PointScreen = () => {
         <View style={styles.infoCard}>
           <Text style={styles.infoTitle}>포인트 획득 방법</Text>
           <View style={styles.infoItem}>
-            <Icon name="rate-review" size={20} color="#4CAF50" />
+            <Icon name="rate-review" size={20} color="#228B22" />
             <Text style={styles.infoText}>리뷰 작성: +10포인트</Text>
           </View>
           <View style={styles.infoItem}>
-            <Icon name="location-on" size={20} color="#4CAF50" />
+            <Icon name="location-on" size={20} color="#228B22" />
             <Text style={styles.infoText}>위치 인증: +5포인트</Text>
           </View>
           <View style={styles.infoItem}>
-            <Icon name="thumb-up" size={20} color="#4CAF50" />
+            <Icon name="thumb-up" size={20} color="#228B22" />
             <Text style={styles.infoText}>리뷰 좋아요: +1포인트</Text>
           </View>
         </View>
@@ -208,7 +216,7 @@ const PointScreen = () => {
                     style={[
                       styles.transactionAmount,
                       {
-                        color: transaction.amount > 0 ? '#4CAF50' : '#F44336',
+                        color: transaction.amount > 0 ? '#228B22' : '#F44336',
                       },
                     ]}>
                     {transaction.amount > 0 ? '+' : ''}
@@ -276,11 +284,11 @@ const styles = StyleSheet.create({
   balanceAmount: {
     fontSize: 36,
     fontWeight: 'bold',
-    color: '#4CAF50',
+    color: '#228B22',
     marginBottom: 16,
   },
   testButton: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#90EE90',
     paddingHorizontal: 20,
     paddingVertical: 10,
     borderRadius: 20,

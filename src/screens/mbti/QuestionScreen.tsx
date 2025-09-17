@@ -177,7 +177,7 @@ export default function QuestionScreen({navigation}: Props) {
   if (loading) {
     return (
       <ScrollView contentContainerStyle={styles.container}>
-        <ActivityIndicator size="large" color="#0288d1" />
+        <ActivityIndicator size="large" color="#228B22" />
         <Text style={styles.loadingText}>{t('analyzing')}</Text>
       </ScrollView>
     );
@@ -186,7 +186,7 @@ export default function QuestionScreen({navigation}: Props) {
   if (questions.length === 0) {
     return (
       <ScrollView contentContainerStyle={styles.container}>
-        <ActivityIndicator size="large" color="#0288d1" />
+        <ActivityIndicator size="large" color="#228B22" />
         <Text style={styles.loadingText}>{t('loadingQuestions')}</Text>
       </ScrollView>
     );
@@ -249,7 +249,7 @@ const styles = StyleSheet.create({
   pageTitle: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#2196F3',
+    color: '#228B22',
     marginBottom: 20,
     textAlign: 'center',
   },
@@ -288,7 +288,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   optionButton: {
-    backgroundColor: '#BBDEFB',
+    backgroundColor: '#90EE90',
     paddingVertical: 14,
     paddingHorizontal: 20,
     borderRadius: 12,
@@ -298,11 +298,11 @@ const styles = StyleSheet.create({
     borderColor: '#2196F3',
   },
   optionSelected: {
-    backgroundColor: '#2196F3',
+    backgroundColor: '#228B22',
   },
   optionText: {
     fontSize: 16,
-    color: '#0d47a1',
+    color: '#228B22',
     textAlign: 'center',
   },
   optionTextSelected: {
@@ -314,7 +314,7 @@ const styles = StyleSheet.create({
     marginTop: 12,
   },
   prevButtonText: {
-    color: '#1976D2',
+    color: '#228B22',
     fontSize: 14,
   },
 });

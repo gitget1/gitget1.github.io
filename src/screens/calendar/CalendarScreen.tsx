@@ -70,13 +70,26 @@ function CalendarScreen() {
         selectedDateStart,
         selectedDateEnd,
         reservations: selectedDateReservations,
+        reservationsCount: selectedDateReservations.length,
         isLoading: isSelectedDateLoading,
         isError: isSelectedDateError
+      });
+      
+      // 각 예약의 날짜 정보도 로그로 출력
+      selectedDateReservations.forEach((reservation, index) => {
+        console.log(`📅 예약 ${index + 1}:`, {
+          id: reservation.id,
+          title: reservation.tourProgramTitle,
+          startDate: reservation.guideStartDate,
+          endDate: reservation.guideEndDate,
+          role: reservation.role,
+          counterpartName: reservation.counterpartName
+        });
       });
     }
   }, [selectedDateString, selectedDateReservations, isSelectedDateLoading, isSelectedDateError]);
 
-  // 월별 예약 데이터 조회 (캘린더 표시용) - 받은 예약 사용
+  // 월별 예약 데이터는 캘린더 표시용으로만 사용 (실제 예약 목록에는 사용하지 않음)
   const { 
     data: monthlyReservations = [], 
     isLoading: isMonthlyLoading, 
@@ -85,7 +98,7 @@ function CalendarScreen() {
 
   // 월별 예약 데이터 디버깅 로그
   useEffect(() => {
-    console.log('📅 월별 예약 데이터 디버깅:', {
+    console.log('📅 월별 예약 데이터 디버깅 (캘린더 표시용):', {
       start,
       end,
       monthlyReservations,
@@ -95,7 +108,7 @@ function CalendarScreen() {
     });
   }, [start, end, monthlyReservations, isMonthlyLoading, isMonthlyError]);
 
-  // API 데이터만 사용 (캘린더 표시용)
+  // 캘린더 표시용 예약 데이터 (실제 예약 목록에는 사용하지 않음)
   const reservations = monthlyReservations;
 
   // 디버깅 로그 제거
@@ -146,6 +159,35 @@ function CalendarScreen() {
 
   // 선택된 날짜의 예약 데이터 필터링
   const filteredSelectedDateReservations = selectedDateReservations.filter(item => {
+    // 날짜 필터링 (클라이언트에서 추가 필터링)
+    if (selectedDateString) {
+      const selectedDate = dayjs(selectedDateString);
+      const itemStartDate = dayjs(item.guideStartDate);
+      const itemEndDate = dayjs(item.guideEndDate);
+      
+      // 예약이 선택된 날짜와 겹치는지 확인
+      const isOnSelectedDate = itemStartDate.isSame(selectedDate, 'day') || 
+                               itemEndDate.isSame(selectedDate, 'day') ||
+                               (itemStartDate.isBefore(selectedDate, 'day') && itemEndDate.isAfter(selectedDate, 'day'));
+      
+      if (!isOnSelectedDate) {
+        console.log(`❌ 예약 ${item.id} 필터링됨:`, {
+          selectedDate: selectedDate.format('YYYY-MM-DD'),
+          itemStartDate: itemStartDate.format('YYYY-MM-DD'),
+          itemEndDate: itemEndDate.format('YYYY-MM-DD'),
+          isOnSelectedDate
+        });
+        return false;
+      }
+      
+      console.log(`✅ 예약 ${item.id} 포함됨:`, {
+        selectedDate: selectedDate.format('YYYY-MM-DD'),
+        itemStartDate: itemStartDate.format('YYYY-MM-DD'),
+        itemEndDate: itemEndDate.format('YYYY-MM-DD'),
+        title: item.tourProgramTitle
+      });
+    }
+    
     // 상태 필터링
     if (selectedStatus === null) return true;
     
@@ -220,7 +262,7 @@ function CalendarScreen() {
             {monthYear.year}년 {monthYear.month}월 {selectedDate}일 예약 현황
           </Text>
           <Text style={styles.selectedDateSubtitle}>
-            {selectedDateString ? `총 ${filteredSelectedDateReservations.length}건의 예약` : '날짜를 선택해주세요'}
+            {selectedDateString ? `선택된 날짜: ${selectedDateString} (총 ${filteredSelectedDateReservations.length}건의 예약)` : '날짜를 선택해주세요'}
           </Text>
         </View>
         
@@ -242,14 +284,30 @@ function CalendarScreen() {
         {!isSelectedDateLoading && !isSelectedDateError && selectedDateString && (
           <>
             {filteredSelectedDateReservations.length > 0 ? (
-              <EventList 
-                posts={filteredSelectedDateReservations} 
-                onStatusChange={handleStatusChange}
-              />
+              <>
+                <View style={styles.debugInfo}>
+                  <Text style={styles.debugText}>
+                    📅 선택된 날짜: {selectedDateString}
+                  </Text>
+                  <Text style={styles.debugText}>
+                    📊 서버에서 받은 예약 수: {selectedDateReservations.length}건
+                  </Text>
+                  <Text style={styles.debugText}>
+                    📊 필터링 후 표시할 예약 수: {filteredSelectedDateReservations.length}건
+                  </Text>
+                </View>
+                <EventList 
+                  posts={filteredSelectedDateReservations} 
+                  onStatusChange={handleStatusChange}
+                />
+              </>
             ) : (
               <View style={styles.noReservationContainer}>
                 <Text style={styles.noReservationText}>
-                  이 날짜에는 예약이 없습니다.
+                  📅 {selectedDateString}에는 예약이 없습니다.
+                </Text>
+                <Text style={styles.noReservationSubText}>
+                  다른 날짜를 선택해보세요.
                 </Text>
               </View>
             )}
@@ -293,7 +351,7 @@ const styles = StyleSheet.create({
     borderColor: '#ddd',
   },
   rejectedButton: {
-    backgroundColor: '#ffebee',
+    backgroundColor: '#90EE90',
     borderColor: '#f44336',
   },
   successButton: {
@@ -310,6 +368,7 @@ const styles = StyleSheet.create({
   statusButtonText: {
     fontSize: 12,
     fontWeight: '600',
+    color: '#000000',
   },
   selectedDateInfo: {
     padding: 15,
@@ -320,12 +379,12 @@ const styles = StyleSheet.create({
   selectedDateTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: colors.BLACK,
+    color: '#000000',
     marginBottom: 4,
   },
   selectedDateSubtitle: {
     fontSize: 14,
-    color: colors.GRAY_500,
+    color: '#000000',
   },
   noReservationContainer: {
     padding: 40,
@@ -334,7 +393,7 @@ const styles = StyleSheet.create({
   },
   noReservationText: {
     fontSize: 16,
-    color: colors.GRAY_500,
+    color: '#000000',
     textAlign: 'center',
   },
   loadingContainer: {
@@ -344,7 +403,7 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     fontSize: 16,
-    color: colors.GRAY_500,
+    color: '#000000',
     textAlign: 'center',
   },
   errorContainer: {
@@ -356,6 +415,25 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: colors.PINK_700,
     textAlign: 'center',
+  },
+  debugInfo: {
+    padding: 10,
+    backgroundColor: '#f0f8ff',
+    borderLeftWidth: 4,
+    borderLeftColor: '#228B22',
+    marginHorizontal: 15,
+    marginVertical: 10,
+  },
+  debugText: {
+    fontSize: 12,
+    color: '#000000',
+    marginBottom: 2,
+  },
+  noReservationSubText: {
+    fontSize: 14,
+    color: '#000000',
+    textAlign: 'center',
+    marginTop: 8,
   },
 });
 

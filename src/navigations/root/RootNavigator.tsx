@@ -18,7 +18,7 @@ import MainScreen from '../../screens/mypage/MyPage';
 import QuestionScreen from '../../screens/mbti/QuestionScreen';
 import ResultScreen from '../../screens/mbti/ResultScreen';
 import Make_program from '../../screens/program/Make_program';
-import Practice from '../../screens/auth/Practice';
+// import Practice from '../../screens/auth/Practice';
 import MainHomeScreen from '../../screens/auth/MainHomeScreen';
 
 // 스택 네비게이터 타입 정의
@@ -61,11 +61,11 @@ const AppNavigator = () => {
           component={Make_program}
           options={{title: '프로그램 작성하기'}}
         />
-        <Stack.Screen
+        {/* <Stack.Screen
           name="Practice"
           component={Practice}
           options={{title: '지역 설정'}}
-        />
+        /> */}
         <Stack.Screen name="MainHome" component={MainHomeScreen} />
       </Stack.Navigator>
     </NavigationContainer>

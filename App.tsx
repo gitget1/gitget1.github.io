@@ -1,3 +1,6 @@
+// React Native 폴리필 초기화
+import 'react-native-get-random-values';
+
 if (typeof global.TextEncoder === 'undefined') {
   const {TextEncoder} = require('text-encoding');
   global.TextEncoder = TextEncoder;

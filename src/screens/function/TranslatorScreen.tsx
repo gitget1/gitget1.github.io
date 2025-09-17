@@ -254,7 +254,7 @@ const TranslatorScreen: React.FC = () => {
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.swapButton} onPress={swapLanguages}>
-            <Icon name="swap-horiz" size={24} color="#007AFF" />
+            <Icon name="swap-horiz" size={24} color="#228B22" />
           </TouchableOpacity>
 
           <TouchableOpacity

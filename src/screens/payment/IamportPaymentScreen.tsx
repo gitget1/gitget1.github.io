@@ -3,6 +3,7 @@ import IMP from 'iamport-react-native';
 import axios from 'axios';
 import {useNavigation, useRoute} from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage'; // ✅ 1. AsyncStorage import 추가
+import {View, Text, ActivityIndicator} from 'react-native';
 
 const IamportPaymentScreen = () => {
   const navigation = useNavigation();
@@ -121,10 +122,19 @@ const IamportPaymentScreen = () => {
   return (
     <IMP.Payment
       userCode={userCode}
-      loading={<></>}
+      loading={
+        <View style={{flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f5f6fa'}}>
+          <Text style={{fontSize: 18, color: '#228B22', marginBottom: 20}}>결제 페이지를 불러오는 중...</Text>
+          <ActivityIndicator size="large" color="#228B22" />
+        </View>
+      }
       data={{
         ...data,
         app_scheme: 'tourapps',
+        // 테스트 모드 설정
+        test_mode: true, // 테스트 모드 활성화
+        // 사용자에게 더 명확한 안내
+        notice_url: '', // 공지사항 URL (필요시)
       }}
       callback={callback}
     />

@@ -10,6 +10,7 @@
     "test": "jest"
   },
   "dependencies": {
+    "@craftzdog/react-native-buffer": "^6.1.0",
     "@expo/vector-icons": "^14.1.0",
     "@mapbox/polyline": "^1.2.1",
     "@react-native-async-storage/async-storage": "^2.1.2",
@@ -26,9 +27,12 @@
     "@tanstack/react-query": "^5.69.0",
     "axios": "^1.8.4",
     "fast-text-encoding": "^1.0.6",
+    "form-data": "^4.0.4",
     "haversine-distance": "^1.2.3",
     "i18next": "^25.2.1",
     "iamport-react-native": "^2.0.15",
+    "inherits": "^2.0.4",
+    "proxy-from-env": "^1.1.0",
     "react": "18.3.1",
     "react-i18next": "^15.5.3",
     "react-native": "0.75.2",
@@ -46,8 +50,11 @@
     "react-native-vector-icons": "^10.2.0",
     "react-native-video": "^6.16.1",
     "react-native-webview": "^13.15.0",
+    "readable-stream": "^4.7.0",
     "sockjs-client": "^1.6.1",
+    "string_decoder": "^1.3.0",
     "text-encoding": "^0.7.0",
+    "url": "^0.11.4",
     "uuid": "^8.3.2"
   },
   "devDependencies": {

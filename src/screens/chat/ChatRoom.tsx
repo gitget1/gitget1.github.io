@@ -11,7 +11,7 @@ import {
   TouchableOpacity,
   Alert,
 } from 'react-native';
-import {useRoute, RouteProp} from '@react-navigation/native';
+import {useRoute, useNavigation, RouteProp} from '@react-navigation/native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
@@ -42,6 +42,7 @@ type RootStackParamList = {
 type ChatRoomRouteProp = RouteProp<RootStackParamList, 'ChatRoom'>;
 const ChatRoom = () => {
   const {t} = useTranslation();
+  const navigation = useNavigation();
   const {params} = useRoute<ChatRoomRouteProp>();
   const [input, setInput] = useState('');
   const [messages, setMessages] = useState<Message[]>([]);
@@ -68,6 +69,9 @@ const ChatRoom = () => {
         const token = await AsyncStorage.getItem('accessToken');
         if (!token) {
           console.warn('JWT 토큰이 없습니다.');
+          Alert.alert('알림', '채팅은 로그인이 필요한 기능입니다.', [
+            { text: '확인', onPress: () => navigation.navigate('MainHomeScreen') }
+          ]);
           return;
         }
 

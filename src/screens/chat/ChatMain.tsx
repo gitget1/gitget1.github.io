@@ -47,6 +47,9 @@ const ChatMain = () => {
       const token = await AsyncStorage.getItem('accessToken');
       if (!token) {
         console.warn('JWT 토큰이 없습니다.');
+        Alert.alert('알림', '채팅은 로그인이 필요한 기능입니다.', [
+          { text: '확인', onPress: () => navigation.navigate('MainHomeScreen') }
+        ]);
         return;
       }
 
@@ -172,7 +175,7 @@ const ChatMain = () => {
         <ActivityIndicator
           style={{marginTop: 20}}
           size="large"
-          color="#0288d1"
+          color="#228B22"
         />
       ) : (
         <FlatList

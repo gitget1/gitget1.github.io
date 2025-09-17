@@ -10,6 +10,10 @@ const config = {
   watchFolders: [],
   resolver: {
     useWatchman: false, // Watchman 비활성화로 안정성 향상
+    // axios가 브라우저 버전을 사용하도록 설정
+    resolverMainFields: ['browser', 'main'],
+    // Node.js 모듈들을 무시하도록 설정
+    blacklistRE: /node_modules\/axios\/dist\/node\/.*/,
   },
   server: {
     port: 8081,
