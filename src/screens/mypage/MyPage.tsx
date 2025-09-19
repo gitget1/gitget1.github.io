@@ -682,7 +682,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   profileWrap: {alignItems: 'center'},
-  helloText: {fontSize: 20, fontWeight: 'bold', color: '#228B22'},
+  helloText: {fontSize: 20, fontWeight: '800', color: '#228B22'},
   gridBox: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -700,17 +700,17 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   gridIcon: {fontSize: 30},
-  gridText: {marginTop: 8, fontSize: 14, fontWeight: '500'},
+  gridText: {marginTop: 8, fontSize: 14, fontWeight: '700', color: '#000000'},
   noticeCard: {
     backgroundColor: '#e6f5ea',
     borderRadius: 12,
     margin: 16,
     padding: 16,
   },
-  noticeTitle: {fontSize: 16, fontWeight: 'bold', color: '#228B22'},
+  noticeTitle: {fontSize: 16, fontWeight: '800', color: '#228B22'},
   pointsValue: {
     fontSize: 22,
-    fontWeight: '800',
+    fontWeight: '900',
     marginTop: 6,
     color: '#228B22',
   },
@@ -736,14 +736,14 @@ const styles = StyleSheet.create({
   },
   editModalTitle: {
     fontSize: 20,
-    fontWeight: 'bold',
+    fontWeight: '800',
     textAlign: 'center',
     marginBottom: 20,
     color: '#228B22',
   },
   editFormContainer: {maxHeight: 400},
   inputGroup: {marginBottom: 16},
-  inputLabel: {fontSize: 14, fontWeight: '500', marginBottom: 8, color: '#333'},
+  inputLabel: {fontSize: 14, fontWeight: '700', marginBottom: 8, color: '#333'},
   textInput: {
     borderWidth: 1,
     borderColor: '#ddd',
@@ -751,6 +751,7 @@ const styles = StyleSheet.create({
     padding: 12,
     fontSize: 16,
     backgroundColor: '#f9f9f9',
+    color: '#000000',
   },
   editModalButtons: {
     flexDirection: 'row',
@@ -770,8 +771,8 @@ const styles = StyleSheet.create({
     borderColor: '#ddd',
   },
   saveButton: {backgroundColor: '#90EE90'},
-  cancelButtonText: {fontSize: 16, fontWeight: '500', color: '#666'},
-  saveButtonText: {fontSize: 16, fontWeight: '500', color: '#fff'},
+  cancelButtonText: {fontSize: 16, fontWeight: '700', color: '#666'},
+  saveButtonText: {fontSize: 16, fontWeight: '700', color: '#000000'},
   pickerButton: {
     borderWidth: 1,
     borderColor: '#ddd',
@@ -782,7 +783,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  pickerButtonText: {fontSize: 16, color: '#333'},
+  pickerButtonText: {fontSize: 16, color: '#000000'},
   pickerArrow: {fontSize: 12, color: '#666'},
   pickerContainer: {
     borderWidth: 1,
@@ -799,7 +800,7 @@ const styles = StyleSheet.create({
     padding: 12,
     backgroundColor: '#f0f0f0',
   },
-  fixedValueText: {fontSize: 16, color: '#666', fontWeight: '500'},
+  fixedValueText: {fontSize: 16, color: '#000000', fontWeight: '500'},
   selectionModalContainer: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
@@ -814,7 +815,7 @@ const styles = StyleSheet.create({
   },
   selectionModalTitle: {
     fontSize: 18,
-    fontWeight: 'bold',
+    fontWeight: '800',
     textAlign: 'center',
     marginBottom: 20,
     color: '#228B22',
@@ -826,7 +827,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#f0f0f0',
   },
-  selectionItemText: {fontSize: 16, color: '#333', textAlign: 'center'},
+  selectionItemText: {fontSize: 16, color: '#000000', textAlign: 'center'},
   selectionCancelButton: {
     marginTop: 20,
     paddingVertical: 16,
@@ -834,5 +835,5 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: 'center',
   },
-  selectionCancelText: {fontSize: 16, fontWeight: '500', color: '#666'},
+  selectionCancelText: {fontSize: 16, fontWeight: '700', color: '#000000'},
 });

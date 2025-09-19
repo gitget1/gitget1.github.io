@@ -515,7 +515,7 @@ const MainHomeScreen = () => {
             },
             {
               icon: '🔎',
-              label: '성향별 맞춤 찾기',
+              label: '스타일별 관광 탐색',
               action: () => navigation.navigate('TraitSelection1'),
               bg: '#FFF9C4',
             },

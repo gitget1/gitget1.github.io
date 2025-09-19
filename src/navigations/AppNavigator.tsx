@@ -19,7 +19,7 @@ import PaymentScreen from '../screens/payment/PaymentScreen';
 import PaymentCompleteScreen from '../screens/payment/PaymentCompleteScreen';
 import WishlistScreen from '../screens/wishlist/WishlistScreen';
 import {NativeStackScreenProps} from '@react-navigation/native-stack';
-import IamportPaymentScreen from '../screens/payment/IamportPaymentScreen';
+// import IamportPaymentScreen from '../screens/payment/IamportPaymentScreen';
 import CalendarScreen from '../screens/calendar/CalendarScreen';
 import ChatMain from '../screens/chat/ChatMain';
 import ChatRoom from '../screens/chat/ChatRoom';
@@ -67,19 +67,19 @@ export type AppStackParamList = {
   PlaceReview: { placeId: string; placeName?: string };
   PracticeDetail: {tourProgramId: number; refresh?: boolean; selectedLanguage?: string};
   PlaceDetail: {placeName: string; placeDescription: string; lat: number; lon: number; placeId?: string; language?: string; tourProgramId?: number};
-  IamportPayment: {
-    userCode: string;
-    data: {
-      pg: string;
-      pay_method: string;
-      name: string;
-      amount: number;
-      merchant_uid: string;
-      buyer_name: string;
-      buyer_tel: string;
-      buyer_email: string;
-    };
-  };
+  // IamportPayment: {
+  //   userCode: string;
+  //   data: {
+  //     pg: string;
+  //     pay_method: string;
+  //     name: string;
+  //     amount: number;
+  //     merchant_uid: string;
+  //     buyer_name: string;
+  //     buyer_tel: string;
+  //     buyer_email: string;
+  //   };
+  // };
   CalendarHome: undefined;
   ChatMain: undefined;
   ChatRoom: {roomId: string; userId?: number};
@@ -235,11 +235,11 @@ const AppNavigator = () => {
           headerTitleStyle: {fontSize: 20},
         }}
       />
-      <Stack.Screen
+      {/* <Stack.Screen
         name="IamportPayment"
         component={IamportPaymentScreen}
         options={{headerShown: false}}
-      />
+      /> */}
       <Stack.Screen
         name="CalendarHome"
         component={CalendarScreen}

@@ -62,7 +62,7 @@ function AuthHomeScreen({navigation, navigationOverride}: AuthHomeScreenProps) {
           <Image
             resizeMode="contain"
             style={styles.image}
-            source={require('../../assets/294a0d52-c4d4-4588-b752-0c2f2727f1bd.png')}
+            source={require('../../assets/KakaoTalk_20250919_002642553.png')}
           />
         </View>
         <View style={styles.buttonContainer}>

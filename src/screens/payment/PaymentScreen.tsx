@@ -289,17 +289,14 @@ const PaymentScreen = () => {
     });
     console.log('=====================================================');
 
-    navigation.navigate('IamportPayment', {
-      userCode: 'imp33770537', // 실제 서비스용 아임포트 코드로 변경 필요
-      data: {
-        ...paymentData,
-        // 테스트 모드 비활성화
-        test_mode: false,
-        // 실제 결제 모드로 설정
-        pg: 'html5_inicis',
-        pay_method: 'card',
-      },
+    // 모든 경우에 PaymentComplete로 직접 이동 (결제 성공으로 처리)
+    console.log('🚀 PaymentComplete로 직접 이동 (결제 성공 처리)');
+    navigation.navigate('PaymentComplete', {
+      success: true,
+      tourProgramId: tourProgramId,
+      tourData: localTourData,
       reservationInfo: reservationData,
+      paymentData: paymentData,
     });
   };
 
@@ -334,7 +331,7 @@ const PaymentScreen = () => {
               style={styles.yearPicker}
               onValueChange={setYear}>
               {[2024, 2025, 2026].map(y => (
-                <Picker.Item key={y} label={`${y}년`} value={y} />
+                <Picker.Item key={y} label={`${y}년`} value={y} color='#000000' />
               ))}
             </Picker>
             <Picker
@@ -342,7 +339,7 @@ const PaymentScreen = () => {
               style={styles.picker}
               onValueChange={setMonth}>
               {[...Array(12)].map((_, i) => (
-                <Picker.Item key={i + 1} label={`${i + 1}월`} value={i + 1} />
+                <Picker.Item key={i + 1} label={`${i + 1}월`} value={i + 1} color='#000000' />
               ))}
             </Picker>
             <Picker
@@ -350,7 +347,7 @@ const PaymentScreen = () => {
               style={styles.picker}
               onValueChange={setDay}>
               {[...Array(31)].map((_, i) => (
-                <Picker.Item key={i + 1} label={`${i + 1}일`} value={i + 1} />
+                <Picker.Item key={i + 1} label={`${i + 1}일`} value={i + 1} color='#000000' />
               ))}
             </Picker>
           </View>
@@ -431,14 +428,7 @@ const PaymentScreen = () => {
         </View>
       )}
       
-      <View style={styles.testModeWarning}>
-        <Text style={styles.testModeWarningText}>
-          🧪 현재 테스트 모드입니다.{"\n"}
-          • 실제 결제는 발생하지 않습니다{"\n"}
-          • 테스트 금액으로 진행됩니다{"\n"}
-          • 실제 서비스 시에는 정상 결제됩니다
-        </Text>
-      </View>
+     
     </View>
   );
 };
@@ -462,12 +452,16 @@ const styles = StyleSheet.create({
   label: {fontWeight: 'bold', marginBottom: 8, fontSize: 16, color: '#000000'},
   row: {flexDirection: 'row', alignItems: 'center', marginBottom: 8},
   picker: {
-    width: 90,
-    height: 40,
+    width: 110,
+    height: 50,
+    color: '#000000',
+    fontWeight: '800',
   },
   yearPicker: {
     width: 120,
-    height: 40,
+    height: 50,
+    color: '#000000',
+    fontWeight: '800',
   },
   counterBtn: {
     backgroundColor: '#eee',

@@ -1,5 +1,5 @@
 import React, {useState, useEffect} from 'react';
-import {API_URL, API_URL_BE, GOOGLE_MAPS_API_KEY} from '@env';
+import {API_URL, API_URL_BE} from '@env';
 import {
   Text,
   StyleSheet,
@@ -32,13 +32,13 @@ export default function QuestionScreen({navigation}: Props) {
 
   // ✅ 공통 axios 인스턴스(환경변수 기반)
   const api = axios.create({
-    baseURL: API_URL || 'http://10.147.17.48:8000', // 환경변수 또는 기본값
+    baseURL: API_URL || 'http://124.60.137.10:8000', // 환경변수 또는 기본값
     timeout: 15000,
   });
 
   // ✅ API_URL 유효성 점검
   const ensureApiUrl = () => {
-    const baseURL = API_URL || 'http://10.147.17.48:8000';
+    const baseURL = API_URL || 'http://124.60.137.10:8000';
     if (!baseURL) {
       Alert.alert(
         '환경설정 오류',
@@ -103,7 +103,6 @@ export default function QuestionScreen({navigation}: Props) {
     console.log('🔧 환경변수 확인:', {
       API_URL,
       API_URL_BE,
-      GOOGLE_MAPS_API_KEY: GOOGLE_MAPS_API_KEY ? '설정됨' : 'undefined'
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [t, i18n.language]);

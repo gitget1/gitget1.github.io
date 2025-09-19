@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -16,7 +16,7 @@ import {
   PermissionsAndroid,
   Platform,
 } from 'react-native';
-import { useNavigation, useRoute } from '@react-navigation/native';
+import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
 import type { StackNavigationProp } from '@react-navigation/stack';
 import type { RouteProp } from '@react-navigation/native';
 import type { AppStackParamList } from '../../navigations/AppNavigator';
@@ -90,6 +90,7 @@ const PlaceDetailScreen = () => {
     longitude: number;
   } | null>(null);
   const [isRequesting, setIsRequesting] = useState(false); // 중복 요청 방지
+  const [hasLocationPermission, setHasLocationPermission] = useState(false); // 위치 권한 확인 상태
 
   // 새로운 API로 장소 정보 가져오기
   const fetchPlaceData = async () => {
@@ -303,9 +304,13 @@ const PlaceDetailScreen = () => {
     }
   };
 
-  useEffect(() => {
-    fetchPlaceData();
-  }, []);
+  // 페이지에 포커스될 때마다 데이터 새로고침
+  useFocusEffect(
+    useCallback(() => {
+      console.log('🔄 PlaceDetailScreen 포커스됨 - 데이터 새로고침 시작');
+      fetchPlaceData();
+    }, [])
+  );
 
   // 위치 권한 요청 함수
   const requestLocationPermission = async (): Promise<boolean> => {
@@ -416,7 +421,7 @@ const PlaceDetailScreen = () => {
             return;
           }
         }
-        
+
       }
 
       // 다른 에러들은 그대로 throw
@@ -462,25 +467,35 @@ const PlaceDetailScreen = () => {
       console.log('🟢 위치 검증 결과:', verificationResult);
 
       // 새로운 API 응답 구조에 맞게 수정
-      if (verificationResult.status === '100 CONTINUE' || verificationResult.status === '200 OK') {
-        if (verificationResult.data?.isVerified) {
+      if (verificationResult.status === '100 CONTINUE' || verificationResult.status === '200 OK' || verificationResult.status === 'OK') {
+        // 성공 메시지가 포함된 경우 성공으로 처리
+        const successMessage = verificationResult.message || verificationResult.data?.message || '';
+        if (verificationResult.data?.isVerified ||
+          successMessage.includes('성공적으로') ||
+          successMessage.includes('권한이 부여되었습니다') ||
+          successMessage.includes('이미 방문 권한이 있습니다')) {
+          // 위치 권한 확인 성공
+          setHasLocationPermission(true);
+
           // "이미 방문 권한이 있다"는 경우 성공 메시지 표시
-          if (verificationResult.data?.message?.includes('이미 방문 권한이 있습니다')) {
+          if (successMessage.includes('이미 방문 권한이 있습니다')) {
             Alert.alert('GPS 권한 확인', '이미 방문 권한이 있습니다. 리뷰를 작성하시겠습니까?', [
               { text: '취소', style: 'cancel' },
               { text: '리뷰 작성', onPress: () => setShowReviewModal(true) }
             ]);
           } else {
-            Alert.alert('GPS 권한 성공', verificationResult.data.message || '현장 방문이 확인되었습니다! 리뷰를 작성하시겠습니까?', [
+            Alert.alert('GPS 권한 성공', successMessage || '현장 방문이 확인되었습니다! 리뷰를 작성하시겠습니까?', [
               { text: '취소', style: 'cancel' },
               { text: '리뷰 작성', onPress: () => setShowReviewModal(true) }
             ]);
           }
           console.log('🟢 GPS 권한 성공:', verificationResult);
         } else {
+          // 위치 권한 확인 실패
+          setHasLocationPermission(false);
           Alert.alert(
             'GPS 권한 실패',
-            verificationResult.data?.message || '현재 위치에서 장소를 방문해주세요.\n(3km 반경 내에서만 리뷰 작성 가능)',
+            successMessage || '현재 위치에서 장소를 방문해주세요.\n(3km 반경 내에서만 리뷰 작성 가능)',
             [
               { text: '확인', style: 'default' },
               { text: '위치 다시 확인', onPress: () => handleWriteReview() }
@@ -489,6 +504,8 @@ const PlaceDetailScreen = () => {
           console.log('🔴 GPS 권한 실패:', verificationResult);
         }
       } else {
+        // 위치 권한 확인 실패
+        setHasLocationPermission(false);
         Alert.alert('GPS 권한 실패', verificationResult.message || '위치 검증에 실패했습니다.');
         console.log('🔴 GPS 권한 실패:', verificationResult);
       }
@@ -502,6 +519,7 @@ const PlaceDetailScreen = () => {
           const errorMessage = error.response?.data?.message || '';
           if (errorMessage.includes('이미 해당 장소에 대한 방문 권한이 있습니다')) {
             console.log('🟢 이미 방문 권한이 있음 - 성공으로 처리');
+            setHasLocationPermission(true);
             Alert.alert('GPS 권한 확인', '이미 방문 권한이 있습니다. 리뷰를 작성하시겠습니까?', [
               { text: '취소', style: 'cancel' },
               { text: '리뷰 작성', onPress: () => setShowReviewModal(true) }
@@ -510,6 +528,7 @@ const PlaceDetailScreen = () => {
           }
 
           // 다른 400 에러는 실패로 처리
+          setHasLocationPermission(false);
           Alert.alert(
             'GPS 권한 실패',
             `${errorMessage}\n(3km 반경 내에서만 리뷰 작성 가능)`,
@@ -523,7 +542,8 @@ const PlaceDetailScreen = () => {
           const errorMessage = error.response?.data?.message || '';
           if (errorMessage.includes('이미 존재하는 데이터입니다') || errorMessage.includes('이미 해당 장소에 대한 방문 권한이 있습니다')) {
             console.log('🟢 이미 방문 권한이 있음 (409) - 성공으로 처리');
-            Alert.alert('GPS 권한 확인', '이미 방문 권한이 있습니다. 리뷰를 작성하시겠습니까?', [
+            setHasLocationPermission(true);
+            Alert.alert('GPS 권한 확인', '이미 방문 권한이 있습니다.', [
               { text: '취소', style: 'cancel' },
               { text: '리뷰 작성', onPress: () => setShowReviewModal(true) }
             ]);
@@ -531,13 +551,20 @@ const PlaceDetailScreen = () => {
           }
 
           // 다른 409 에러는 실패로 처리
+          setHasLocationPermission(false);
           Alert.alert('GPS 권한 실패', `${errorMessage}\n(이미 권한이 있는 상태입니다)`);
         } else if (error.response?.status === 500) {
+          setHasLocationPermission(false);
           Alert.alert('오류', '서버 오류가 발생했습니다. 잠시 후 다시 시도해주세요.');
+        } else if (error.response?.status === 400 && error.response?.data?.message?.includes('사용자가 위치에 존재하지않아')) {
+          setHasLocationPermission(false);
+          Alert.alert('위치 오류', '사용자가 위치에 존재하지않아 오류가 발생했습니다.');
         } else {
+          setHasLocationPermission(false);
           Alert.alert('오류', '위치 확인 중 오류가 발생했습니다. 다시 시도해주세요.');
         }
       } else {
+        setHasLocationPermission(false);
         Alert.alert('오류', '위치 확인 중 오류가 발생했습니다. 다시 시도해주세요.');
       }
     }
@@ -584,18 +611,27 @@ const PlaceDetailScreen = () => {
             content: newReview.content,
             name: '나', // 현재 사용자
             createdAt: new Date().toISOString(),
-            verificationBadge: true,
+            verificationBadge: hasLocationPermission,
           };
 
-          setPlaceDetail(prev => ({
-            ...prev!,
-            travelLocalEvaluation: {
-              ...prev!.travelLocalEvaluation!,
-              reviews: [newReviewData, ...(prev!.travelLocalEvaluation!.reviews || [])],
-              reviewCount: (prev!.travelLocalEvaluation!.reviewCount || 0) + 1,
-              rating: ((prev!.travelLocalEvaluation!.rating || 0) * (prev!.travelLocalEvaluation!.reviewCount || 0) + newReview.rating) / ((prev!.travelLocalEvaluation!.reviewCount || 0) + 1),
-            }
-          }));
+          setPlaceDetail(prev => {
+            const currentReviews = prev!.travelLocalEvaluation!.reviews || [];
+            const newReviews = [newReviewData, ...currentReviews];
+            
+            // 정확한 평점 계산: 모든 리뷰의 별점 합계 / 리뷰 개수
+            const totalRating = newReviews.reduce((sum, review) => sum + (review.rating || 0), 0);
+            const averageRating = newReviews.length > 0 ? totalRating / newReviews.length : 0;
+            
+            return {
+              ...prev!,
+              travelLocalEvaluation: {
+                ...prev!.travelLocalEvaluation!,
+                reviews: newReviews,
+                reviewCount: newReviews.length,
+                rating: averageRating,
+              }
+            };
+          });
         }
         console.log('✅ 리뷰 작성 후 리뷰 데이터 업데이트 완료');
       } else {
@@ -737,7 +773,7 @@ const PlaceDetailScreen = () => {
             <View style={{ marginBottom: 8 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                 <Icon name="schedule" size={18} color="#666" />
-                <Text style={{ marginLeft: 8, fontSize: 15, color: '#666' }}>
+                <Text style={{ marginLeft: 8, fontSize: 15, color: '#000000', fontWeight: '700' }}>
                   영업시간
                 </Text>
               </View>
@@ -768,7 +804,7 @@ const PlaceDetailScreen = () => {
                   return daysOrder.map(day => (
                     <Text
                       key={day}
-                      style={{ fontSize: 15, color: '#666', lineHeight: 22 }}>
+                      style={{ fontSize: 15, color: '#000000', lineHeight: 22, fontWeight: '600' }}>
                       {day}: {dayMap[day] || '-'}
                     </Text>
                   ));
@@ -778,20 +814,22 @@ const PlaceDetailScreen = () => {
           )}
 
           {/* GPS로 리뷰권한 받기 버튼 - 모든 장소에서 표시 */}
-          <TouchableOpacity
-            style={{
-              marginTop: 12,
-              alignSelf: 'flex-start',
-              backgroundColor: '#90EE90',
-              borderRadius: 8,
-              paddingHorizontal: 16,
-              paddingVertical: 10,
-            }}
-            onPress={handleWriteReview}>
-            <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 15 }}>
-              GPS로 리뷰권한 받기
-            </Text>
-          </TouchableOpacity>
+          <View style={{ marginTop: 12 }}>
+            <TouchableOpacity
+              style={{
+                backgroundColor: '#90EE90',
+                borderRadius: 8,
+                paddingHorizontal: 16,
+                paddingVertical: 10,
+                alignSelf: 'flex-start',
+                width: '48%',
+              }}
+              onPress={handleWriteReview}>
+              <Text style={{ color: '#fff', fontWeight: '800', fontSize: 15, textAlign: 'center' }}>
+                GPS로 리뷰권한 받기
+              </Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* 탭 네비게이션 */}
@@ -854,9 +892,187 @@ const PlaceDetailScreen = () => {
           </View>
         ) : selectedTab === 'reviews' ? (
           <View style={styles.reviewsContent}>
-            {/* 평점 비교 카드 UI */}
-            <Text style={{ fontWeight: 'bold', fontSize: 18, marginBottom: 12 }}>
-              평점 비교
+            {/* 우리앱 리뷰만 표시 */}
+            <Text style={{ fontWeight: '800', fontSize: 18, marginBottom: 12, color: '#000000' }}>
+              우리앱 리뷰
+            </Text>
+            {(() => {
+              // 우리앱 평점 - 서버에서 잘못된 평균을 보낼 수 있으므로 직접 계산
+              const reviews = placeDetail?.travelLocalEvaluation?.reviews || [];
+              const calculatedRating = reviews.length > 0 
+                ? reviews.reduce((sum, review) => sum + (review.rating || 0), 0) / reviews.length 
+                : 0;
+              
+              const ourAppRating = {
+                platform: '우리앱',
+                icon: '⭐',
+                rating: Math.min(calculatedRating, 5), // 5점 이하로 제한
+                reviewCount: reviews.length,
+              };
+              // 최신 리뷰 미리보기(최신 5개)
+              const previewReviews =
+                placeDetail?.travelLocalEvaluation?.reviews?.slice(0, 5) || [];
+              return (
+                <View
+                  style={{
+                    backgroundColor: '#fff',
+                    borderRadius: 12,
+                    padding: 16,
+                    marginBottom: 16,
+                    elevation: 2,
+                  }}>
+                  <View
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      marginBottom: 8,
+                    }}>
+                    <Text style={{ fontSize: 20, marginRight: 8 }}>
+                      {ourAppRating.icon}
+                    </Text>
+                    <Text style={{ fontWeight: '800', fontSize: 16, color: '#000000' }}>
+                      {ourAppRating.platform}
+                    </Text>
+                    <Text
+                      style={{
+                        color: '#000000',
+                        fontWeight: '800',
+                        fontSize: 18,
+                        marginLeft: 8,
+                      }}>
+                      {ourAppRating.rating
+                        ? ourAppRating.rating.toFixed(1)
+                        : '-'}
+                    </Text>
+                    <Text style={{ color: '#000000', marginLeft: 4, fontWeight: '600' }}>
+                      리뷰 {ourAppRating.reviewCount}개
+                    </Text>
+                    <View style={{ flexDirection: 'row', marginLeft: 8 }}>
+                      {[1, 2, 3, 4, 5].map(i => (
+                        <Text
+                          key={i}
+                          style={{
+                            color:
+                              i <= Math.round(ourAppRating.rating)
+                                ? '#FFD700'
+                                : '#ccc',
+                            fontSize: 18,
+                          }}>
+                          ★
+                        </Text>
+                      ))}
+                    </View>
+                  </View>
+                  <Text
+                    style={{
+                      fontWeight: '800',
+                      fontSize: 15,
+                      marginBottom: 8,
+                      color: '#000000',
+                    }}>
+                    최신 리뷰
+                  </Text>
+                  {previewReviews.length > 0 ? (
+                    previewReviews.map((review, idx) => {
+                      // 실제 사용자 이름 표시 (개인 ID는 익명으로 처리)
+                      let displayName = review.name || '';
+                      if (
+                        /^naver_|^kakao_|^google_/i.test(displayName) ||
+                        displayName.length > 15
+                      ) {
+                        displayName = '익명';
+                      }
+                      return (
+                        <View
+                          key={idx}
+                          style={{
+                            backgroundColor: '#f8f9fa',
+                            borderRadius: 8,
+                            padding: 12,
+                            marginBottom: 8,
+                          }}>
+                          <View
+                            style={{
+                              flexDirection: 'row',
+                              alignItems: 'center',
+                              marginBottom: 4,
+                            }}>
+                            <Text
+                              style={{
+                                fontWeight: '800',
+                                marginRight: 8,
+                                fontSize: 13,
+                                color: '#000000',
+                              }}
+                              numberOfLines={1}>
+                              {displayName}
+                            </Text>
+                            <Text
+                              style={{
+                                color: '#000000',
+                                fontWeight: '800',
+                                fontSize: 13,
+                              }}>
+                              {review.rating?.toFixed(1) ?? '-'}
+                            </Text>
+                            <Text
+                              style={{
+                                color: '#000000',
+                                marginLeft: 8,
+                                fontSize: 11,
+                              }}>
+                              {review.createdAt
+                                ? new Date(
+                                  review.createdAt,
+                                ).toLocaleDateString()
+                                : ''}
+                            </Text>
+                          </View>
+                          <View style={{ position: 'relative' }}>
+                            <Text
+                              style={{ fontSize: 13, color: '#000000', fontWeight: '600' }}
+                              numberOfLines={2}>
+                              {review.content}
+                            </Text>
+                            {review.verificationBadge && (
+                              <Text style={{
+                                position: 'absolute',
+                                bottom: 0,
+                                right: 0,
+                                fontSize: 14,
+                                color: '#1DA1F2',
+                              }}>
+                                ☑️
+                              </Text>
+                            )}
+                          </View>
+                        </View>
+                      );
+                    })
+                  ) : (
+                    <Text
+                      style={{ color: '#000000', fontSize: 13, marginBottom: 8, fontWeight: '600' }}>
+                      아직 등록된 리뷰가 없습니다.
+                    </Text>
+                  )}
+                  <TouchableOpacity
+                    style={{ alignSelf: 'center', backgroundColor: '#1976D2', borderRadius: 20, paddingHorizontal: 18, paddingVertical: 6, marginTop: 4 }}
+                    onPress={() => navigation.navigate('PlaceReview', {
+                      placeId,
+                      placeName: placeDetail?.tourApiResponse?.name || placeName
+                    })}
+                  >
+                    <Text style={{ color: '#fff', fontWeight: '800', fontSize: 18 }}>+</Text>
+                  </TouchableOpacity>
+                </View>
+              );
+            })()}
+          </View>
+        ) : (
+          <View style={styles.reviewsContent}>
+            {/* 3사 플랫폼 비교 */}
+            <Text style={{ fontWeight: '800', fontSize: 18, marginBottom: 12, color: '#000000' }}>
+              3사 플랫폼 비교
             </Text>
             {(() => {
               // 평점 비교 카드: Google/Naver/Kakao
@@ -871,17 +1087,6 @@ const PlaceDetailScreen = () => {
                 { platform: 'Naver', icon: '🟢', rating: null, reviewCount: null }, // 리뷰수와 별점 숨김
                 { platform: 'Kakao', icon: '🟡', rating: null, reviewCount: null }, // 리뷰수와 별점 숨김
               ];
-              // 우리앱 평점
-              const ourAppRating = {
-                platform: '우리앱',
-                icon: '⭐',
-                rating: placeDetail?.travelLocalEvaluation?.rating ?? 0,
-                reviewCount:
-                  placeDetail?.travelLocalEvaluation?.reviewCount ?? 0,
-              };
-              // 최신 리뷰 미리보기(최신 5개)
-              const previewReviews =
-                placeDetail?.travelLocalEvaluation?.reviews?.slice(0, 5) || [];
               return (
                 <>
                   {/* 평점 비교 카드 (Google/Naver/Kakao) */}
@@ -902,7 +1107,7 @@ const PlaceDetailScreen = () => {
                           {item.icon}
                         </Text>
                         <View style={{ flex: 1 }}>
-                          <Text style={{ fontWeight: 'bold' }}>
+                          <Text style={{ fontWeight: '800', color: '#000000' }}>
                             {item.platform}
                           </Text>
                           <View
@@ -915,18 +1120,18 @@ const PlaceDetailScreen = () => {
                               <>
                                 <Text
                                   style={{
-                                    color: '#1976D2',
-                                    fontWeight: 'bold',
+                                    color: '#000000',
+                                    fontWeight: '800',
                                     fontSize: 22,
                                   }}>
                                   {item.rating ? item.rating.toFixed(1) : '-'}
                                 </Text>
-                                <Text style={{ color: '#888', marginLeft: 4 }}>
+                                <Text style={{ color: '#000000', marginLeft: 4, fontWeight: '600' }}>
                                   리뷰 {item.reviewCount}개
                                 </Text>
                               </>
                             ) : (
-                              <Text style={{ color: '#888', fontSize: 14 }}>
+                              <Text style={{ color: '#000000', fontSize: 14, fontWeight: '600' }}>
                                 해당 플랫폼의 리뷰수와 별점은 앱에 들어가서 볼 수 있습니다
                               </Text>
                             )}
@@ -976,7 +1181,7 @@ const PlaceDetailScreen = () => {
                               style={{
                                 marginLeft: 8,
                                 color: '#007AFF',
-                                fontWeight: '500',
+                                fontWeight: '700',
                                 fontSize: 15,
                               }}>
                               Google Maps
@@ -1010,7 +1215,7 @@ const PlaceDetailScreen = () => {
                               style={{
                                 marginLeft: 8,
                                 color: '#fff',
-                                fontWeight: '500',
+                                fontWeight: '700',
                                 fontSize: 15,
                               }}>
                               네이버 지도
@@ -1044,7 +1249,7 @@ const PlaceDetailScreen = () => {
                               style={{
                                 marginLeft: 8,
                                 color: '#3C1E1E',
-                                fontWeight: '500',
+                                fontWeight: '700',
                                 fontSize: 15,
                               }}>
                               카카오맵
@@ -1053,170 +1258,9 @@ const PlaceDetailScreen = () => {
                         )}
                     </View>
                   ))}
-                  {/* 우리앱 평점 + 최신 리뷰 미리보기 하나의 박스 */}
-                  <View
-                    style={{
-                      backgroundColor: '#fff',
-                      borderRadius: 12,
-                      padding: 16,
-                      marginBottom: 16,
-                      elevation: 2,
-                    }}>
-                    <View
-                      style={{
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        marginBottom: 8,
-                      }}>
-                      <Text style={{ fontSize: 20, marginRight: 8 }}>
-                        {ourAppRating.icon}
-                      </Text>
-                      <Text style={{ fontWeight: 'bold', fontSize: 16 }}>
-                        {ourAppRating.platform}
-                      </Text>
-                      <Text
-                        style={{
-                          color: '#1976D2',
-                          fontWeight: 'bold',
-                          fontSize: 18,
-                          marginLeft: 8,
-                        }}>
-                        {ourAppRating.rating
-                          ? ourAppRating.rating.toFixed(1)
-                          : '-'}
-                      </Text>
-                      <Text style={{ color: '#888', marginLeft: 4 }}>
-                        리뷰 {ourAppRating.reviewCount}개
-                      </Text>
-                      <View style={{ flexDirection: 'row', marginLeft: 8 }}>
-                        {[1, 2, 3, 4, 5].map(i => (
-                          <Text
-                            key={i}
-                            style={{
-                              color:
-                                i <= Math.round(ourAppRating.rating)
-                                  ? '#FFD700'
-                                  : '#ccc',
-                              fontSize: 18,
-                            }}>
-                            ★
-                          </Text>
-                        ))}
-                      </View>
-                    </View>
-                    <Text
-                      style={{
-                        fontWeight: 'bold',
-                        fontSize: 15,
-                        marginBottom: 8,
-                      }}>
-                      최신 리뷰
-                    </Text>
-                    {previewReviews.length > 0 ? (
-                      previewReviews.map((review, idx) => {
-                        // 실제 사용자 이름 표시 (개인 ID는 익명으로 처리)
-                        let displayName = review.name || '';
-                        if (
-                          /^naver_|^kakao_|^google_/i.test(displayName) ||
-                          displayName.length > 15
-                        ) {
-                          displayName = '익명';
-                        }
-                        return (
-                          <View
-                            key={idx}
-                            style={{
-                              backgroundColor: '#f8f9fa',
-                              borderRadius: 8,
-                              padding: 12,
-                              marginBottom: 8,
-                            }}>
-                            <View
-                              style={{
-                                flexDirection: 'row',
-                                alignItems: 'center',
-                                marginBottom: 4,
-                              }}>
-                              <Text
-                                style={{
-                                  fontWeight: 'bold',
-                                  marginRight: 8,
-                                  fontSize: 13,
-                                }}
-                                numberOfLines={1}>
-                                {displayName}
-                              </Text>
-                              <Text
-                                style={{
-                                  color: '#1976D2',
-                                  fontWeight: 'bold',
-                                  fontSize: 13,
-                                }}>
-                                {review.rating?.toFixed(1) ?? '-'}
-                              </Text>
-                              <Text
-                                style={{
-                                  color: '#888',
-                                  marginLeft: 8,
-                                  fontSize: 11,
-                                }}>
-                                {review.createdAt
-                                  ? new Date(
-                                    review.createdAt,
-                                  ).toLocaleDateString()
-                                  : ''}
-                              </Text>
-                            </View>
-                            <View style={{ position: 'relative' }}>
-                              <Text
-                                style={{ fontSize: 13, color: '#333' }}
-                                numberOfLines={2}>
-                                {review.content}
-                              </Text>
-                              {review.verificationBadge && (
-                                <Text style={{
-                                  position: 'absolute',
-                                  bottom: 0,
-                                  right: 0,
-                                  fontSize: 14,
-                                  color: '#1DA1F2',
-                                }}>
-                                  ☑️
-                                </Text>
-                              )}
-                            </View>
-                          </View>
-                        );
-                      })
-                    ) : (
-                      <Text
-                        style={{ color: '#888', fontSize: 13, marginBottom: 8 }}>
-                        아직 등록된 리뷰가 없습니다.
-                      </Text>
-                    )}
-                    <TouchableOpacity
-                      style={{ alignSelf: 'center', backgroundColor: '#1976D2', borderRadius: 20, paddingHorizontal: 18, paddingVertical: 6, marginTop: 4 }}
-                      onPress={() => navigation.navigate('PlaceReview', {
-                        placeId,
-                        placeName: placeDetail?.tourApiResponse?.name || placeName
-                      })}
-                    >
-                      <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 18 }}>+</Text>
-                    </TouchableOpacity>
-                  </View>
                 </>
               );
             })()}
-          </View>
-        ) : (
-          // <MultiPlatformReviewComparison
-          //   placeName={placeDetail?.tourApiResponse?.name || placeName}
-          //   latitude={lat}
-          //   longitude={lon}
-          //   ourAppReviews={placeDetail?.travelLocalEvaluation?.reviews || []}
-          // />
-          <View style={styles.placeholderContainer}>
-            <Text style={styles.placeholderText}>리뷰 비교 기능이 준비 중입니다.</Text>
           </View>
         )}
       </ScrollView>
@@ -1289,7 +1333,7 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 16,
     fontSize: 16,
-    color: '#666',
+    color: '#000000',
   },
   errorContainer: {
     flex: 1,
@@ -1300,7 +1344,7 @@ const styles = StyleSheet.create({
   errorText: {
     marginTop: 16,
     fontSize: 16,
-    color: '#666',
+    color: '#000000',
     textAlign: 'center',
   },
   retryButton: {
@@ -1329,9 +1373,10 @@ const styles = StyleSheet.create({
   headerTitle: {
     flex: 1,
     fontSize: 18,
-    fontWeight: 'bold',
+    fontWeight: '800',
     textAlign: 'center',
     marginHorizontal: 16,
+    color: '#000000',
   },
   shareButton: {
     padding: 4,
@@ -1347,9 +1392,9 @@ const styles = StyleSheet.create({
   },
   placeName: {
     fontSize: 24,
-    fontWeight: 'bold',
+    fontWeight: '800',
     marginBottom: 12,
-    color: '#333',
+    color: '#000000',
   },
   ratingContainer: {
     flexDirection: 'row',
@@ -1362,7 +1407,7 @@ const styles = StyleSheet.create({
   },
   ratingText: {
     fontSize: 14,
-    color: '#666',
+    color: '#000000',
   },
   addressContainer: {
     flexDirection: 'row',
@@ -1372,7 +1417,7 @@ const styles = StyleSheet.create({
   addressText: {
     marginLeft: 8,
     fontSize: 14,
-    color: '#666',
+    color: '#000000',
     flex: 1,
   },
   phoneContainer: {
@@ -1383,7 +1428,7 @@ const styles = StyleSheet.create({
   phoneText: {
     marginLeft: 8,
     fontSize: 14,
-    color: '#666',
+    color: '#000000',
   },
   tabContainer: {
     flexDirection: 'row',
@@ -1401,11 +1446,11 @@ const styles = StyleSheet.create({
   },
   tabText: {
     fontSize: 16,
-    color: '#666',
+    color: '#000000',
   },
   activeTabText: {
     color: '#007AFF',
-    fontWeight: '600',
+    fontWeight: '700',
   },
   infoContent: {
     backgroundColor: 'white',
@@ -1413,14 +1458,14 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 18,
-    fontWeight: 'bold',
+    fontWeight: '800',
     marginBottom: 12,
-    color: '#333',
+    color: '#000000',
   },
   descriptionText: {
     fontSize: 14,
     lineHeight: 20,
-    color: '#666',
+    color: '#000000',
     marginBottom: 20,
   },
   linkButtonsContainer: {
@@ -1439,7 +1484,7 @@ const styles = StyleSheet.create({
     marginLeft: 12,
     fontSize: 16,
     color: '#007AFF',
-    fontWeight: '500',
+    fontWeight: '700',
   },
   reviewsContent: {
     backgroundColor: 'white',
@@ -1459,7 +1504,7 @@ const styles = StyleSheet.create({
   },
   writeReviewButtonText: {
     color: 'white',
-    fontWeight: '600',
+    fontWeight: '700',
   },
   reviewStats: {
     alignItems: 'center',
@@ -1470,19 +1515,19 @@ const styles = StyleSheet.create({
   },
   ratingNumber: {
     fontSize: 48,
-    fontWeight: 'bold',
-    color: '#333',
+    fontWeight: '800',
+    color: '#000000',
     marginBottom: 8,
   },
   reviewCountText: {
     fontSize: 14,
-    color: '#666',
+    color: '#000000',
     marginTop: 8,
   },
   noReviewsText: {
     textAlign: 'center',
     fontSize: 14,
-    color: '#999',
+    color: '#000000',
     fontStyle: 'italic',
   },
   modalOverlay: {
@@ -1505,8 +1550,8 @@ const styles = StyleSheet.create({
   },
   modalTitle: {
     fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
+    fontWeight: '800',
+    color: '#000000',
   },
   closeButton: {
     padding: 4,
@@ -1516,9 +1561,9 @@ const styles = StyleSheet.create({
   },
   ratingLabel: {
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '700',
     marginBottom: 12,
-    color: '#333',
+    color: '#000000',
   },
   starsInputContainer: {
     flexDirection: 'row',
@@ -1543,7 +1588,7 @@ const styles = StyleSheet.create({
   submitButtonText: {
     color: 'white',
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '700',
   },
   placeholderContainer: {
     flex: 1,
@@ -1556,7 +1601,7 @@ const styles = StyleSheet.create({
   },
   placeholderText: {
     fontSize: 16,
-    color: '#666',
+    color: '#000000',
     textAlign: 'center',
   },
 });

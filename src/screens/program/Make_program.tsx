@@ -1347,17 +1347,51 @@ function Make_program() {
               types: 'establishment', // 장소 타입 제한
             }}
             styles={{
-              textInput: styles.input,
+              textInput: [styles.input, {color: '#000000', fontWeight: '800', placeholderTextColor: '#000000'}],
               listView: {
                 backgroundColor: 'white',
                 zIndex: 2000,
+              },
+              row: {
+                backgroundColor: 'white',
+                padding: 13,
+                height: 44,
+                flexDirection: 'row',
+              },
+              separator: {
+                height: 0.5,
+                backgroundColor: '#c8c7cc',
+              },
+              description: {
+                fontSize: 14,
+                color: '#111111',
+                fontWeight: '800',
+              },
+              predefinedPlacesDescription: {
+                fontSize: 14,
+                color: '#111111',
+                fontWeight: '800',
+              },
+              mainText: {
+                fontSize: 14,
+                color: '#111111',
+                fontWeight: '800',
+              },
+              secondaryText: {
+                fontSize: 12,
+                color: '#333333',
+                fontWeight: '600',
               },
             }}
             enablePoweredByContainer={false}
             debounce={500} // 디바운스 시간 증가
             timeout={15000} // 타임아웃 설정
           />
-          <Button title="닫기" onPress={() => setPlaceModalVisible(false)} />
+          <TouchableOpacity 
+            style={styles.modalCloseButton}
+            onPress={() => setPlaceModalVisible(false)}>
+            <Text style={styles.modalCloseButtonText}>닫기</Text>
+          </TouchableOpacity>
         </View>
       </Modal>
 
@@ -1465,6 +1499,7 @@ function Make_program() {
               <TextInput
                 style={styles.airbnbInput}
                 placeholder="매력적인 제목을 입력하세요"
+                placeholderTextColor="#000000"
                 value={title}
                 onChangeText={setTitle}
               />
@@ -1475,6 +1510,7 @@ function Make_program() {
               <TextInput
                 style={styles.airbnbInput}
                 placeholder="가격을 입력하세요"
+                placeholderTextColor="#000000"
                 value={guidePrice}
                 onChangeText={setGuidePrice}
                 keyboardType="numeric"
@@ -1542,6 +1578,7 @@ function Make_program() {
             <TextInput
               style={styles.airbnbDescriptionInput}
               placeholder="여행객들에게 전달하고 싶은 프로그램의 특징과 매력을 자유롭게 작성해주세요..."
+              placeholderTextColor="#000000"
               value={description}
               onChangeText={setDescription}
               multiline
@@ -1764,6 +1801,7 @@ function Make_program() {
                         <TextInput
                           style={styles.airbnbPlanInputWide}
                           placeholder="장소 검색"
+                          placeholderTextColor="#000000"
                           value={selectedDay === idx ? plan.place : ''}
                           onFocus={() => {
                             setSelectedDay(idx);
@@ -1774,6 +1812,7 @@ function Make_program() {
                         <TextInput
                           style={styles.airbnbPlanInputSmall}
                           placeholder="소요시간(분)"
+                          placeholderTextColor="#000000"
                           value={selectedDay === idx ? (plan.travelTime ? plan.travelTime.toString() : '') : ''}
                           onChangeText={text => {
                             setSelectedDay(idx);
@@ -1787,6 +1826,7 @@ function Make_program() {
                       <TextInput
                         style={styles.airbnbPlanDescriptionInput}
                         placeholder="장소에 대한 설명을 자유롭게 작성해주세요..."
+                        placeholderTextColor="#000000"
                         value={selectedDay === idx ? plan.memo : ''}
                         onChangeText={text => {
                           setSelectedDay(idx);
@@ -1844,7 +1884,7 @@ const styles = StyleSheet.create({
   },
   airbnbTitle: {
     fontSize: 28,
-    fontWeight: 'bold',
+    fontWeight: '800',
     color: '#222',
     marginBottom: 8,
   },
@@ -1859,7 +1899,7 @@ const styles = StyleSheet.create({
   },
   sectionLabel: {
     fontSize: 18,
-    fontWeight: '600',
+    fontWeight: '700',
     color: '#222',
     marginBottom: 12,
   },
@@ -1889,7 +1929,7 @@ const styles = StyleSheet.create({
   },
   airbnbThumbnailText: {
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '700',
     color: '#222',
     marginBottom: 4,
   },
@@ -1906,7 +1946,7 @@ const styles = StyleSheet.create({
   },
   inputLabel: {
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: '700',
     color: '#222',
     marginBottom: 8,
   },
@@ -1917,7 +1957,7 @@ const styles = StyleSheet.create({
     padding: 16,
     fontSize: 16,
     backgroundColor: '#fff',
-    color: '#222',
+    color: '#000000',
   },
   airbnbButton: {
     backgroundColor: '#90EE90',
@@ -1930,7 +1970,7 @@ const styles = StyleSheet.create({
   airbnbButtonText: {
     color: '#fff',
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '700',
   },
   airbnbTagChip: {
     flexDirection: 'row',
@@ -1970,7 +2010,7 @@ const styles = StyleSheet.create({
     padding: 16,
     fontSize: 16,
     backgroundColor: '#fff',
-    color: '#222',
+    color: '#000000',
     minHeight: 120,
     textAlignVertical: 'top',
   },
@@ -2136,7 +2176,7 @@ const styles = StyleSheet.create({
   },
   dayTitle: {
     fontSize: 18,
-    fontWeight: '600',
+    fontWeight: '700',
     color: '#222',
   },
   dayToggle: {
@@ -2159,13 +2199,13 @@ const styles = StyleSheet.create({
   },
   planPlace: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#222',
+    fontWeight: '700',
+    color: '#000000',
     marginBottom: 4,
   },
   planMemo: {
     fontSize: 14,
-    color: '#666',
+    color: '#000000',
   },
   airbnbPlanInputColumn: {
     marginTop: 16,
@@ -2187,6 +2227,7 @@ const styles = StyleSheet.create({
     padding: 12,
     fontSize: 14,
     backgroundColor: '#fff',
+    color: '#000000',
   },
   airbnbPlanInputSmall: {
     width: 100,
@@ -2196,6 +2237,7 @@ const styles = StyleSheet.create({
     padding: 12,
     fontSize: 14,
     backgroundColor: '#fff',
+    color: '#000000',
   },
   airbnbPlanDescriptionInput: {
     borderWidth: 1,
@@ -2207,6 +2249,7 @@ const styles = StyleSheet.create({
     minHeight: 140,
     marginBottom: 12,
     textAlignVertical: 'top',
+    color: '#000000',
   },
   airbnbAddButtonWide: {
     backgroundColor: '#90EE90',
@@ -2216,9 +2259,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   airbnbAddButtonText: {
-    color: '#fff',
+    color: '#000000',
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: '700',
   },
   airbnbEditButton: {
     backgroundColor: '#007AFF',
@@ -2256,9 +2299,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   publishButtonText: {
-    color: '#fff',
+    color: '#000000',
     fontSize: 18,
-    fontWeight: 'bold',
+    fontWeight: '800',
   },
   input: {
     borderWidth: 1,
@@ -2488,6 +2531,19 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   removeTagX: {color: '#fff', fontWeight: '900', lineHeight: 18},
+  modalCloseButton: {
+    backgroundColor: '#007AFF',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+    alignItems: 'center',
+    margin: 16,
+  },
+  modalCloseButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '800',
+  },
 });
 
 export default Make_program;

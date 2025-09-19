@@ -1567,7 +1567,7 @@ const Program_detail = () => {
                               style={styles.placeBox}
                               onPress={() => handlePlacePress(item)}>
                               <Text
-                                style={{fontSize: 15, lineHeight: 22}}
+                                style={{fontSize: 15, lineHeight: 22, color: '#000000'}}
                                 selectable={true}>
                                 {getTranslatedUIText('장소', selectedLanguage)}{' '}
                                 {String(idx + 1)}.{' '}
@@ -1811,7 +1811,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 24,
-    fontWeight: 'bold',
+    fontWeight: '800',
     marginBottom: 16,
     color: '#333',
   },
@@ -1879,7 +1879,7 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 18,
-    fontWeight: 'bold',
+    fontWeight: '800',
     marginBottom: 12,
     color: '#333',
   },
@@ -1894,9 +1894,9 @@ const styles = StyleSheet.create({
   },
   dayTitle: {
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: '800',
     marginBottom: 12,
-    color: '#333',
+    color: '#000000',
   },
   placeBox: {
     backgroundColor: 'white',
@@ -1929,7 +1929,7 @@ const styles = StyleSheet.create({
   },
   moveTimeText: {
     fontSize: 12,
-    color: '#999',
+    color: '#000000',
     marginVertical: 4,
   },
   bottomBar: {
@@ -1940,7 +1940,7 @@ const styles = StyleSheet.create({
   },
   price: {
     fontSize: 20,
-    fontWeight: 'bold',
+    fontWeight: '800',
     textAlign: 'center',
     marginBottom: 16,
     color: '#333',
@@ -1958,7 +1958,7 @@ const styles = StyleSheet.create({
   },
   chatText: {
     color: '#333',
-    fontWeight: '600',
+    fontWeight: '700',
   },
   reserveBtn: {
     flex: 1,
@@ -1969,12 +1969,12 @@ const styles = StyleSheet.create({
   },
   reserveText: {
     color: 'white',
-    fontWeight: '600',
+    fontWeight: '700',
   },
   description: {
     fontSize: 14,
     lineHeight: 20,
-    color: '#666',
+    color: '#000000',
     marginBottom: 20,
   },
   translationProgressContainer: {

@@ -48,7 +48,9 @@ const getRatingTexts = (t: any) => [
 ];
 
 function renderStars(rating: number) {
-  const fullStars = Math.floor(rating);
+  // 별점을 5점 이하로 제한
+  const clampedRating = Math.min(Math.max(rating, 0), 5);
+  const fullStars = Math.floor(clampedRating);
   const emptyStars = 5 - fullStars;
   return '⭐'.repeat(fullStars) + '☆'.repeat(emptyStars);
 }
@@ -78,16 +80,28 @@ export default function ReviewScreen() {
       }));
 
     let totalRating = 0;
+    let validReviewCount = 0;
+    
     reviews.forEach(review => {
-      const rating = Math.floor(review.rating);
-      if (rating >= 1 && rating <= 5) {
-        distribution[5 - rating].count++;
-        totalRating += review.rating;
+      const rating = review.rating;
+      if (rating && rating >= 1 && rating <= 5) {
+        // 별점 분포 계산 (정수 부분만 사용)
+        const ratingFloor = Math.floor(rating);
+        if (ratingFloor >= 1 && ratingFloor <= 5) {
+          distribution[5 - ratingFloor].count++;
+        }
+        
+        // 총 별점 합계 (실제 별점 값 사용)
+        totalRating += rating;
+        validReviewCount++;
       }
     });
 
+    // 정확한 평균 계산: 총별점 / 유효한 리뷰 개수
+    const average = validReviewCount > 0 ? totalRating / validReviewCount : 0;
+
     return {
-      average: totalRating / reviews.length,
+      average: average,
       distribution,
     };
   };
@@ -651,12 +665,13 @@ export default function ReviewScreen() {
           <Text style={{marginRight: 8}}>{t('ratingReview')}</Text>
           {renderStarInput()}
         </View>
-        <Text style={{marginBottom: 8, color: '#1976d2', fontWeight: 'bold'}}>
+        <Text style={{marginBottom: 8, color: '#000000', fontWeight: '800'}}>
           {getRatingTexts(t)[Math.round(newRating)]}
         </Text>
         <TextInput
           style={styles.input}
           placeholder={t('enterReviewContent')}
+          placeholderTextColor="#000000"
           value={newContent}
           onChangeText={setNewContent}
           multiline
@@ -664,6 +679,7 @@ export default function ReviewScreen() {
         <TextInput
           style={styles.input}
           placeholder={t('imageUrlOptional')}
+          placeholderTextColor="#000000"
           value={newImageUrl}
           onChangeText={setNewImageUrl}
         />
@@ -686,7 +702,7 @@ export default function ReviewScreen() {
           return (
             <>
               <View style={{alignItems: 'center', marginRight: 24}}>
-                <Text style={styles.bigScore}>{average.toFixed(1)}</Text>
+                <Text style={styles.bigScore}>{Math.min(average, 5).toFixed(1)}</Text>
                 <Text style={styles.stars}>{renderStars(average)}</Text>
               </View>
               <View style={{flex: 1}}>
@@ -823,9 +839,10 @@ const styles = StyleSheet.create({
     marginBottom: 0,
   },
   writeTitle: {
-    fontWeight: 'bold',
+    fontWeight: '800',
     fontSize: 16,
     marginBottom: 8,
+    color: '#000000',
   },
   writeRow: {
     flexDirection: 'row',
@@ -840,6 +857,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     fontSize: 14,
     backgroundColor: '#fff',
+    color: '#000000',
   },
   submitBtn: {
     backgroundColor: '#1976d2',
@@ -851,8 +869,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#ccc',
   },
   submitBtnText: {
-    color: '#fff',
-    fontWeight: 'bold',
+    color: '#000000',
+    fontWeight: '800',
     fontSize: 16,
   },
   ratingSummary: {
@@ -863,14 +881,16 @@ const styles = StyleSheet.create({
   },
   bigScore: {
     fontSize: 48,
-    fontWeight: 'bold',
+    fontWeight: '800',
     textAlign: 'center',
+    color: '#000000',
   },
   stars: {
     fontSize: 20,
     textAlign: 'center',
-    color: '#FFA500',
+    color: '#000000',
     marginTop: 4,
+    fontWeight: '800',
   },
   scoreRow: {
     flexDirection: 'row',
@@ -880,6 +900,8 @@ const styles = StyleSheet.create({
   scoreLabel: {
     width: 30,
     fontSize: 14,
+    color: '#000000',
+    fontWeight: '600',
   },
   barBackground: {
     height: 6,
@@ -897,7 +919,8 @@ const styles = StyleSheet.create({
     width: 24,
     textAlign: 'right',
     fontSize: 13,
-    color: '#333',
+    color: '#000000',
+    fontWeight: '600',
   },
   reviewHeaderRow: {
     flexDirection: 'row',
@@ -908,8 +931,8 @@ const styles = StyleSheet.create({
   },
   totalReviewText: {
     fontSize: 14,
-    fontWeight: 'bold',
-    color: '#333',
+    fontWeight: '800',
+    color: '#000000',
   },
   pickerContainer: {
     width: 150,
@@ -917,6 +940,7 @@ const styles = StyleSheet.create({
   picker: {
     height: 40,
     width: '100%',
+    color: '#000000',
   },
   reviewCard: {
     padding: 16,
@@ -935,21 +959,26 @@ const styles = StyleSheet.create({
     marginRight: 12,
   },
   nickname: {
-    fontWeight: 'bold',
+    fontWeight: '800',
+    color: '#000000',
   },
   smallText: {
     fontSize: 12,
-    color: '#666',
+    color: '#000000',
+    fontWeight: '600',
   },
   date: {
     fontSize: 12,
-    color: '#aaa',
+    color: '#000000',
     textAlign: 'right',
     minWidth: 240,
+    fontWeight: '600',
   },
   content: {
     fontSize: 14,
     marginBottom: 8,
+    color: '#000000',
+    fontWeight: '500',
   },
   tagBox: {
     flexDirection: 'row',
@@ -996,9 +1025,9 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   tempDeleteButtonText: {
-    color: '#fff',
+    color: '#000000',
     fontSize: 12,
-    fontWeight: 'bold',
+    fontWeight: '800',
   },
   tourHeader: {
     flexDirection: 'row',
@@ -1012,12 +1041,14 @@ const styles = StyleSheet.create({
   },
   tourTitle: {
     fontSize: 18,
-    fontWeight: 'bold',
+    fontWeight: '800',
     marginBottom: 4,
+    color: '#000000',
   },
   tourRegion: {
     fontSize: 14,
-    color: '#666',
+    color: '#000000',
+    fontWeight: '600',
   },
   tourStats: {
     flexDirection: 'row',
@@ -1025,11 +1056,13 @@ const styles = StyleSheet.create({
   },
   reviewCount: {
     fontSize: 14,
-    fontWeight: 'bold',
+    fontWeight: '800',
     marginRight: 16,
+    color: '#000000',
   },
   wishlistCount: {
     fontSize: 14,
-    color: '#666',
+    color: '#000000',
+    fontWeight: '600',
   },
 });
