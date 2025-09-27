@@ -27,6 +27,12 @@ const getBarColor = (status: Reservation['requestStatus']) => {
       return '#facc15'; // 노랑
     case 'REJECTED':
       return '#ef4444'; // 빨강
+    case 'CANCELLED_BY_USER':
+      return '#2563eb'; // 파랑
+    case 'CANCELLED_BY_GUIDE':
+      return '#7c3aed'; // 보라
+    case 'COMPLETED':
+      return '#6b7280'; // 회색
     default:
       return colors.GRAY_200;
   }

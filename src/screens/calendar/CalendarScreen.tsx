@@ -59,7 +59,8 @@ function CalendarScreen() {
   const { 
     data: selectedDateReservations = [], 
     isLoading: isSelectedDateLoading, 
-    isError: isSelectedDateError 
+    isError: isSelectedDateError,
+    refetch: refetchSelectedDate
   } = useGetMyReservations(selectedDateStart, selectedDateEnd);
 
   // 디버깅을 위한 로그
@@ -93,7 +94,8 @@ function CalendarScreen() {
   const { 
     data: monthlyReservations = [], 
     isLoading: isMonthlyLoading, 
-    isError: isMonthlyError 
+    isError: isMonthlyError,
+    refetch: refetchMonthly
   } = useGetMyReservations(start, end);
 
   // 월별 예약 데이터 디버깅 로그
@@ -152,9 +154,21 @@ function CalendarScreen() {
   };
 
   // 예약 상태 변경 함수
-  const handleStatusChange = (reservationId: number, newStatus: 'ACCEPTED' | 'PENDING' | 'REJECTED' | 'CANCELLED_BY_USER' | 'CANCELLED_BY_GUIDE' | 'COMPLETED') => {
+  const handleStatusChange = async (reservationId: number, newStatus: 'ACCEPTED' | 'PENDING' | 'REJECTED' | 'CANCELLED_BY_USER' | 'CANCELLED_BY_GUIDE' | 'COMPLETED') => {
     // 상태 변경 시 필터 해제 (모든 예약이 보이도록)
     setSelectedStatus(null);
+    
+    // 즉시 데이터 새로고침
+    console.log('🔄 예약 상태 변경 후 데이터 새로고침 시작');
+    try {
+      await Promise.all([
+        refetchSelectedDate(), // 선택된 날짜 데이터 새로고침
+        refetchMonthly()       // 월별 데이터 새로고침 (캘린더 막대기 바 업데이트)
+      ]);
+      console.log('✅ 데이터 새로고침 완료');
+    } catch (error) {
+      console.error('❌ 데이터 새로고침 실패:', error);
+    }
   };
 
   // 선택된 날짜의 예약 데이터 필터링

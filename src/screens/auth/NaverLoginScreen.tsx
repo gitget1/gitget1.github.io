@@ -56,7 +56,6 @@ const NaverLoginScreen = () => {
           console.log('❌ 네이버 로그인 - 토큰이 없습니다');
         }
       } catch (error) {
-        console.error('❌ 네이버 로그인 실패:', error.response?.data || error.message);
         Alert.alert('로그인 실패', '토큰을 받을 수 없습니다.');
       }
     },
@@ -132,7 +131,7 @@ const NaverLoginScreen = () => {
         }
       }
     } catch (error) {
-      console.error('❌ 네이버 로그인 - 토큰 재발급 실패:', error.response?.data || error.message);
+      // 토큰 재발급 실패 시 무시
     }
   }, []);
 

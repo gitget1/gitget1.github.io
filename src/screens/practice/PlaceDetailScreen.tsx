@@ -477,18 +477,10 @@ const PlaceDetailScreen = () => {
           // 위치 권한 확인 성공
           setHasLocationPermission(true);
 
-          // "이미 방문 권한이 있다"는 경우 성공 메시지 표시
-          if (successMessage.includes('이미 방문 권한이 있습니다')) {
-            Alert.alert('GPS 권한 확인', '이미 방문 권한이 있습니다. 리뷰를 작성하시겠습니까?', [
-              { text: '취소', style: 'cancel' },
-              { text: '리뷰 작성', onPress: () => setShowReviewModal(true) }
-            ]);
-          } else {
-            Alert.alert('GPS 권한 성공', successMessage || '현장 방문이 확인되었습니다! 리뷰를 작성하시겠습니까?', [
-              { text: '취소', style: 'cancel' },
-              { text: '리뷰 작성', onPress: () => setShowReviewModal(true) }
-            ]);
-          }
+          // 성공 메시지 표시
+          Alert.alert('GPS 권한 성공', successMessage || '현장 방문이 확인되었습니다! 성공적으로 확인되었습니다!', [
+            { text: '확인', style: 'default' }
+          ]);
           console.log('🟢 GPS 권한 성공:', verificationResult);
         } else {
           // 위치 권한 확인 실패

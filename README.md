@@ -1,8 +1,34 @@
-This is a new [**React Native**](https://reactnative.dev) project, bootstrapped using [`@react-native-community/cli`](https://github.com/react-native-community/cli).
+# TravelLocal
+
+TravelLocal은 여행자들이 현지인과 연결되어 진정한 현지 경험을 할 수 있도록 도와주는 모바일 앱입니다.
+
+## 앱 소개
+
+TravelLocal은 다음과 같은 기능을 제공합니다:
+
+- 소셜 로그인 (카카오, 네이버, 구글)
+- 현지인과의 연결 및 채팅
+- 여행 프로그램 예약
+- 포인트 시스템
+- 위시리스트 관리
+- MBTI 기반 여행 추천
+
+## 로그인 화면
+
+![TravelLocal 로그인 화면](./src/assets/login.webp)
+
+TravelLocal 앱의 로그인 화면입니다. 아름다운 풍경 배경과 함께 카카오, 네이버, 구글 소셜 로그인 옵션을 제공합니다.
+
+## 기술 스택
+
+- **Frontend**: React Native, TypeScript
+- **Backend**: NestJS, TypeScript
+- **Database**: (추후 추가 예정)
+- **Authentication**: JWT, 소셜 로그인
 
 # Getting Started
 
->**Note**: Make sure you have completed the [React Native - Environment Setup](https://reactnative.dev/docs/environment-setup) instructions till "Creating a new application" step, before proceeding.
+> **Note**: Make sure you have completed the [React Native - Environment Setup](https://reactnative.dev/docs/environment-setup) instructions till "Creating a new application" step, before proceeding.
 
 ## Step 1: Start the Metro Server
 
@@ -80,20 +106,20 @@ To learn more about React Native, take a look at the following resources:
 
 # Android
 
-•	buildToolsVersion = "34.0.0"
+• buildToolsVersion = "34.0.0"
 → Android Build Tools 34.0.0 사용
 
-•	minSdkVersion = 23
+• minSdkVersion = 23
 → Android 6.0 (API 23) 이상 기기에서 앱 실행 가능
 
-•	compileSdkVersion = 34
+• compileSdkVersion = 34
 → 앱을 Android 14 (API 34) 기준으로 컴파일
 
-•	targetSdkVersion = 34
+• targetSdkVersion = 34
 → 앱이 Android 14 (API 34) 버전에 맞춰 최적화됨
 
-•	ndkVersion = "26.1.10909125"
+• ndkVersion = "26.1.10909125"
 → NDK 26.1.10909125 버전 사용 (C/C++ 네이티브 빌드)
 
-•	kotlinVersion = "1.9.24"
+• kotlinVersion = "1.9.24"
 → Kotlin 1.9.24 버전 사용 (Kotlin 코드가 있을 경우)

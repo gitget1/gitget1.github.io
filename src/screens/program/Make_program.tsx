@@ -197,7 +197,7 @@ function Make_program() {
     planIdx: number;
   } | null>(null);
   const [isAnimating, setIsAnimating] = useState(false); // 지도 애니메이션 중인지 확인
-  const [watchId, setWatchId] = useState<number | null>(null); // 위치 감시 ID
+  // 위치 감시 ID 제거 - 더 이상 사용하지 않음
 
   useEffect(() => {
     if (editData) {
@@ -261,15 +261,7 @@ function Make_program() {
     }
   }, [editData]);
 
-  // 컴포넌트 언마운트 시 위치 감시 정리
-  useEffect(() => {
-    return () => {
-      if (watchId !== null) {
-        Geolocation.clearWatch(watchId);
-        console.log('📍 위치 감시 정리됨');
-      }
-    };
-  }, [watchId]);
+  // 위치 감시 기능 제거로 인해 정리 코드 불필요
 
   // 위치 권한 요청 (Android)
   const requestLocationPermission = async () => {
@@ -565,73 +557,7 @@ function Make_program() {
         setTimeout(() => setIsAnimating(false), 1200);
       }
 
-      // 정확도가 낮으면 위치 감시 시작
-      if (position.coords.accuracy > 10) {
-        console.log('📍 정확도가 낮아 위치 감시를 시작합니다...');
-        
-        // 기존 감시 중지
-        if (watchId !== null) {
-          Geolocation.clearWatch(watchId);
-        }
-
-        const newWatchId = Geolocation.watchPosition(
-          (watchedPosition: GeolocationPosition) => {
-            console.log('📍 위치 감시 업데이트:', {
-              latitude: watchedPosition.coords.latitude,
-              longitude: watchedPosition.coords.longitude,
-              accuracy: watchedPosition.coords.accuracy,
-            });
-
-            // 정확도가 개선되면 위치 업데이트
-            if (watchedPosition.coords.accuracy < position.coords.accuracy) {
-              const updatedRegion = {
-                latitude: watchedPosition.coords.latitude,
-                longitude: watchedPosition.coords.longitude,
-                latitudeDelta: 0.005,
-                longitudeDelta: 0.005,
-              };
-              setRegion(updatedRegion);
-              setCurrentLocation({
-                latitude: watchedPosition.coords.latitude,
-                longitude: watchedPosition.coords.longitude,
-              });
-
-              if (mapRef.current) {
-                setIsAnimating(true);
-                mapRef.current.animateToRegion(updatedRegion, 1000);
-                setTimeout(() => setIsAnimating(false), 1200);
-              }
-
-              // 정확도가 충분히 좋아지면 감시 중지
-              if (watchedPosition.coords.accuracy <= 5) {
-                Geolocation.clearWatch(newWatchId);
-                setWatchId(null);
-                console.log('📍 위치 감시 중지 (정확도 충분)');
-              }
-            }
-          },
-          (error: GeolocationError) => {
-            console.error('위치 감시 오류:', error);
-          },
-          {
-            enableHighAccuracy: true,
-            timeout: 10000,
-            maximumAge: 1000, // 1초마다 업데이트
-            distanceFilter: 1, // 1미터 이상 이동시에만 업데이트
-          }
-        );
-
-        setWatchId(newWatchId);
-        
-        // 30초 후 자동으로 감시 중지
-        setTimeout(() => {
-          if (newWatchId !== null) {
-            Geolocation.clearWatch(newWatchId);
-            setWatchId(null);
-            console.log('📍 위치 감시 자동 중지 (30초 경과)');
-          }
-        }, 30000);
-      }
+      // 위치 감시 기능 제거 - 한 번만 위치 가져오기
 
       setLocationLoading(false);
       
