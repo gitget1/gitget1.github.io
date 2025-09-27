@@ -15,7 +15,7 @@ TravelLocal은 다음과 같은 기능을 제공합니다:
 
 ## 로그인 화면
 
-![TravelLocal 로그인 화면](./src/assets/login.webp)
+<img src="./src/assets/login.webp" alt="TravelLocal 로그인 화면" width="300" />
 
 TravelLocal 앱의 로그인 화면입니다. 아름다운 풍경 배경과 함께 카카오, 네이버, 구글 소셜 로그인 옵션을 제공합니다.
 
