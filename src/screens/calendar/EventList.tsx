@@ -11,6 +11,7 @@ import {colors} from '../../constants';
 import dayjs from 'dayjs';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import {useQueryClient} from '@tanstack/react-query';
 const BE_server = 'http://124.60.137.10:8083';
 
 // ✅ 백엔드 Enum 그대로 사용 (오타 FIX: CANCELLED)
@@ -137,6 +138,7 @@ async function patchReservationStatus(
 
 function EventList({posts, onStatusChange, onRemoveFromList}: EventListProps) {
   const [statusTexts, setStatusTexts] = React.useState<{[key: string]: string}>({});
+  const queryClient = useQueryClient();
 
   // 상태 텍스트를 미리 로드
   React.useEffect(() => {
@@ -163,6 +165,24 @@ function EventList({posts, onStatusChange, onRemoveFromList}: EventListProps) {
         String(result.message ?? '다시 시도해 주세요.'),
       );
       return;
+    }
+
+    // 상태 변경 성공 후 캘린더 데이터 새로고침
+    console.log('🔄 상태 변경 성공, 캘린더 데이터 새로고침 시작');
+    try {
+      // 모든 캘린더 관련 쿼리 무효화하여 새로고침
+      await queryClient.invalidateQueries({
+        queryKey: ['calendarReservations'],
+      });
+      await queryClient.invalidateQueries({
+        queryKey: ['myReservations'],
+      });
+      await queryClient.invalidateQueries({
+        queryKey: ['calendarStatus'],
+      });
+      console.log('✅ 캘린더 데이터 새로고침 완료');
+    } catch (error) {
+      console.error('❌ 캘린더 데이터 새로고침 실패:', error);
     }
 
     // 상태별 차별화된 처리
