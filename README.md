@@ -75,10 +75,10 @@
 
 |                        서비스 흐름도                         |                                                              실행 영상                                                              |
 | :----------------------------------------------------------: | :---------------------------------------------------------------------------------------------------------------------------------: |
-| <img src="./src/assets/images/foreigner_1.png" width="800"/> |                                      <img src="./src/assets/images/mbti-test.gif" width="180" />                                      |
+| <img src="./src/assets/images/foreigner_1.png" width="800"/> |                                     <img src="./src/assets/images/mbti-test.gif" width="180" />                                     |
 | <img src="./src/assets/images/foreigner_2.png" width="800"/> |                                   <img src="./src/assets/images/find-program.gif" width="180" />                                    |
-| <img src="./src/assets/images/foreigner_3.png" width="800"/> |       <img src="./src/assets/images/payment.gif" width="180" /><img src="./src/assets/images/calendar.gif" width="180" />       |
-| <img src="./src/assets/images/foreigner_4.png" width="800"/> |                                     <img src="./src/assets/images/GPS-review.gif" width="180" />                                      |
+| <img src="./src/assets/images/foreigner_3.png" width="800"/> |         <img src="./src/assets/images/payment.gif" width="180" /><img src="./src/assets/images/calendar.gif" width="180" />         |
+| <img src="./src/assets/images/foreigner_4.png" width="800"/> |                                    <img src="./src/assets/images/GPS-review.gif" width="180" />                                     |
 |  <img src="./src/assets/images/korean_1.png" width="800"/>   | <img src="./src/assets/images/Calendar_Localperson.gif" width="180" /><img src="./src/assets/images/Program_out.gif" width="180" /> |
 
 ---
