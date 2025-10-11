@@ -1079,12 +1079,7 @@ function Make_program() {
                         {
                           text: '확인',
                           onPress: () => {
-                            navigation.navigate('TraitSelection', {
-                              newPost: {
-                                data: response.data.data,
-                                tourProgramId: response.data.data.tourProgramId,
-                              },
-                            });
+                            navigation.navigate('Main');
                           },
                         },
                       ]);
@@ -1153,17 +1148,12 @@ function Make_program() {
             },
           ]);
         } else {
-          // 새로 등록 모드: 기존 로직 유지
+          // 새로 등록 모드: 메인화면으로 이동
           Alert.alert('성공', '여행 일정이 등록되었습니다!', [
             {
               text: '확인',
               onPress: () => {
-                navigation.navigate('TraitSelection', {
-                  newPost: {
-                    data: response.data.data,
-                    tourProgramId: response.data.data.tourProgramId,
-                  },
-                });
+                navigation.navigate('Main');
               },
             },
           ]);

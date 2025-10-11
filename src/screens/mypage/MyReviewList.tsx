@@ -40,7 +40,7 @@ const MyReviewList = () => {
       // 토큰에서 'Bearer ' 접두사 제거
       const cleanToken = token.replace('Bearer ', '');
 
-      const res = await axios.get('http://124.60.137.10/api/review', {
+      const res = await axios.get('http://124.60.137.10:8083/api/tour-program/review', {
         params: {
           page: 0,
           size: 10,
@@ -122,11 +122,11 @@ const MyReviewList = () => {
 
             console.log('🗑️ 리뷰 삭제 요청:', {
               reviewId: id,
-              url: `http://124.60.137.10/api/review/${id}`,
+              url: `http://124.60.137.10:8083/api/tour-program/review/${id}`,
             });
 
             const response = await axios.delete(
-              `http://124.60.137.10/api/review/${id}`,
+              `http://124.60.137.10:8083/api/tour-program/review/${id}`,
               {
                 headers: {
                   'Content-Type': 'application/json',

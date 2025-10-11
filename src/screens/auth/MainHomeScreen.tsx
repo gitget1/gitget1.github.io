@@ -400,7 +400,7 @@ const MainHomeScreen = () => {
             marginRight: isLeft ? GUTTER / 2 : H_PADDING,
           },
         ]}
-        // onPress={() => navigation.navigate('TourProgramDetail', { id: item.id })}
+        onPress={() => navigation.navigate('PracticeDetail', { tourProgramId: item.id })}
       >
         <View style={styles.tourThumbWrap}>
           {item.thumbnailUrl ? (
