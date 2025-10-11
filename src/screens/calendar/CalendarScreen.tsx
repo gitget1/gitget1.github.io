@@ -10,9 +10,11 @@ import {
 } from './useGetCalendarReservations';
 import dayjs from 'dayjs';
 import {useTranslation} from 'react-i18next';
+import {useQueryClient} from '@tanstack/react-query';
 
 function CalendarScreen() {
   const {t} = useTranslation();
+  const queryClient = useQueryClient();
   const currentMonthYear = getMonthYearDetails(new Date());
   const [monthYear, setMonthYear] = useState(currentMonthYear);
   const today = new Date().getDate();
@@ -161,6 +163,18 @@ function CalendarScreen() {
     // 즉시 데이터 새로고침
     console.log('🔄 예약 상태 변경 후 데이터 새로고침 시작');
     try {
+      // React Query 캐시 무효화로 강제 새로고침
+      await queryClient.invalidateQueries({
+        queryKey: ['calendarReservations'],
+      });
+      await queryClient.invalidateQueries({
+        queryKey: ['myReservations'],
+      });
+      await queryClient.invalidateQueries({
+        queryKey: ['calendarStatus'],
+      });
+      
+      // 기존 refetch도 함께 실행
       await Promise.all([
         refetchSelectedDate(), // 선택된 날짜 데이터 새로고침
         refetchMonthly()       // 월별 데이터 새로고침 (캘린더 막대기 바 업데이트)
@@ -365,16 +379,16 @@ const styles = StyleSheet.create({
     borderColor: '#ddd',
   },
   rejectedButton: {
-    backgroundColor: '#90EE90',
-    borderColor: '#f44336',
+    backgroundColor: '#dc2626',
+    borderColor: '#dc2626',
   },
   successButton: {
-    backgroundColor: '#e8f5e8',
-    borderColor: '#4caf50',
+    backgroundColor: '#10b981',
+    borderColor: '#10b981',
   },
   consultingButton: {
-    backgroundColor: '#fff8e1',
-    borderColor: '#ff9800',
+    backgroundColor: '#f59e0b',
+    borderColor: '#f59e0b',
   },
   selectedButton: {
     borderWidth: 2,
@@ -382,7 +396,7 @@ const styles = StyleSheet.create({
   statusButtonText: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#000000',
+    color: '#ffffff',
   },
   selectedDateInfo: {
     padding: 15,
