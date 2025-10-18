@@ -32,6 +32,14 @@ interface Reservation {
   requestStatus: RequestStatus;
   role: string; // "GUIDE" or "USER"
   counterpartName: string;
+  // 상대방 이름 조회를 위한 필드들
+  tourProgramId?: number | null;
+  userId?: number | null;
+  guideId?: number | null;
+  userName?: string;
+  guideName?: string;
+  requesterName?: string;
+  guideUserName?: string;
 }
 
 interface EventListProps {
@@ -48,6 +56,122 @@ const getAuthHeader = async () => {
   }
   const pure = raw.startsWith('Bearer ') ? raw.replace(/^Bearer\s+/i, '') : raw;
   return {Authorization: `Bearer ${pure}`};
+};
+
+// ✅ 사용자 정보 가져오기 함수
+const fetchUserInfo = async (userId: number) => {
+  if (!userId || userId <= 0) {
+    console.warn('⚠️ 유효하지 않은 사용자 ID:', userId);
+    return null;
+  }
+  
+  try {
+    const headers = await getAuthHeader();
+    if (!headers) {
+      console.warn('⚠️ 인증 헤더를 가져올 수 없음');
+      return null;
+    }
+    
+    console.log(`🔍 사용자 ${userId} 정보 조회 중...`);
+    const response = await axios.get(`${BE_server}/api/user/${userId}`, {
+      headers,
+      timeout: 5000,
+    });
+    
+    const userData = response.data?.data || response.data;
+    console.log(`✅ 사용자 ${userId} 정보 조회 성공:`, userData?.name || userData?.username);
+    return userData;
+  } catch (error) {
+    console.error(`❌ 사용자 ${userId} 정보 가져오기 실패:`, error);
+    return null;
+  }
+};
+
+
+// ✅ 상대방 이름 가져오기 함수 (user_id와 guide_id 기반)
+const getCounterpartName = async (reservation: Reservation): Promise<string> => {
+  console.log('🔍 예약 정보 분석:', {
+    reservationId: reservation.id,
+    role: reservation.role,
+    userId: reservation.userId,
+    guideId: reservation.guideId,
+    tourProgramId: reservation.tourProgramId,
+    tourProgramTitle: reservation.tourProgramTitle,
+    counterpartName: reservation.counterpartName
+  });
+  
+  // 먼저 기존 필드에서 찾기
+  const possibleNames = [
+    reservation.counterpartName,
+    reservation.userName,
+    reservation.requesterName,
+    reservation.guideUserName,
+    reservation.guideName
+  ];
+  
+  const existingName = possibleNames.find(name => name && name.trim() !== '');
+  if (existingName) {
+    console.log('✅ 기존 필드에서 이름 발견:', existingName);
+    return existingName;
+  }
+  
+  // user_id와 guide_id를 사용해서 상대방 이름 조회
+  if (reservation.role === 'USER') {
+    // 예약자 입장: 가이드가 상대방
+    if (reservation.guideId) {
+      console.log('🔍 예약자 입장: 가이드 이름 조회 시도...', reservation.guideId);
+      const guideInfo = await fetchUserInfo(reservation.guideId);
+      if (guideInfo) {
+        const guideName = guideInfo.name || guideInfo.username || '가이드';
+        console.log('✅ 가이드 이름 조회 완료:', guideName);
+        return guideName;
+      }
+    }
+    
+    // guideId가 없으면 투어 프로그램 작성자 정보로 대체
+    if (reservation.tourProgramId) {
+      console.log('🔍 예약자 입장: 투어 프로그램 작성자 조회 시도...', reservation.tourProgramId);
+      try {
+        const headers = await getAuthHeader();
+        if (headers) {
+          const response = await axios.get(`${BE_server}/api/tour-program/${reservation.tourProgramId}`, {
+            headers,
+            timeout: 5000,
+          });
+          
+          const program = response.data?.data || response.data;
+          if (program && program.userId) {
+            console.log(`✅ 투어 프로그램 작성자 ID: ${program.userId}`);
+            const authorInfo = await fetchUserInfo(program.userId);
+            if (authorInfo) {
+              const authorName = authorInfo.name || authorInfo.username || '가이드';
+              console.log('✅ 투어 프로그램 작성자 이름 조회 완료:', authorName);
+              return authorName;
+            }
+          }
+        }
+      } catch (error) {
+        console.error('❌ 투어 프로그램 작성자 조회 실패:', error);
+      }
+    }
+  } else if (reservation.role === 'GUIDE') {
+    // 가이드 입장: 예약자가 상대방
+    if (reservation.userId) {
+      console.log('🔍 가이드 입장: 예약자 이름 조회 시도...', reservation.userId);
+      const userInfo = await fetchUserInfo(reservation.userId);
+      if (userInfo) {
+        const userName = userInfo.name || userInfo.username || '예약자';
+        console.log('✅ 예약자 이름 조회 완료:', userName);
+        return userName;
+      }
+    }
+    
+    // userId가 없으면 기본값 사용 (서버에서 예약자 정보를 제공하지 않음)
+    console.log('⚠️ 가이드 입장: 예약자 정보가 없어 기본값 사용');
+  }
+  
+  console.log('⚠️ 이름을 찾을 수 없어 기본값 사용');
+  return reservation.role === 'GUIDE' ? '예약자' : '가이드';
 };
 
 // ✅ 상태별 색상 (더 선명한 색상으로 변경)
@@ -138,6 +262,8 @@ async function patchReservationStatus(
 
 function EventList({posts, onStatusChange, onRemoveFromList}: EventListProps) {
   const [statusTexts, setStatusTexts] = React.useState<{[key: string]: string}>({});
+  const [counterpartNames, setCounterpartNames] = React.useState<{[key: string]: string}>({});
+  const [isLoadingNames, setIsLoadingNames] = React.useState(false);
   const queryClient = useQueryClient();
 
   // 상태 텍스트를 미리 로드
@@ -149,6 +275,55 @@ function EventList({posts, onStatusChange, onRemoveFromList}: EventListProps) {
     }
     setStatusTexts(texts);
   }, [posts]);
+
+  // 상대방 이름을 비동기로 가져오기
+  React.useEffect(() => {
+    const fetchCounterpartNames = async () => {
+      if (isLoadingNames || posts.length === 0) return;
+      
+      setIsLoadingNames(true);
+      const names: {[key: string]: string} = {};
+      
+      // 이미 로딩된 이름이 있으면 복사
+      Object.assign(names, counterpartNames);
+      
+      // 아직 로딩되지 않은 예약들만 처리 (취소된 예약 제외)
+      const postsToProcess = posts.filter(post => {
+        const isCancelled = post.requestStatus === 'CANCELLED_BY_USER' || 
+                           post.requestStatus === 'CANCELLED_BY_GUIDE';
+        return !isCancelled && !counterpartNames[post.id];
+      });
+      
+      console.log(`🔍 ${postsToProcess.length}개의 예약에 대해 이름 조회 시작`);
+      
+      for (const post of postsToProcess) {
+        const key = `${post.id}`;
+        try {
+          const name = await getCounterpartName(post);
+          
+          // 유효하지 않은 예약인 경우 제거
+          if (name === 'INVALID_RESERVATION') {
+            console.log(`🗑️ 유효하지 않은 예약 제거: ${post.id} (${post.tourProgramTitle})`);
+            // 부모 컴포넌트에 제거 요청
+            onRemoveFromList?.(post.id);
+            continue;
+          }
+          
+          names[key] = name;
+          console.log(`✅ 예약 ${post.id} 이름 조회 완료: ${name}`);
+        } catch (error) {
+          console.error(`❌ 예약 ${post.id} 이름 조회 실패:`, error);
+          names[key] = post.role === 'GUIDE' ? '예약자' : '가이드';
+        }
+      }
+      
+      setCounterpartNames(names);
+      setIsLoadingNames(false);
+      console.log('✅ 모든 이름 조회 완료');
+    };
+    
+    fetchCounterpartNames();
+  }, [posts]); // posts가 변경될 때만 실행
 
   const handlePress = async (
     reservationId: number,
@@ -185,13 +360,17 @@ function EventList({posts, onStatusChange, onRemoveFromList}: EventListProps) {
       console.error('❌ 캘린더 데이터 새로고침 실패:', error);
     }
 
-    // 상태별 차별화된 처리
+    // 상태별 차별화된 처리 - 실제 상대방 이름 사용
+    const counterpartName = counterpartNames[reservationId] || (reservation.role === 'GUIDE' ? '예약자' : '가이드');
+    
     switch (newStatus) {
       case 'ACCEPTED':
         // 승인: 목록에서 제거
         Alert.alert(
           '예약 승인 완료',
-          `${reservation.counterpartName}님의 예약이 승인되었습니다.`,
+          reservation.role === 'GUIDE' 
+            ? `${counterpartName}님의 예약이 승인되었습니다.`
+            : `${counterpartName}님께서 예약을 승인했습니다.`,
           [
             {
               text: '확인',
@@ -208,7 +387,9 @@ function EventList({posts, onStatusChange, onRemoveFromList}: EventListProps) {
         // 거절: 목록에서 제거
         Alert.alert(
           '예약 거절 완료',
-          `${reservation.counterpartName}님의 예약이 거절되었습니다.`,
+          reservation.role === 'GUIDE' 
+            ? `${counterpartName}님의 예약이 거절되었습니다.`
+            : `${counterpartName}님께서 예약을 거절했습니다.`,
           [
             {
               text: '확인',
@@ -225,7 +406,9 @@ function EventList({posts, onStatusChange, onRemoveFromList}: EventListProps) {
         // 가이드 취소: 목록에서 제거
         Alert.alert(
           '예약 취소 완료',
-          `${reservation.counterpartName}님의 예약이 취소되었습니다.`,
+          reservation.role === 'GUIDE' 
+            ? `${counterpartName}님의 예약이 취소되었습니다.`
+            : `${counterpartName}님께서 예약을 취소했습니다.`,
           [
             {
               text: '확인',
@@ -242,7 +425,9 @@ function EventList({posts, onStatusChange, onRemoveFromList}: EventListProps) {
         // 완료: 목록에서 제거
         Alert.alert(
           '예약 완료',
-          `${reservation.counterpartName}님의 예약이 완료되었습니다.`,
+          reservation.role === 'GUIDE' 
+            ? `${counterpartName}님의 예약이 완료되었습니다.`
+            : `${counterpartName}님과의 예약이 완료되었습니다.`,
           [
             {
               text: '확인',
@@ -256,14 +441,33 @@ function EventList({posts, onStatusChange, onRemoveFromList}: EventListProps) {
         break;
 
       case 'PENDING':
-      case 'CANCELLED_BY_USER':
-        // 대기/사용자 취소: 단순 상태 변경만 (목록에 유지)
+        // 대기: 단순 상태 변경만 (목록에 유지)
         const statusText = getStatusText(newStatus, reservation.role);
         Alert.alert(
           '상태 변경 완료',
           `예약 상태가 "${statusText}"로 변경되었습니다.`,
         );
         onStatusChange?.(reservationId, newStatus);
+        break;
+
+      case 'CANCELLED_BY_USER':
+        // 사용자 취소: 목록과 캘린더에서 제거
+        console.log('🔄 사용자 예약취소: 예약 현황과 캘린더에서 제거');
+        Alert.alert(
+          '예약 취소 완료',
+          reservation.role === 'GUIDE' 
+            ? `${counterpartName}님께서 예약을 취소했습니다.`
+            : '예약이 취소되었습니다.',
+          [
+            {
+              text: '확인',
+              onPress: () => {
+                // 목록에서 제거
+                onRemoveFromList?.(reservationId);
+              },
+            },
+          ],
+        );
         break;
 
       default:
@@ -273,10 +477,20 @@ function EventList({posts, onStatusChange, onRemoveFromList}: EventListProps) {
     }
   };
 
+  // 취소된 예약 필터링
+  const filteredPosts = posts.filter(post => {
+    const isCancelled = post.requestStatus === 'CANCELLED_BY_USER' || 
+                       post.requestStatus === 'CANCELLED_BY_GUIDE';
+    if (isCancelled) {
+      console.log(`🗑️ 취소된 예약 제외: ${post.id} (${post.requestStatus})`);
+    }
+    return !isCancelled;
+  });
+
   return (
     <ScrollView style={styles.container}>
       <View style={styles.innerContainer}>
-        {posts.map(post => (
+        {filteredPosts.map(post => (
           <View key={post.id} style={styles.itemContainer}>
             {/* 상태 색상 표시 */}
             <View
@@ -297,7 +511,7 @@ function EventList({posts, onStatusChange, onRemoveFromList}: EventListProps) {
               
               <View style={styles.detailRow}>
                 <Text style={styles.detailText}>
-                  상대방: {post.counterpartName}
+                  상대방: {counterpartNames[post.id] || (isLoadingNames ? '로딩 중...' : '정보 없음')}
                 </Text>
                 <Text style={styles.detailText}>
                   인원: {post.numOfPeople}명
@@ -317,48 +531,55 @@ function EventList({posts, onStatusChange, onRemoveFromList}: EventListProps) {
                 </Text>
               </View>
 
-              {/* COMPLETED가 아닐 때만 버튼 */}
+              {/* 역할과 상태에 따라 다른 버튼 표시 */}
               {post.requestStatus !== 'COMPLETED' && (
                 <View style={styles.actionButtonsContainer}>
-                  <TouchableOpacity
-                    style={[styles.actionButton, styles.acceptButton]}
-                    onPress={() => handlePress(post.id, 'ACCEPTED', post)}>
-                    <Text style={styles.actionButtonText}>가이드 승인</Text>
-                  </TouchableOpacity>
+                  {post.role === 'GUIDE' ? (
+                    // 가이드 입장: 상태에 따라 다른 버튼 표시
+                    <>
+                      {post.requestStatus === 'ACCEPTED' ? (
+                        // 승인 상태: 가이드 예약취소 버튼만 표시
+                        <TouchableOpacity
+                          style={[styles.actionButton, styles.guideCancelButton]}
+                          onPress={() => handlePress(post.id, 'CANCELLED_BY_GUIDE', post)}>
+                          <Text style={styles.actionButtonText}>
+                            가이드 예약 취소
+                          </Text>
+                        </TouchableOpacity>
+                      ) : (
+                        // 승인되지 않은 상태: 승인, 거절 버튼 표시
+                        <>
+                          <TouchableOpacity
+                            style={[styles.actionButton, styles.acceptButton]}
+                            onPress={() => handlePress(post.id, 'ACCEPTED', post)}>
+                            <Text style={styles.actionButtonText}>가이드 승인</Text>
+                          </TouchableOpacity>
 
-                  <TouchableOpacity
-                    style={[styles.actionButton, styles.PENDINGButton]}
-                    onPress={() => handlePress(post.id, 'PENDING', post)}>
-                    <Text style={styles.actionButtonText}>예약 대기</Text>
-                  </TouchableOpacity>
+                          <TouchableOpacity
+                            style={[styles.actionButton, styles.rejectButton]}
+                            onPress={() => handlePress(post.id, 'REJECTED', post)}>
+                            <Text style={styles.actionButtonText}>가이드 거절</Text>
+                          </TouchableOpacity>
+                        </>
+                      )}
+                    </>
+                  ) : (
+                    // 예약자 입장: 사용자 예약취소 버튼만 표시
+                    <TouchableOpacity
+                      style={[styles.actionButton, styles.userCancelButton]}
+                      onPress={() => handlePress(post.id, 'CANCELLED_BY_USER', post)}>
+                      <Text style={styles.actionButtonText}>
+                        사용자 예약 취소
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              )}
 
-                  <TouchableOpacity
-                    style={[styles.actionButton, styles.rejectButton]}
-                    onPress={() => handlePress(post.id, 'REJECTED', post)}>
-                    <Text style={styles.actionButtonText}>가이드 거절</Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={[styles.actionButton, styles.userCancelButton]}
-                    onPress={() => handlePress(post.id, 'CANCELLED_BY_USER', post)}>
-                    <Text style={styles.actionButtonText}>
-                      사용자 예약 취소
-                    </Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={[styles.actionButton, styles.guideCancelButton]}
-                    onPress={() => handlePress(post.id, 'CANCELLED_BY_GUIDE', post)}>
-                    <Text style={styles.actionButtonText}>
-                      가이드 예약 취소
-                    </Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={[styles.actionButton, styles.COMPLETEDButton]}
-                    onPress={() => handlePress(post.id, 'COMPLETED', post)}>
-                    <Text style={styles.actionButtonText}>예약 완료</Text>
-                  </TouchableOpacity>
+              {/* COMPLETED 상태일 때는 텍스트만 표시 */}
+              {post.requestStatus === 'COMPLETED' && (
+                <View style={styles.completedTextContainer}>
+                  <Text style={styles.completedText}>✅ 예약 완료</Text>
                 </View>
               )}
             </View>
@@ -421,6 +642,21 @@ const styles = StyleSheet.create({
   guideCancelButton: {backgroundColor: '#7c3aed', borderColor: '#7c3aed'},
   COMPLETEDButton: {backgroundColor: '#6b7280', borderColor: '#6b7280'},
   actionButtonText: {color: colors.WHITE, fontSize: 11, fontWeight: '600'},
+  completedTextContainer: {
+    marginTop: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    backgroundColor: '#f0f9ff',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#0ea5e9',
+  },
+  completedText: {
+    color: '#0ea5e9',
+    fontSize: 13,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
 });
 
 export default EventList;

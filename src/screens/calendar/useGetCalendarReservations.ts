@@ -18,6 +18,18 @@ interface ReservationCalendarDTO {
   requestStatus: string;
   role: string; // "GUIDE" or "USER"
   counterpartName: string;
+  // 상대방 이름 조회를 위한 필드들
+  tourProgramId?: number;
+  userId?: number;
+  guideId?: number;
+  userName?: string;
+  guideName?: string;
+  requesterName?: string;
+  guideUserName?: string;
+  // 중첩 객체 지원
+  tourProgram?: {id: number; userId?: number};
+  user?: {id: number; name?: string; username?: string};
+  guide?: {id: number; name?: string; username?: string};
 }
 
 // 두 가지 API 엔드포인트를 지원하는 함수들
@@ -58,6 +70,14 @@ const fetchMyReservations = async (
     '📋 Response data length:',
     Array.isArray(response.data) ? response.data.length : 'not array',
   );
+
+  // 첫 번째 예약의 상세 정보 로그
+  if (Array.isArray(response.data) && response.data.length > 0) {
+    console.log(
+      '📋 첫 번째 예약 상세 정보:',
+      JSON.stringify(response.data[0], null, 2),
+    );
+  }
 
   return response.data || [];
 };
@@ -136,6 +156,23 @@ const fetchCalendarReservations = async (start: string, end: string) => {
           | 'COMPLETED') || 'PENDING',
       role: reservation.role || 'USER', // 서버에서 제공하는 role 필드 사용
       counterpartName: reservation.counterpartName || '', // 서버에서 제공하는 counterpartName 필드 사용
+      // 상대방 이름 조회를 위한 필드들 추가
+      tourProgramId:
+        reservation.tourProgramId || reservation.tourProgram?.id || null,
+      userId: reservation.userId || reservation.user?.id || null,
+      guideId: reservation.guideId || reservation.guide?.id || null,
+      userName:
+        reservation.userName ||
+        reservation.user?.name ||
+        reservation.user?.username ||
+        '',
+      guideName:
+        reservation.guideName ||
+        reservation.guide?.name ||
+        reservation.guide?.username ||
+        '',
+      requesterName: reservation.requesterName || '',
+      guideUserName: reservation.guideUserName || '',
     }));
 
     console.log('✅ Final combined data:', combinedData);
@@ -241,24 +278,54 @@ export function useGetMyReservations(start: string, end: string) {
       console.log('📅 선택된 날짜 API 요청:', {start, end});
       const myReservations = await fetchMyReservations(start, end, token);
 
-      // API 응답을 표준 형식으로 변환
-      return myReservations.map(reservation => ({
-        id: reservation.id || 0,
-        tourProgramTitle: reservation.tourProgramTitle || '',
-        guideStartDate: reservation.guideStartDate || '',
-        guideEndDate: reservation.guideEndDate || '',
-        numOfPeople: reservation.numOfPeople || 0,
-        requestStatus:
-          (reservation.requestStatus as
-            | 'ACCEPTED'
-            | 'PENDING'
-            | 'REJECTED'
-            | 'CANCELLED_BY_USER'
-            | 'CANCELLED_BY_GUIDE'
-            | 'COMPLETED') || 'PENDING',
-        role: reservation.role || 'USER',
-        counterpartName: reservation.counterpartName || '',
-      }));
+      // API 응답을 표준 형식으로 변환하고 취소된 예약 필터링
+      return myReservations
+        .filter(reservation => {
+          // 취소된 예약은 제외
+          const isCancelled =
+            reservation.requestStatus === 'CANCELLED_BY_USER' ||
+            reservation.requestStatus === 'CANCELLED_BY_GUIDE';
+          if (isCancelled) {
+            console.log(
+              `🗑️ 취소된 예약 제외: ${reservation.id} (${reservation.requestStatus})`,
+            );
+          }
+          return !isCancelled;
+        })
+        .map(reservation => ({
+          id: reservation.id || 0,
+          tourProgramTitle: reservation.tourProgramTitle || '',
+          guideStartDate: reservation.guideStartDate || '',
+          guideEndDate: reservation.guideEndDate || '',
+          numOfPeople: reservation.numOfPeople || 0,
+          requestStatus:
+            (reservation.requestStatus as
+              | 'ACCEPTED'
+              | 'PENDING'
+              | 'REJECTED'
+              | 'CANCELLED_BY_USER'
+              | 'CANCELLED_BY_GUIDE'
+              | 'COMPLETED') || 'PENDING',
+          role: reservation.role || 'USER',
+          counterpartName: reservation.counterpartName || '',
+          // 상대방 이름 조회를 위한 필드들 추가
+          tourProgramId:
+            reservation.tourProgramId || reservation.tourProgram?.id || null,
+          userId: reservation.userId || reservation.user?.id || null,
+          guideId: reservation.guideId || reservation.guide?.id || null,
+          userName:
+            reservation.userName ||
+            reservation.user?.name ||
+            reservation.user?.username ||
+            '',
+          guideName:
+            reservation.guideName ||
+            reservation.guide?.name ||
+            reservation.guide?.username ||
+            '',
+          requesterName: reservation.requesterName || '',
+          guideUserName: reservation.guideUserName || '',
+        }));
     },
     enabled: !!(start && end), // start와 end가 있을 때만 쿼리 실행
     refetchInterval: 50000000,
