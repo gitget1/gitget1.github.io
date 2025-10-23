@@ -32,6 +32,7 @@ interface Reservation {
   requestStatus: RequestStatus;
   role: string; // "GUIDE" or "USER"
   counterpartName: string;
+  otherName: string; // 백엔드에서 추가된 필드
   // 상대방 이름 조회를 위한 필드들
   tourProgramId?: number | null;
   userId?: number | null;
@@ -88,7 +89,7 @@ const fetchUserInfo = async (userId: number) => {
 };
 
 
-// ✅ 상대방 이름 가져오기 함수 (user_id와 guide_id 기반)
+// ✅ 상대방 이름 가져오기 함수 (otherName 필드 우선 사용)
 const getCounterpartName = async (reservation: Reservation): Promise<string> => {
   console.log('🔍 예약 정보 분석:', {
     reservationId: reservation.id,
@@ -97,10 +98,17 @@ const getCounterpartName = async (reservation: Reservation): Promise<string> => 
     guideId: reservation.guideId,
     tourProgramId: reservation.tourProgramId,
     tourProgramTitle: reservation.tourProgramTitle,
-    counterpartName: reservation.counterpartName
+    counterpartName: reservation.counterpartName,
+    otherName: reservation.otherName
   });
   
-  // 먼저 기존 필드에서 찾기
+  // 백엔드에서 제공하는 otherName 필드를 최우선으로 사용
+  if (reservation.otherName && reservation.otherName.trim() !== '') {
+    console.log('✅ otherName 필드에서 이름 발견:', reservation.otherName);
+    return reservation.otherName;
+  }
+  
+  // 기존 필드들에서 찾기 (fallback)
   const possibleNames = [
     reservation.counterpartName,
     reservation.userName,

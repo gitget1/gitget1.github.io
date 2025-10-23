@@ -249,40 +249,7 @@ function CalendarScreen() {
         bounces={true}
       >
         {/* 상태 필터 버튼들 */}
-        <View style={styles.statusButtonsContainer}>
-          <TouchableOpacity
-            style={[
-              styles.statusButton,
-              styles.rejectedButton,
-              selectedStatus === 'rejected' && styles.selectedButton
-            ]}
-            onPress={() => setSelectedStatus(selectedStatus === 'rejected' ? null : 'rejected')}
-          >
-            <Text style={styles.statusButtonText}>예약 거절</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity
-            style={[
-              styles.statusButton,
-              styles.successButton,
-              selectedStatus === 'success' && styles.selectedButton
-            ]}
-            onPress={() => setSelectedStatus(selectedStatus === 'success' ? null : 'success')}
-          >
-            <Text style={styles.statusButtonText}>예약 성공</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity
-            style={[
-              styles.statusButton,
-              styles.consultingButton,
-              selectedStatus === 'consulting' && styles.selectedButton
-            ]}
-            onPress={() => setSelectedStatus(selectedStatus === 'consulting' ? null : 'consulting')}
-          >
-            <Text style={styles.statusButtonText}>상담중</Text>
-          </TouchableOpacity>
-        </View>
+        
         
         {/* 선택된 날짜 정보 */}
         <View style={styles.selectedDateInfo}>

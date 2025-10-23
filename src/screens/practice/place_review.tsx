@@ -60,6 +60,7 @@ export default function ReviewScreen() {
   const route = useRoute<RouteProp<AppStackParamList, 'Practice'>>();
   const placeId = route.params?.placeId;
   const placeName = route.params?.placeName;
+  const googlePlaceId = placeId; // placeId를 googlePlaceId로 사용
 
   console.log('🟢 Practice 화면 - route.params:', route.params);
   console.log('🟢 Practice 화면 - 받은 placeId:', placeId);
@@ -297,11 +298,11 @@ export default function ReviewScreen() {
         const token = await AsyncStorage.getItem('accessToken');
         const cleanToken = token ? token.replace('Bearer ', '') : null;
 
-        const requestUrl = `http://124.60.137.10:8083/api/place/review/${placeId}`;
+        const requestUrl = `http://124.60.137.10:8083/api/place/review/${googlePlaceId}`;
         const requestParams = {
           page: 0,
           size: 10,
-          // sortOption: sortMap[sortOrder], // 일시적으로 제거하여 테스트
+          sortOption: sortMap[sortOrder], 
         };
 
         console.log('🟢 Place 리뷰 조회 요청 URL:', requestUrl);
@@ -318,6 +319,11 @@ export default function ReviewScreen() {
               }
             : undefined,
         });
+
+        console.log('🟢 Place 리뷰 조회 응답 URL:', res.config.url);
+        console.log('🟢 Place 리뷰 조회 응답 상태:', res.status);
+        console.log('🟢 Place 리뷰 조회 응답 헤더:', res.headers);
+        console.log('🟢 Place 리뷰 조회 응답 데이터:', JSON.stringify(res.data, null, 2));
         if (
           res.data.status === '100 CONTINUE' ||
           res.data.status === 'Success' ||
@@ -343,6 +349,11 @@ export default function ReviewScreen() {
             (review: any, index: number) => {
               const reviewId = review.reviewId || index + 1000;
               console.log(`🔍 리뷰 ID: ${reviewId}, 원본 reviewId: ${review.reviewId}, 인덱스: ${index}`);
+              console.log(`🔍 리뷰 사용자 정보:`, {
+                userId: review.userId,
+                name: review.name,
+                verificationBadge: review.verificationBadge
+              });
               
               return {
                 ...review,
@@ -357,58 +368,12 @@ export default function ReviewScreen() {
                 // 서버에서 잘못된 별점을 보낼 수 있으므로 5점 이하로 제한
                 rating: Math.min(Math.max(typeof review.rating === 'number' ? review.rating : 0, 0), 5),
                 content: review.content || '',
-                // 실제 작성자 이름을 무조건 표시 (소셜 계정 ID 변환)
-                name: (() => {
-                  // 현재 사용자의 리뷰인지 확인 (문자열 비교로 정확히 매칭)
-                  const isCurrentUserReview = 
-                    review.userId?.toString() === currentUserId?.toString() || 
-                    review.user_id?.toString() === currentUserId?.toString();
-                  
-                  console.log(`🔍 리뷰 ${review.reviewId} 이름 처리:`, {
-                    reviewUserId: review.userId,
-                    reviewUserId2: review.user_id,
-                    currentUserId,
-                    currentUserName,
-                    isCurrentUserReview,
-                    serverName: review.name,
-                    userIdMatch: review.userId?.toString() === currentUserId?.toString(),
-                    user_idMatch: review.user_id?.toString() === currentUserId?.toString()
-                  });
-                  
-                  // 현재 사용자의 리뷰면 무조건 실제 이름 사용
-                  if (isCurrentUserReview && currentUserName) {
-                    console.log(`✅ 현재 사용자 리뷰 - ${currentUserName} 사용`);
-                    return currentUserName;
-                  }
-                  
-                  // 서버에서 받은 name 필드 처리
-                  const serverName = review.name || '';
-                  
-                  if (serverName) {
-                    // 소셜 계정 ID인 경우 변환
-                    if (serverName.startsWith('naver_')) {
-                      console.log(`✅ 네이버 계정 - ${serverName} → 네이버 사용자`);
-                      return '네이버 사용자';
-                    } else if (serverName.startsWith('kakao_')) {
-                      console.log(`✅ 카카오 계정 - ${serverName} → 카카오 사용자`);
-                      return '카카오 사용자';
-                    } else if (serverName.startsWith('google_')) {
-                      console.log(`✅ 구글 계정 - ${serverName} → 구글 사용자`);
-                      return '구글 사용자';
-                    } else {
-                      // 일반 사용자 이름
-                      console.log(`✅ 일반 사용자 이름 - ${serverName}`);
-                      return serverName;
-                    }
-                  }
-                  
-                  // 이름이 없는 경우에만 기본값 사용
-                  console.log(`⚠️ 이름 없음 - 기본값 사용`);
-                  return '사용자';
-                })(),
-                // [요구사항 1] API에서 받은 verificationBadge 값을 저장합니다. 없으면 false로 기본값 처리합니다.
+                // 서버에서 받은 실제 사용자 이름 사용
+                name: review.name || '익명',
+                // API에서 받은 verificationBadge 값을 저장합니다.
                 verificationBadge: review.verificationBadge || false,
                 user_id: review.userId,
+                userId: review.userId, // 추가로 userId 필드도 유지
                 createdAt: review.createdAt || new Date().toISOString(),
               };
             },
@@ -544,6 +509,7 @@ export default function ReviewScreen() {
         skipPermissionCheck: true, // 권한 검증 우회 플래그
       };
 
+      console.log('🔍 리뷰 작성 요청 URL:', requestUrl);
       console.log('🔍 리뷰 작성 요청 데이터:', requestBody);
       console.log('🔍 현재 사용자 이름:', currentUserName);
       console.log('🔍 현재 사용자 ID:', currentUserId);
@@ -559,6 +525,11 @@ export default function ReviewScreen() {
           'X-Allow-No-Permission': 'true', // 권한 없이 리뷰 작성 허용
         },
       });
+
+      console.log('🔍 리뷰 작성 응답 URL:', response.config.url);
+      console.log('🔍 리뷰 작성 응답 상태:', response.status);
+      console.log('🔍 리뷰 작성 응답 헤더:', response.headers);
+      console.log('🔍 리뷰 작성 응답 데이터:', JSON.stringify(response.data, null, 2));
 
       if (
         response.data.status === '100 CONTINUE' ||
@@ -585,6 +556,11 @@ export default function ReviewScreen() {
               (review: any, index: number) => {
                 const reviewId = review.reviewId || index + 1000;
                 console.log(`🔄 새로고침 리뷰 ID: ${reviewId}, 원본 reviewId: ${review.reviewId}, 인덱스: ${index}`);
+                console.log(`🔄 새로고침 리뷰 사용자 정보:`, {
+                  userId: review.userId,
+                  name: review.name,
+                  verificationBadge: review.verificationBadge
+                });
                 
                 return {
                   ...review,
@@ -592,39 +568,11 @@ export default function ReviewScreen() {
                   imageUrls: Array.isArray(review.imagesUrls)
                     ? review.imagesUrls
                     : [],
-                  name: (() => {
-                    // 현재 사용자의 리뷰인지 확인 (문자열 비교로 정확히 매칭)
-                    const isCurrentUserReview = 
-                      review.userId?.toString() === currentUserId?.toString() || 
-                      review.user_id?.toString() === currentUserId?.toString();
-                    
-                    // 현재 사용자의 리뷰면 무조건 실제 이름 사용
-                    if (isCurrentUserReview && currentUserName) {
-                      return currentUserName;
-                    }
-                    
-                    // 서버에서 받은 name 필드 처리
-                    const serverName = review.name || '';
-                    
-                    if (serverName) {
-                      // 소셜 계정 ID인 경우 변환
-                      if (serverName.startsWith('naver_')) {
-                        return '네이버 사용자';
-                      } else if (serverName.startsWith('kakao_')) {
-                        return '카카오 사용자';
-                      } else if (serverName.startsWith('google_')) {
-                        return '구글 사용자';
-                      } else {
-                        // 일반 사용자 이름
-                        return serverName;
-                      }
-                    }
-                    
-                    // 이름이 없는 경우에만 기본값 사용
-                    return '사용자';
-                  })(),
+                  // 서버에서 받은 실제 사용자 이름 사용
+                  name: review.name || '익명',
                   verificationBadge: review.verificationBadge || false,
                   user_id: review.userId,
+                  userId: review.userId, // 추가로 userId 필드도 유지
                   createdAt: review.createdAt || new Date().toISOString(),
                 };
               },
@@ -691,19 +639,14 @@ export default function ReviewScreen() {
 
             const deleteUrl = `http://124.60.137.10:8083/api/place/review`;
             const deleteParams = {
-              googlePlaceId: placeId, // placeId를 googlePlaceId로 변경
+              googlePlaceId: googlePlaceId, // googlePlaceId 사용
               reviewId: reviewId,
             };
 
-            console.log('🔍 삭제 요청 상세 정보:', {
-              url: deleteUrl,
-              params: deleteParams,
-              headers: {
-                Authorization: `Bearer ${cleanToken.substring(0, 20)}...`,
-              },
-              placeId: placeId,
-              reviewId: reviewId,
-              reviewIndex: reviewIndex
+            console.log('🔍 삭제 요청 URL:', deleteUrl);
+            console.log('🔍 삭제 요청 파라미터:', deleteParams);
+            console.log('🔍 삭제 요청 헤더:', {
+              Authorization: `Bearer ${cleanToken.substring(0, 20)}...`,
             });
 
             const response = await axios.delete(deleteUrl, {
@@ -713,7 +656,10 @@ export default function ReviewScreen() {
               },
             });
 
-            console.log('🔍 삭제 응답:', response.data);
+            console.log('🔍 삭제 응답 URL:', response.config.url);
+            console.log('🔍 삭제 응답 상태:', response.status);
+            console.log('🔍 삭제 응답 헤더:', response.headers);
+            console.log('🔍 삭제 응답 데이터:', JSON.stringify(response.data, null, 2));
 
             if (
               response.data.status === 'OK' ||
@@ -723,7 +669,7 @@ export default function ReviewScreen() {
               // 삭제 성공 후 리뷰 목록 새로고침
               try {
                 const refreshRes = await axios.get(
-                  `http://124.60.137.10:8083/api/place/review/${placeId}`,
+                  `http://124.60.137.10:8083/api/place/review/${googlePlaceId}`,
                   {
                     params: {page: 0, size: 10},
                     headers: cleanToken ? {Authorization: `Bearer ${cleanToken}`} : undefined,
@@ -740,6 +686,11 @@ export default function ReviewScreen() {
                     (review: any, index: number) => {
                       const reviewId = review.reviewId || index + 1000;
                       console.log(`🗑️ 삭제 후 새로고침 리뷰 ID: ${reviewId}, 원본 reviewId: ${review.reviewId}, 인덱스: ${index}`);
+                      console.log(`🗑️ 삭제 후 새로고침 리뷰 사용자 정보:`, {
+                        userId: review.userId,
+                        name: review.name,
+                        verificationBadge: review.verificationBadge
+                      });
                       
                       return {
                         ...review,
@@ -747,39 +698,11 @@ export default function ReviewScreen() {
                         imageUrls: Array.isArray(review.imagesUrls)
                           ? review.imagesUrls
                           : [],
-                        name: (() => {
-                          // 현재 사용자의 리뷰인지 확인 (문자열 비교로 정확히 매칭)
-                          const isCurrentUserReview = 
-                            review.userId?.toString() === currentUserId?.toString() || 
-                            review.user_id?.toString() === currentUserId?.toString();
-                          
-                          // 현재 사용자의 리뷰면 무조건 실제 이름 사용
-                          if (isCurrentUserReview && currentUserName) {
-                            return currentUserName;
-                          }
-                          
-                          // 서버에서 받은 name 필드 처리
-                          const serverName = review.name || '';
-                          
-                          if (serverName) {
-                            // 소셜 계정 ID인 경우 변환
-                            if (serverName.startsWith('naver_')) {
-                              return '네이버 사용자';
-                            } else if (serverName.startsWith('kakao_')) {
-                              return '카카오 사용자';
-                            } else if (serverName.startsWith('google_')) {
-                              return '구글 사용자';
-                            } else {
-                              // 일반 사용자 이름
-                              return serverName;
-                            }
-                          }
-                          
-                          // 이름이 없는 경우에만 기본값 사용
-                          return '사용자';
-                        })(),
+                        // 서버에서 받은 실제 사용자 이름 사용
+                        name: review.name || '익명',
                         verificationBadge: review.verificationBadge || false,
                         user_id: review.userId,
+                        userId: review.userId, // 추가로 userId 필드도 유지
                         createdAt: review.createdAt || new Date().toISOString(),
                       };
                     },
@@ -859,17 +782,17 @@ export default function ReviewScreen() {
         <Text style={{marginBottom: 8, color: '#1976d2', fontWeight: '800'}}>
           {getRatingTexts(t)[Math.round(newRating)]}
         </Text>
-        <TextInput
+        {/* <TextInput
           style={styles.input}
-          placeholder={t('enterReviewContent')}
+          placeholder="제목을 입력하세요"
           placeholderTextColor="#000000"
           value={newContent}
           onChangeText={setNewContent}
           multiline
-        />
+        /> */}
         <TextInput
           style={styles.input}
-          placeholder={t('imageUrlOptional')}
+          placeholder="리뷰 내용을 입력하세요"
           placeholderTextColor="#000000"
           value={newImageUrl}
           onChangeText={setNewImageUrl}
@@ -944,16 +867,6 @@ export default function ReviewScreen() {
       {reviews.map((review, i) => (
         <View key={review.id || i} style={styles.reviewCard}>
           <View style={styles.profileRow}>
-            <Image
-              source={{
-                uri:
-                  review.user?.avatar ||
-                  `https://via.placeholder.com/36x36.png?text=${encodeURIComponent(
-                    (review.name || '익명').charAt(0),
-                  )}`,
-              }}
-              style={styles.avatar}
-            />
             <View style={styles.flex1}>
               {/* ======================== [수정된 부분 4] ======================== */}
               {/* 이름과 인증 뱃지를 함께 보여주기 위한 UI 수정입니다. */}
@@ -961,7 +874,7 @@ export default function ReviewScreen() {
               {/* =============================================================== */}
               <View style={styles.nicknameContainer}>
                 <Text style={styles.nickname}>
-                  {review.name || '사용자'}
+                  {review.name || '익명'}
                 </Text>
                 {/* [요구사항 2] verificationBadge가 true이면 인증 뱃지를 표시합니다. */}
                 {review.verificationBadge && (
@@ -972,9 +885,11 @@ export default function ReviewScreen() {
                 <Text style={styles.smallText}>
                   {renderStars(review.rating || 0)}
                 </Text>
-                <Text style={styles.date}>
-                  {new Date(review.createdAt).toLocaleDateString()}
-                </Text>
+                <View style={styles.dateContainer}>
+                  <Text style={styles.date}>
+                    {new Date(review.createdAt).toLocaleDateString()}
+                  </Text>
+                </View>
               </View>
             </View>
             {/* 디버깅: 현재 사용자 ID와 리뷰 사용자 ID 확인 */}
@@ -987,7 +902,7 @@ export default function ReviewScreen() {
                 reviewUserId2: review.user_id,
                 reviewName: review.name,
                 isCurrentUser: review.userId === currentUserId || review.user_id === currentUserId,
-                finalDisplayName: review.name || '사용자',
+                finalDisplayName: review.name || '익명',
                 // 추가 디버깅 정보
                 reviewData: {
                   originalName: review.name,
@@ -999,36 +914,62 @@ export default function ReviewScreen() {
               return null;
             })()}
             
-            {/* 임시로 모든 리뷰에 삭제 버튼 표시 (테스트용) */}
-            <TouchableOpacity
-              style={styles.tempDeleteButton}
-              onPress={() => {
-                console.log('🗑️ 삭제 버튼 클릭됨 - 리뷰 ID:', review.id, '인덱스:', i);
-                console.log('🔍 현재 사용자 ID:', currentUserId);
-                console.log('🔍 리뷰 사용자 ID:', review.userId, review.user_id);
-                handleDeleteReview(review.id, i);
-              }}>
-              <Text style={styles.tempDeleteButtonText}>삭제</Text>
-            </TouchableOpacity>
           </View>
+          {review.title && (
+            <Text style={styles.title}>{review.title}</Text>
+          )}
           <Text style={styles.content}>{review.content}</Text>
-          {Array.isArray(review.imageUrls) && review.imageUrls.length > 0 && (
+          {/* 본인 리뷰에만 삭제 버튼 표시 - 사용자 ID로 정확히 비교 */}
+          {(() => {
+            // 사용자 ID로 정확히 비교 (이름이 같아도 ID가 다르면 삭제 불가)
+            const isMyReview = review.userId?.toString() === currentUserId?.toString() || 
+                              review.user_id?.toString() === currentUserId?.toString();
+            
+            console.log('🔍 삭제 버튼 표시 조건 확인:', {
+              reviewUserId: review.userId,
+              reviewUser_id: review.user_id,
+              currentUserId: currentUserId,
+              isMyReview: isMyReview,
+              reviewName: review.name,
+              // 추가 디버깅 정보
+              userIdMatch: review.userId?.toString() === currentUserId?.toString(),
+              user_idMatch: review.user_id?.toString() === currentUserId?.toString()
+            });
+            
+            return isMyReview ? (
+              <TouchableOpacity
+                style={styles.tempDeleteButton}
+                onPress={() => {
+                  console.log('🗑️ 삭제 버튼 클릭됨 - 리뷰 ID:', review.reviewId, '인덱스:', i);
+                  console.log('🔍 현재 사용자 ID:', currentUserId);
+                  console.log('🔍 리뷰 사용자 ID:', review.userId);
+                  console.log('🔍 리뷰 사용자 _id:', review.user_id);
+                  handleDeleteReview(review.reviewId, i);
+                }}>
+                <Text style={styles.tempDeleteButtonText}>삭제</Text>
+              </TouchableOpacity>
+            ) : null;
+          })()}
+          {Array.isArray(review.imagesUrls) && review.imagesUrls.length > 0 && (
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
               style={{marginTop: 10}}>
-              {review.imageUrls.map((img: string, idx: number) => (
-                <Image
-                  key={idx}
-                  source={{uri: img}}
-                  style={{
-                    width: 120,
-                    height: 120,
-                    borderRadius: 8,
-                    marginRight: 10,
-                  }}
-                />
-              ))}
+              {review.imagesUrls
+                .filter((img: string) => img && typeof img === 'string' && (img.startsWith('http') || img.startsWith('https')))
+                .map((img: string, idx: number) => (
+                  <Image
+                    key={idx}
+                    source={{uri: img}}
+                    style={{
+                      width: 120,
+                      height: 120,
+                      borderRadius: 8,
+                      marginRight: 10,
+                    }}
+                    onError={() => console.log('이미지 로드 실패:', img)}
+                  />
+                ))}
             </ScrollView>
           )}
         </View>
@@ -1150,8 +1091,19 @@ const styles = StyleSheet.create({
   reviewCard: {
     padding: 16,
     marginTop: 12,
-    borderColor: '#eee',
-    borderBottomWidth: 1,
+    marginHorizontal: 16,
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   profileRow: {
     flexDirection: 'row',
@@ -1162,7 +1114,15 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    marginRight: 12,
+    marginRight: 8,
+    backgroundColor: '#007AFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '800',
   },
   // ======================== [수정된 부분 5] ========================
   // 닉네임과 뱃지를 가로로 나열하기 위한 컨테이너 스타일 추가
@@ -1202,21 +1162,34 @@ const styles = StyleSheet.create({
     color: '#000000',
     fontWeight: '500',
   },
+  title: {
+    fontSize: 15,
+    color: '#000000',
+    fontWeight: '800',
+    marginBottom: 6,
+  },
   metaRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginTop: 4,
+    flex: 1,
+  },
+  dateContainer: {
+    flex: 1,
+    alignItems: 'flex-end',
   },
   flex1: {
     flex: 1,
+    alignItems: 'flex-start',
   },
   tempDeleteButton: {
     backgroundColor: '#ff4444',
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 8,
-    marginLeft: 8,
+    marginTop: 8,
+    alignSelf: 'flex-end',
     borderWidth: 1,
     borderColor: '#ff0000',
   },

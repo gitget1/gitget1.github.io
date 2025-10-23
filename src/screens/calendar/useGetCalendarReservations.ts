@@ -18,6 +18,7 @@ interface ReservationCalendarDTO {
   requestStatus: string;
   role: string; // "GUIDE" or "USER"
   counterpartName: string;
+  otherName: string; // 백엔드에서 추가된 필드
   // 상대방 이름 조회를 위한 필드들
   tourProgramId?: number;
   userId?: number;
@@ -156,6 +157,7 @@ const fetchCalendarReservations = async (start: string, end: string) => {
           | 'COMPLETED') || 'PENDING',
       role: reservation.role || 'USER', // 서버에서 제공하는 role 필드 사용
       counterpartName: reservation.counterpartName || '', // 서버에서 제공하는 counterpartName 필드 사용
+      otherName: reservation.otherName || '', // 백엔드에서 추가된 otherName 필드 사용
       // 상대방 이름 조회를 위한 필드들 추가
       tourProgramId:
         reservation.tourProgramId || reservation.tourProgram?.id || null,
@@ -308,6 +310,7 @@ export function useGetMyReservations(start: string, end: string) {
               | 'COMPLETED') || 'PENDING',
           role: reservation.role || 'USER',
           counterpartName: reservation.counterpartName || '',
+          otherName: reservation.otherName || '', // 백엔드에서 추가된 otherName 필드 사용
           // 상대방 이름 조회를 위한 필드들 추가
           tourProgramId:
             reservation.tourProgramId || reservation.tourProgram?.id || null,

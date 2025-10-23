@@ -753,58 +753,32 @@ export default function ReviewScreen() {
       {reviews.map((review, i) => (
         <View key={i} style={styles.reviewCard}>
           <View style={styles.profileRow}>
-            <Image
-              source={{
-                uri:
-                  review.user?.avatar ||
-                  `https://via.placeholder.com/36x36.png?text=${encodeURIComponent(
-                    (review.name || '익명').charAt(0),
-                  )}`,
-              }}
-              style={styles.avatar}
-            />
             <View style={styles.flex1}>
               <Text style={styles.nickname}>
                 {review.name || t('anonymousReview')}
               </Text>
-              <View style={styles.metaRow}>
-                <Text style={styles.smallText}>
-                  {renderStars(review.rating || 0)}
-                </Text>
-                <Text style={styles.date}>
-                  {new Date(review.createdAt).toLocaleDateString()}
-                </Text>
-              </View>
+              <Text style={styles.smallText}>
+                {renderStars(review.rating || 0)}
+              </Text>
+              <Text style={styles.date}>
+                {new Date(review.createdAt).toLocaleDateString()}
+              </Text>
             </View>
-            {/* 삭제 버튼 일시 비활성화 */}
-            {/* 
-            {(() => {
-              // 디버깅을 위한 로그
-              console.log(`🔍 리뷰 ${i} 삭제 버튼 조건 확인:`, {
-                reviewUserId: review.user_id,
-                currentUserId: currentUserId,
-                reviewName: review.name,
-                reviewUserName: review.user?.name,
-                reviewId: review.id,
-                reviewContent: review.content?.substring(0, 20),
-              });
-
-              // 임시로 모든 리뷰에 삭제 버튼 표시 (테스트용)
-              const isMyReview = true;
-
-              console.log(`🔍 리뷰 ${i} 삭제 버튼 표시 여부:`, isMyReview);
-
-              return isMyReview ? (
-                <TouchableOpacity
-                  style={styles.tempDeleteButton}
-                  onPress={() => handleDeleteReview(review.id, i)}>
-                  <Text style={styles.tempDeleteButtonText}>삭제</Text>
-                </TouchableOpacity>
-              ) : null;
-            })()}
-            */}
           </View>
           <Text style={styles.content}>{review.content}</Text>
+          {/* 본인이 작성한 리뷰에만 삭제 버튼 표시 */}
+          {currentUserId && review.user_id === currentUserId && (
+            <TouchableOpacity
+              style={styles.tempDeleteButton}
+              onPress={() => {
+                console.log('🗑️ 삭제 버튼 클릭됨 - 리뷰 ID:', review.id, '인덱스:', i);
+                console.log('🔍 현재 사용자 ID:', currentUserId);
+                console.log('🔍 리뷰 사용자 ID:', review.user_id);
+                handleDeleteReview(review.id, i);
+              }}>
+              <Text style={styles.tempDeleteButtonText}>삭제</Text>
+            </TouchableOpacity>
+          )}
           {review.imageUrls && review.imageUrls.length > 0 && (
             <ScrollView
               horizontal
@@ -999,6 +973,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 4,
   },
+  nameRatingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
   flex1: {
     flex: 1,
   },
@@ -1022,7 +1001,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 8,
-    marginLeft: 8,
+    marginTop: 8,
+    alignSelf: 'flex-end',
   },
   tempDeleteButtonText: {
     color: '#000000',

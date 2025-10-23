@@ -618,7 +618,6 @@ function Make_program() {
       });
 
       if (!result.assets || !result.assets[0]?.uri) {
-        Alert.alert('오류', '이미지를 선택하지 않았습니다.');
         return;
       }
 

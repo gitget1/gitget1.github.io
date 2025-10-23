@@ -78,21 +78,17 @@ const PaymentScreen = () => {
   const [month, setMonth] = useState(new Date().getMonth() + 1);
   const [day, setDay] = useState(new Date().getDate());
   const [people, setPeople] = useState(1);
-  const [appliedPeople, setAppliedPeople] = useState<number | null>(null);
   const [userId, setUserId] = useState<number | null>(null);
   const [localTourData, setLocalTourData] = useState<any>(tourData);
 
   // guidePrice가 0인 경우 기본값 설정
   const effectiveGuidePrice = localTourData?.guidePrice > 0 ? localTourData.guidePrice : 50000;
-  
-  // appliedPeople이 null인 경우 기본값 설정
-  const effectiveAppliedPeople = appliedPeople || 1;
 
-  const totalPrice = effectiveGuidePrice * effectiveAppliedPeople;
+  // 인원수에 따라 자동으로 가격 계산
+  const totalPrice = effectiveGuidePrice * people;
 
   console.log('💰 totalPrice 계산:', {
-    appliedPeople,
-    effectiveAppliedPeople,
+    people,
     guidePrice: localTourData?.guidePrice,
     effectiveGuidePrice,
     totalPrice,
@@ -208,7 +204,7 @@ const PaymentScreen = () => {
     }
 
     console.log('🧮 최종 totalPrice:', totalPrice);
-    console.log('📌 effectiveAppliedPeople:', effectiveAppliedPeople);
+    console.log('📌 people:', people);
     console.log('🎯 localTourData:', localTourData);
 
     const merchantUid = `merchant_${new Date().getTime()}`;
@@ -229,7 +225,7 @@ const PaymentScreen = () => {
 
     // 서버로 전송할 예약 데이터 (ReservationRequestDTO 구조에 맞춤)
     const reservationData = {
-      numOfPeople: effectiveAppliedPeople,
+      numOfPeople: people,
       guideStartDate: `${year}-${String(month).padStart(2, '0')}-${String(
         day,
       ).padStart(2, '0')}T10:00:00`,
@@ -276,7 +272,7 @@ const PaymentScreen = () => {
     // 🔍 전체 데이터 구조 확인
     console.log('🔍 전체 데이터 구조 확인 ==============================');
     console.log('선택된 날짜:', `${year}년 ${month}월 ${day}일`);
-    console.log('선택된 인원:', effectiveAppliedPeople + '명');
+    console.log('선택된 인원:', people + '명');
     console.log('투어 제목:', localTourData.title);
     console.log('투어 지역:', localTourData.region);
     console.log('가이드 가격:', effectiveGuidePrice.toLocaleString() + '원/인');
@@ -329,6 +325,7 @@ const PaymentScreen = () => {
             <Picker
               selectedValue={year}
               style={styles.yearPicker}
+              itemStyle={styles.pickerItemStyle}
               onValueChange={setYear}>
               {[2024, 2025, 2026].map(y => (
                 <Picker.Item key={y} label={`${y}년`} value={y} color='#000000' />
@@ -337,6 +334,7 @@ const PaymentScreen = () => {
             <Picker
               selectedValue={month}
               style={styles.picker}
+              itemStyle={styles.pickerItemStyle}
               onValueChange={setMonth}>
               {[...Array(12)].map((_, i) => (
                 <Picker.Item key={i + 1} label={`${i + 1}월`} value={i + 1} color='#000000' />
@@ -345,6 +343,7 @@ const PaymentScreen = () => {
             <Picker
               selectedValue={day}
               style={styles.picker}
+              itemStyle={styles.pickerItemStyle}
               onValueChange={setDay}>
               {[...Array(31)].map((_, i) => (
                 <Picker.Item key={i + 1} label={`${i + 1}일`} value={i + 1} color='#000000' />
@@ -355,37 +354,30 @@ const PaymentScreen = () => {
 
         <View style={styles.box}>
           <Text style={styles.label}>인원</Text>
-          <View style={styles.row}>
+          <View style={styles.peopleRow}>
             <TouchableOpacity
               onPress={() => setPeople(Math.max(1, people - 1))}
               style={styles.counterBtn}>
-              <Text>-</Text>
+              <Text style={styles.counterBtnText}>-</Text>
             </TouchableOpacity>
             <Text style={styles.peopleNum}>{people}</Text>
             <TouchableOpacity
               onPress={() => setPeople(people + 1)}
               style={styles.counterBtn}>
-              <Text>+</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.applyBtn}
-              onPress={() => setAppliedPeople(people)}>
-              <Text>적용</Text>
+              <Text style={styles.counterBtnText}>+</Text>
             </TouchableOpacity>
           </View>
-          {effectiveAppliedPeople > 0 && (
-            <View style={styles.totalPeopleBox}>
-              <Text style={styles.totalPeopleText}>
-                총 인원: {effectiveAppliedPeople}명
-              </Text>
-            </View>
-          )}
+          <View style={styles.totalPeopleBox}>
+            <Text style={styles.totalPeopleText}>
+              총 인원: {people}명
+            </Text>
+          </View>
         </View>
 
         <View style={styles.box}>
           <Text style={styles.label}>총 금액</Text>
           <Text style={styles.totalPrice}>
-            {(localTourData?.guidePrice || 100) * (effectiveAppliedPeople || 1)}원
+            {totalPrice.toLocaleString()}원
           </Text>
         </View>
 
@@ -450,32 +442,60 @@ const styles = StyleSheet.create({
   region: {fontSize: 16, color: '#000000'},
   price: {fontSize: 16, color: '#000000', fontWeight: 'bold', marginTop: 4},
   label: {fontWeight: 'bold', marginBottom: 8, fontSize: 16, color: '#000000'},
-  row: {flexDirection: 'row', alignItems: 'center', marginBottom: 8},
+  row: {
+    flexDirection: 'column', 
+    alignItems: 'center', 
+    marginBottom: 8,
+    borderRadius: 6,
+    padding: 0,
+    backgroundColor: '#f8f9fa',
+    justifyContent: 'center',
+  },
+  peopleRow: {
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    marginBottom: 8,
+  },
   picker: {
-    width: 110,
+    width: '100%',
     height: 50,
     color: '#000000',
-    fontWeight: '800',
+    fontWeight: '900',
+    backgroundColor: '#ffffff',
+    borderRadius: 4,
+    marginVertical: 4,
+    textAlign: 'center',
   },
   yearPicker: {
-    width: 120,
+    width: '100%',
     height: 50,
     color: '#000000',
-    fontWeight: '800',
+    fontWeight: '900',
+    backgroundColor: '#ffffff',
+    borderRadius: 4,
+    marginVertical: 4,
+    textAlign: 'center',
+  },
+  pickerItemStyle: {
+    color: '#1E3A8A',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
   counterBtn: {
-    backgroundColor: '#eee',
-    padding: 8,
-    borderRadius: 6,
+    backgroundColor: '#007AFF',
+    padding: 12,
+    borderRadius: 8,
     marginHorizontal: 8,
+    minWidth: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  counterBtnText: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: 'bold',
   },
   peopleNum: {fontSize: 18, fontWeight: 'bold', marginHorizontal: 8, color: '#000000'},
-  applyBtn: {
-    backgroundColor: '#90EE90',
-    padding: 8,
-    borderRadius: 6,
-    marginLeft: 8,
-  },
   totalPeopleBox: {position: 'absolute', right: 20, bottom: 20},
   totalPeopleText: {fontSize: 15, color: '#000000', fontWeight: 'bold'},
   totalPrice: {fontWeight: 'bold', color: '#000000', fontSize: 18},

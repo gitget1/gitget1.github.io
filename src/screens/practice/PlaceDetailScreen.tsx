@@ -31,6 +31,24 @@ import Geolocation from '@react-native-community/geolocation';
 
 const { width } = Dimensions.get('window');
 
+// JWT 토큰 디코딩 함수
+const decodeJWT = (token: string) => {
+  try {
+    const base64Url = token.split('.')[1];
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const jsonPayload = decodeURIComponent(
+      atob(base64)
+        .split('')
+        .map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+        .join(''),
+    );
+    return JSON.parse(jsonPayload);
+  } catch (error) {
+    console.error('JWT 디코딩 실패:', error);
+    return null;
+  }
+};
+
 // 새로운 API 응답 타입 정의
 type TourApiResponse = {
   name: string;
@@ -82,6 +100,7 @@ const PlaceDetailScreen = () => {
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [newReview, setNewReview] = useState({
     rating: 0,
+    title: '',
     content: '',
   });
   const [gpsPermissionCount, setGpsPermissionCount] = useState(0); // GPS 권한 카운터 초기값 0
@@ -91,6 +110,71 @@ const PlaceDetailScreen = () => {
   } | null>(null);
   const [isRequesting, setIsRequesting] = useState(false); // 중복 요청 방지
   const [hasLocationPermission, setHasLocationPermission] = useState(false); // 위치 권한 확인 상태
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [currentUserName, setCurrentUserName] = useState<string | null>(null);
+
+  // 현재 사용자 정보 가져오기
+  useEffect(() => {
+    const getCurrentUser = async () => {
+      try {
+        // 먼저 AsyncStorage에서 저장된 사용자 정보 확인
+        const savedUserName = await AsyncStorage.getItem('currentUserName');
+        const savedUserId = await AsyncStorage.getItem('currentUserId');
+        
+        if (savedUserName && savedUserId) {
+          console.log('✅ PlaceDetailScreen AsyncStorage에서 사용자 정보 발견:', { savedUserName, savedUserId });
+          setCurrentUserName(savedUserName);
+          setCurrentUserId(savedUserId);
+          return;
+        }
+        
+        const token = await AsyncStorage.getItem('accessToken');
+        if (token) {
+          const cleanToken = token.replace('Bearer ', '');
+          
+          // 서버 API로 사용자 정보 조회 시도
+          try {
+            const response = await axios.get('http://124.60.137.10:8083/api/user', {
+              headers: {
+                Authorization: `Bearer ${cleanToken}`,
+                'Content-Type': 'application/json',
+              },
+            });
+            
+            if (response.data.status === 'OK' || response.data.status === '100 CONTINUE') {
+              const userData = response.data.data;
+              const userName = userData.name || userData.username;
+              
+              if (userName) {
+                setCurrentUserName(userName);
+                await AsyncStorage.setItem('currentUserName', userName);
+                
+                if (userData.id) {
+                  setCurrentUserId(userData.id.toString());
+                  await AsyncStorage.setItem('currentUserId', userData.id.toString());
+                }
+                return;
+              }
+            }
+          } catch (apiError) {
+            console.log('⚠️ PlaceDetailScreen 사용자 상세 정보 API 호출 실패:', apiError);
+          }
+          
+          // API 호출이 실패하면 JWT에서 추출
+          const decoded = decodeJWT(token);
+          if (decoded && decoded.sub) {
+            const userName = decoded.name || decoded.username || decoded.nickname;
+            setCurrentUserId(decoded.sub);
+            setCurrentUserName(userName);
+            await AsyncStorage.setItem('currentUserName', userName);
+          }
+        }
+      } catch (error) {
+        console.error('PlaceDetailScreen 사용자 정보 가져오기 실패:', error);
+      }
+    };
+    getCurrentUser();
+  }, []);
 
   // 새로운 API로 장소 정보 가져오기
   const fetchPlaceData = async () => {
@@ -576,6 +660,7 @@ const PlaceDetailScreen = () => {
         {
           googlePlaceId: placeId, // placeId를 googlePlaceId로 변경
           rating: newReview.rating,
+          title: newReview.title,
           content: newReview.content,
           imageUrls: [],
         },
@@ -590,7 +675,7 @@ const PlaceDetailScreen = () => {
       if (response.data.status === '100 CONTINUE' || response.data.status === '200 OK') {
         // 리뷰 작성 성공 시 포인트 지급 (서버에서 자동 처리됨)
         setShowReviewModal(false);
-        setNewReview({ rating: 0, content: '' });
+        setNewReview({ rating: 0, title: '', content: '' });
         Alert.alert('성공', '리뷰가 등록되었습니다. 10포인트가 지급되었습니다!');
 
         // 리뷰 데이터만 업데이트 (장소 정보 전체를 다시 조회하지 않음)
@@ -598,11 +683,15 @@ const PlaceDetailScreen = () => {
         if (placeDetail?.travelLocalEvaluation) {
           // 기존 리뷰 데이터에 새 리뷰 추가 (임시로 클라이언트에서 처리)
           const newReviewData = {
-            id: Date.now(), // 임시 ID
+            reviewId: Date.now(), // 임시 ID (API 응답 구조에 맞게)
+            userId: 0, // 현재 사용자 ID
             rating: newReview.rating,
+            title: newReview.title,
             content: newReview.content,
             name: '나', // 현재 사용자
             createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            imagesUrls: [], // API 응답 구조에 맞게
             verificationBadge: hasLocationPermission,
           };
 
@@ -717,11 +806,6 @@ const PlaceDetailScreen = () => {
       <ScrollView>
         {/* 헤더 */}
         <View style={styles.header}>
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={() => navigation.goBack()}>
-            <Icon name="arrow-back" size={24} color="#333" />
-          </TouchableOpacity>
           <Text style={styles.headerTitle} numberOfLines={1}>
             {placeDetail?.tourApiResponse?.name || '장소명 없음'}
           </Text>
@@ -966,14 +1050,8 @@ const PlaceDetailScreen = () => {
                   </Text>
                   {previewReviews.length > 0 ? (
                     previewReviews.map((review, idx) => {
-                      // 실제 사용자 이름 표시 (개인 ID는 익명으로 처리)
-                      let displayName = review.name || '';
-                      if (
-                        /^naver_|^kakao_|^google_/i.test(displayName) ||
-                        displayName.length > 15
-                      ) {
-                        displayName = '익명';
-                      }
+                      // Program_review.tsx와 동일한 방식으로 이름 처리
+                      const displayName = review.user?.name || review.name || '익명';
                       return (
                         <View
                           key={idx}
@@ -1021,9 +1099,16 @@ const PlaceDetailScreen = () => {
                             </Text>
                           </View>
                           <View style={{ position: 'relative' }}>
+                            {review.title && (
+                              <Text
+                                style={{ fontSize: 15, color: '#000000', fontWeight: '800', marginBottom: 6 }}
+                                numberOfLines={1}>
+                                {review.title}
+                              </Text>
+                            )}
                             <Text
-                              style={{ fontSize: 13, color: '#000000', fontWeight: '600' }}
-                              numberOfLines={2}>
+                              style={{ fontSize: 13, color: '#333333', fontWeight: '500', lineHeight: 18 }}
+                              numberOfLines={3}>
                               {review.content}
                             </Text>
                             {review.verificationBadge && (
@@ -1292,13 +1377,21 @@ const PlaceDetailScreen = () => {
             </View>
 
             <TextInput
+              style={styles.titleInput}
+              placeholder="제목을 입력하세요"
+              value={newReview.title}
+              onChangeText={text => setNewReview({ ...newReview, title: text })}
+            />
+            
+            <TextInput
               style={styles.reviewInput}
-              placeholder="리뷰를 작성해주세요..."
+              placeholder="리뷰 내용을 입력하세요"
               value={newReview.content}
               onChangeText={text => setNewReview({ ...newReview, content: text })}
-              multiline
+              multiline={true}
               numberOfLines={4}
             />
+            
 
             <TouchableOpacity
               style={styles.submitButton}
@@ -1359,19 +1452,25 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
   },
-  backButton: {
-    padding: 4,
-  },
   headerTitle: {
-    flex: 1,
     fontSize: 18,
     fontWeight: '800',
     textAlign: 'center',
-    marginHorizontal: 16,
     color: '#000000',
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
+    textAlignVertical: 'center',
   },
   shareButton: {
     padding: 4,
+    position: 'absolute',
+    right: 16,
+    top: 0,
+    bottom: 0,
+    justifyContent: 'center',
   },
   mainImage: {
     width: '100%',
@@ -1560,6 +1659,14 @@ const styles = StyleSheet.create({
   starsInputContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
+  },
+  titleInput: {
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+    marginBottom: 12,
   },
   reviewInput: {
     borderWidth: 1,

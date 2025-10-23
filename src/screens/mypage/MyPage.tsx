@@ -420,10 +420,10 @@ const MainScreen = () => {
             <Text style={styles.gridIcon}>✏️</Text>
             <Text style={styles.gridText}>정보 수정</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.gridItem} onPress={goToReview}>
+          {/* <TouchableOpacity style={styles.gridItem} onPress={goToReview}>
             <Text style={styles.gridIcon}>📚</Text>
             <Text style={styles.gridText}>{t('myReview')}</Text>
-          </TouchableOpacity>
+          </TouchableOpacity> */}
         </View>
 
         {/* 🔵 잔여 포인트 카드 (Buddy Pass 대신) */}
