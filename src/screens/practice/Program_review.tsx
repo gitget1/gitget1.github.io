@@ -753,10 +753,24 @@ export default function ReviewScreen() {
       {reviews.map((review, i) => (
         <View key={i} style={styles.reviewCard}>
           <View style={styles.profileRow}>
+<<<<<<< Updated upstream:src/screens/practice/Program_review.tsx
+=======
+            <Image
+              source={{
+                uri:
+                  review.user?.avatar ||
+                  `https://via.placeholder.com/36x36.png?text=${encodeURIComponent(
+                    (review.name || '익명').charAt(0),
+                  )}`,
+              }}
+              style={styles.avatar}
+            />
+>>>>>>> Stashed changes:src/screens/practice/Practice.tsx
             <View style={styles.flex1}>
               <Text style={styles.nickname}>
                 {review.name || t('anonymousReview')}
               </Text>
+<<<<<<< Updated upstream:src/screens/practice/Program_review.tsx
               <Text style={styles.smallText}>
                 {renderStars(review.rating || 0)}
               </Text>
@@ -779,6 +793,44 @@ export default function ReviewScreen() {
               <Text style={styles.tempDeleteButtonText}>삭제</Text>
             </TouchableOpacity>
           )}
+=======
+              <View style={styles.metaRow}>
+                <Text style={styles.smallText}>
+                  {renderStars(review.rating || 0)}
+                </Text>
+                <Text style={styles.date}>
+                  {new Date(review.createdAt).toLocaleDateString()}
+                </Text>
+              </View>
+            </View>
+            {/* 본인이 작성한 리뷰인 경우만 삭제 버튼 표시 */}
+            {(() => {
+              // 디버깅을 위한 로그
+              console.log(`🔍 리뷰 ${i} 삭제 버튼 조건 확인:`, {
+                reviewUserId: review.user_id,
+                currentUserId: currentUserId,
+                reviewName: review.name,
+                reviewUserName: review.user?.name,
+                reviewId: review.id,
+                reviewContent: review.content?.substring(0, 20),
+              });
+
+              // 임시로 모든 리뷰에 삭제 버튼 표시 (테스트용)
+              const isMyReview = true;
+
+              console.log(`🔍 리뷰 ${i} 삭제 버튼 표시 여부:`, isMyReview);
+
+              return isMyReview ? (
+                <TouchableOpacity
+                  style={styles.tempDeleteButton}
+                  onPress={() => handleDeleteReview(review.id, i)}>
+                  <Text style={styles.tempDeleteButtonText}>삭제</Text>
+                </TouchableOpacity>
+              ) : null;
+            })()}
+          </View>
+          <Text style={styles.content}>{review.content}</Text>
+>>>>>>> Stashed changes:src/screens/practice/Practice.tsx
           {review.imageUrls && review.imageUrls.length > 0 && (
             <ScrollView
               horizontal

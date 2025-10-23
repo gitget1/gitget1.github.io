@@ -29,6 +29,7 @@ const NaverLoginScreen = () => {
           { withCredentials: true }
         );
 
+<<<<<<< Updated upstream
         console.log('📡 네이버 로그인 - 서버 응답:', response.status);
         console.log('📡 네이버 로그인 - 응답 헤더:', response.headers);
 
@@ -51,6 +52,11 @@ const NaverLoginScreen = () => {
         if (accessToken) {
           await AsyncStorage.setItem('accessToken', accessToken);
           console.log('✅ 네이버 로그인 - 토큰 저장 완료');
+=======
+        const accessToken = response.headers.authorization?.replace('Bearer ', '');
+        if (accessToken) {
+          await AsyncStorage.setItem('accessToken', accessToken);
+>>>>>>> Stashed changes
           navigation.replace('Main');
         } else {
           console.log('❌ 네이버 로그인 - 토큰이 없습니다');
@@ -123,8 +129,11 @@ const NaverLoginScreen = () => {
           { withCredentials: true }
         );
         const newAccessToken = response.headers.authorization;
+<<<<<<< Updated upstream
         console.log('🔑 네이버 로그인 - 재발급된 토큰:', newAccessToken);
         
+=======
+>>>>>>> Stashed changes
         if (newAccessToken) {
           await AsyncStorage.setItem('accessToken', newAccessToken);
           console.log('✅ 네이버 로그인 - 재발급 토큰 저장 완료');

@@ -9,9 +9,15 @@ import QuestionScreen from '../screens/mbti/QuestionScreen';
 import Make_program from '../screens/program/Make_program';
 import TraitSelection from '../screens/Select_mbti/Trait_Selection';
 import ResultScreen from '../screens/mbti/ResultScreen';
+<<<<<<< Updated upstream
 import Practice from '../screens/practice/Program_review';
 import PlaceReview from '../screens/practice/place_review';
 import Practice1 from '../screens/practice/Program_detail';
+=======
+import Practice from '../screens/practice/Practice';
+import PlaceReview from '../screens/practice/place_review';
+import Practice1 from '../screens/practice/Practice_detail page';
+>>>>>>> Stashed changes
 import PlaceDetailScreen from '../screens/practice/PlaceDetailScreen';
 import MyReviewList from '../screens/mypage/MyReviewList';
 import MyPage from '../screens/mypage/MyPage';
@@ -67,6 +73,7 @@ export type AppStackParamList = {
   PlaceReview: { placeId: string; placeName?: string };
   PracticeDetail: {tourProgramId: number; refresh?: boolean; selectedLanguage?: string};
   PlaceDetail: {placeName: string; placeDescription: string; lat: number; lon: number; placeId?: string; language?: string; tourProgramId?: number};
+<<<<<<< Updated upstream
   // IamportPayment: {
   //   userCode: string;
   //   data: {
@@ -80,6 +87,21 @@ export type AppStackParamList = {
   //     buyer_email: string;
   //   };
   // };
+=======
+  IamportPayment: {
+    userCode: string;
+    data: {
+      pg: string;
+      pay_method: string;
+      name: string;
+      amount: number;
+      merchant_uid: string;
+      buyer_name: string;
+      buyer_tel: string;
+      buyer_email: string;
+    };
+  };
+>>>>>>> Stashed changes
   CalendarHome: undefined;
   ChatMain: undefined;
   ChatRoom: {roomId: string; userId?: number};

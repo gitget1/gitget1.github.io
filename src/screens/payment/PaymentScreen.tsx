@@ -28,9 +28,12 @@ const PaymentScreen = () => {
   // route params에서 투어 데이터 받아오기
   const tourData = route.params?.tourData as any;
   const tourProgramId = route.params?.tourProgramId as number;
+<<<<<<< Updated upstream
 
   // 사용자 정보 상태
   const [userInfo, setUserInfo] = useState<any>(null);
+=======
+>>>>>>> Stashed changes
   const unlockSchedule = route.params?.unlockSchedule as boolean;
   const resultParam = route.params?.result as 'success' | 'fail' | undefined;
 
@@ -83,12 +86,24 @@ const PaymentScreen = () => {
 
   // guidePrice가 0인 경우 기본값 설정
   const effectiveGuidePrice = localTourData?.guidePrice > 0 ? localTourData.guidePrice : 50000;
+<<<<<<< Updated upstream
 
   // 인원수에 따라 자동으로 가격 계산
   const totalPrice = effectiveGuidePrice * people;
 
   console.log('💰 totalPrice 계산:', {
     people,
+=======
+  
+  // appliedPeople이 null인 경우 기본값 설정
+  const effectiveAppliedPeople = appliedPeople || 1;
+
+  const totalPrice = effectiveGuidePrice * effectiveAppliedPeople;
+
+  console.log('💰 totalPrice 계산:', {
+    appliedPeople,
+    effectiveAppliedPeople,
+>>>>>>> Stashed changes
     guidePrice: localTourData?.guidePrice,
     effectiveGuidePrice,
     totalPrice,
@@ -146,7 +161,11 @@ const PaymentScreen = () => {
     }
   }, [tourData]);
 
+<<<<<<< Updated upstream
   // 투어 데이터 가져오기 함수 (최적화된 버전)
+=======
+  // 투어 데이터 가져오기 함수
+>>>>>>> Stashed changes
   const fetchTourData = async () => {
     try {
       const token = await AsyncStorage.getItem('accessToken');
@@ -164,13 +183,22 @@ const PaymentScreen = () => {
             'Content-Type': 'application/json',
             Authorization: `Bearer ${cleanToken}`,
           },
+<<<<<<< Updated upstream
           timeout: 5000, // 타임아웃을 5초로 단축
+=======
+          timeout: 10000,
+>>>>>>> Stashed changes
         },
       );
 
       if (response.data.status === 'OK') {
         const fetchedTourData = response.data.data;
+<<<<<<< Updated upstream
         console.log('🟢 투어 데이터 가져오기 성공');
+=======
+        // tourData state를 업데이트하거나 직접 사용
+        console.log('🟢 투어 데이터 가져오기 성공:', fetchedTourData);
+>>>>>>> Stashed changes
         setLocalTourData(fetchedTourData);
       } else {
         throw new Error(response.data.message || '투어 정보를 불러오는데 실패했습니다.');
@@ -191,7 +219,10 @@ const PaymentScreen = () => {
     setUserId(1); // 기본값으로 즉시 설정
   }, []);
 
+<<<<<<< Updated upstream
 
+=======
+>>>>>>> Stashed changes
   const handlePayment = () => {
     if (!localTourData) {
       Alert.alert('오류', '투어 정보를 찾을 수 없습니다.');
@@ -204,7 +235,11 @@ const PaymentScreen = () => {
     }
 
     console.log('🧮 최종 totalPrice:', totalPrice);
+<<<<<<< Updated upstream
     console.log('📌 people:', people);
+=======
+    console.log('📌 effectiveAppliedPeople:', effectiveAppliedPeople);
+>>>>>>> Stashed changes
     console.log('🎯 localTourData:', localTourData);
 
     const merchantUid = `merchant_${new Date().getTime()}`;
@@ -225,6 +260,7 @@ const PaymentScreen = () => {
 
     // 서버로 전송할 예약 데이터 (ReservationRequestDTO 구조에 맞춤)
     const reservationData = {
+<<<<<<< Updated upstream
       numOfPeople: people,
       guideStartDate: `${year}-${String(month).padStart(2, '0')}-${String(
         day,
@@ -238,6 +274,22 @@ const PaymentScreen = () => {
       totalPrice: totalPrice,
       // 결제 완료 후 아임포트에서 받을 값들
       impUid: '', // 결제 완료 후 채워짐
+=======
+      reservation: {
+        tourProgramId: localTourData.tourProgramId || localTourData.id,
+        userId: userId,
+        numOfPeople: effectiveAppliedPeople,
+        totalPrice: totalPrice,
+        guideStartDate: `${year}-${String(month).padStart(2, '0')}-${String(
+          day,
+        ).padStart(2, '0')}T10:00:00`,
+        guideEndDate: `${year}-${String(month).padStart(2, '0')}-${String(
+          day,
+        ).padStart(2, '0')}T13:00:00`,
+        paymentMethod: 'card', // 기본값으로 카드 결제 사용
+      },
+      impUid: '', // 결제 완료 후 아임포트에서 받을 값
+>>>>>>> Stashed changes
       merchantUid: merchantUid, // 가맹점 주문 번호
       userId: userInfo?.data?.id || userId, // 실제 사용자 ID 사용
     };
@@ -297,7 +349,11 @@ const PaymentScreen = () => {
   };
 
 
+<<<<<<< Updated upstream
   // tourData가 없으면 로딩 표시 (더 빠른 로딩)
+=======
+  // tourData가 없으면 로딩 표시
+>>>>>>> Stashed changes
   if (!localTourData && !result) {
     return (
       <View style={styles.resultContainer}>
@@ -312,10 +368,17 @@ const PaymentScreen = () => {
         style={styles.container}
         contentContainerStyle={{paddingBottom: 120}}>
         <View style={styles.box}>
+<<<<<<< Updated upstream
           <Text style={styles.title}>{localTourData?.title || '천안 (카카오)'}</Text>
           <Text style={styles.region}>{localTourData?.region || '천안시'}</Text>
           <Text style={styles.price}>
             가격: ₩{(localTourData?.guidePrice || 100).toLocaleString()} /인
+=======
+          <Text style={styles.title}>{localTourData?.title || '투어 제목'}</Text>
+          <Text style={styles.region}>{localTourData?.region || '지역 정보'}</Text>
+          <Text style={styles.price}>
+            가격: ₩{effectiveGuidePrice.toLocaleString()} /인
+>>>>>>> Stashed changes
           </Text>
         </View>
 
@@ -367,9 +430,26 @@ const PaymentScreen = () => {
               <Text style={styles.counterBtnText}>+</Text>
             </TouchableOpacity>
           </View>
+<<<<<<< Updated upstream
           <View style={styles.totalPeopleBox}>
             <Text style={styles.totalPeopleText}>
               총 인원: {people}명
+=======
+          {effectiveAppliedPeople > 0 && (
+            <View style={styles.totalPeopleBox}>
+              <Text style={styles.totalPeopleText}>
+                총 인원: {effectiveAppliedPeople}명
+              </Text>
+            </View>
+          )}
+        </View>
+
+        {effectiveAppliedPeople > 0 && (
+          <View style={styles.box}>
+            <Text style={styles.label}>총 금액</Text>
+            <Text style={styles.totalPrice}>
+              {totalPrice.toLocaleString()}원
+>>>>>>> Stashed changes
             </Text>
           </View>
         </View>

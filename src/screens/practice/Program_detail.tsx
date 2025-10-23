@@ -74,6 +74,7 @@ const Program_detail = () => {
   // 모자이크 처리 관련 state
   const [isScheduleMasked, setIsScheduleMasked] = useState(true);
   const [showUnlockModal, setShowUnlockModal] = useState(false);
+<<<<<<< Updated upstream:src/screens/practice/Program_detail.tsx
   const [scheduleUnlocked, setScheduleUnlocked] = useState(false);
 
   // ✅ [Points] 더미 제거. 실제 잔액은 GET 호출 시점에 받아와 계산만 사용
@@ -83,6 +84,11 @@ const Program_detail = () => {
   const [maskType, setMaskType] = useState<
     'dots' | 'stars' | 'squares' | 'blur'
   >('dots');
+=======
+  const [userPoints, setUserPoints] = useState(5000); // 사용자 포인트 (더미 5000)
+  const [scheduleUnlockCost] = useState(100); // 일정 해제 비용(100)
+  const [maskType, setMaskType] = useState<'dots' | 'stars' | 'squares' | 'blur'>('dots'); // 모자이크 타입
+>>>>>>> Stashed changes:src/screens/practice/Practice_detail page.tsx
 
   console.log('🟢 PracticeDetail 화면 - tourProgramId:', tourProgramId);
 
@@ -1014,9 +1020,47 @@ const Program_detail = () => {
   };
 
   const handleReservation = async () => {
+<<<<<<< Updated upstream:src/screens/practice/Program_detail.tsx
     // 즉시 결제 페이지로 이동 (예약 생성은 결제 완료 후 처리)
     console.log('🚀 결제 페이지로 즉시 이동');
     handleGoToPayment();
+=======
+    try {
+      const token = await AsyncStorage.getItem('accessToken');
+      if (!token) {
+        Alert.alert(getTranslatedUIText('알림', selectedLanguage), getTranslatedUIText('로그인이 필요합니다.', selectedLanguage));
+        return;
+      }
+
+      const cleanToken = token.replace('Bearer ', '');
+      const response = await axios.post(
+        'http://124.60.137.10:80/api/reservation',
+        {
+          tourProgramId: tourProgramId,
+        },
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${cleanToken}`,
+          },
+        },
+      );
+
+      if (response.data.status === 'OK') {
+        const reservationId = response.data.data.reservationId;
+        console.log('🟢 예약 생성 성공:', reservationId);
+        handleGoToPayment();
+      } else {
+        console.error('❌ 예약 생성 실패:', response.data);
+        // 예약 생성 실패 시에도 결제 페이지로 이동 (임시 처리)
+        console.log('⚠️ 예약 생성 실패했지만 결제 페이지로 이동합니다.');
+        handleGoToPayment();
+      }
+    } catch (error) {
+      
+      handleGoToPayment();
+    }
+>>>>>>> Stashed changes:src/screens/practice/Practice_detail page.tsx
   };
 
   const handleGoToPayment = () => {
@@ -1148,6 +1192,7 @@ const Program_detail = () => {
       }
       const cleanToken = token.replace('Bearer ', '');
 
+<<<<<<< Updated upstream:src/screens/practice/Program_detail.tsx
       // 1) 잔여 포인트 조회
       const balanceUrl = 'http://124.60.137.10:8083/api/points/balance';
       console.log('🟦 [POINTS][GET] →', balanceUrl, {
@@ -1301,6 +1346,31 @@ const Program_detail = () => {
         '포인트 정보를 불러오지 못했습니다.',
       );
     }
+=======
+    const before = userPoints;
+    const after = userPoints - scheduleUnlockCost;
+
+    Alert.alert(
+      '포인트 결제',
+      `현재 포인트: ${before}\n결제 금액: ${scheduleUnlockCost}\n잔여 포인트: ${after}`,
+      [
+        {text: getTranslatedUIText('취소', selectedLanguage), style: 'cancel'},
+        {
+          text: getTranslatedUIText('해제', selectedLanguage),
+          onPress: () => {
+            setUserPoints(after);
+            setIsScheduleMasked(false);
+            setShowUnlockModal(false);
+            Alert.alert(
+              getTranslatedUIText('성공', selectedLanguage),
+              getTranslatedUIText('일정이 해제되었습니다', selectedLanguage) + '\n' +
+              `잔여 포인트: ${after}`
+            );
+          }
+        }
+      ]
+    );
+>>>>>>> Stashed changes:src/screens/practice/Practice_detail page.tsx
   };
 
   const handleUnlockWithPayment = () => {
